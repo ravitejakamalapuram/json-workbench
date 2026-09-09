@@ -12,7 +12,15 @@ The core experience is local-only: user data is processed in the browser, with h
 
 ## Current status
 
-Project kickoff. See `docs/ROADMAP.md` and `docs/ARCHITECTURE.md`.
+The foundation and first vertical slice are implemented on `feat/m0-foundation`:
+
+- canonical chunk-safe scanner and structural parser for JSON, JSONL, and NDJSON
+- lossless numeric parsing/export, malformed-input diagnostics, progress, and cancellation
+- structure profiling, schema inference, JSON Pointer/JSONPath indexing, validation, and diff APIs
+- serializable pipelines with native transforms, JSONata, an offline jq preview subset, history, telemetry, code generation, and export
+- worker-backed extension ingestion with Tree, Raw, and Table views plus local recipe persistence
+
+Large-file execution is intentionally preview-capped in the UI until benchmark gates demonstrate safe full-file materialization. See `docs/STATUS.md` for the verified scope and remaining release work.
 
 ## Planned stack
 
