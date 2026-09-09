@@ -5,3 +5,7 @@ export * from "./scanner";
 export * from "./tokenizer";
 export * from "./structure";
 export * from "./profile";
+export * from "./schema";
+export * from "./operations";
+export * from "./jsonata";
+export * from "./step-factory";
