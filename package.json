@@ -4,17 +4,24 @@
   "version": "0.1.0",
   "description": "Local-first Chrome workbench for massive JSON manipulation",
   "type": "module",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "npm run build --workspace @json-workbench/extension",
+    "package:check": "node scripts/package-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "bench": "vitest bench packages/core/src/large-data.bench.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check ."
   },
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "devDependencies": {
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
@@ -28,6 +35,7 @@
   },
   "dependencies": {
     "jsonata": "^2.1.0",
+    "lossless-json": "^4.3.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   }

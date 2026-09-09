@@ -1,4 +1,4 @@
-import { JsonSyntaxError, JsonToken, tokenizeJson } from "./tokenizer";
+import { JsonSyntaxError, scanJson, type JsonToken } from "./scanner";
 
 export type JsonContainerType = "object" | "array";
 export type JsonPrimitiveType = "string" | "number" | "boolean" | "null";
@@ -9,10 +9,21 @@ export type JsonStructureEvent =
   | { type: "start-array"; depth: number; offset: number }
   | { type: "end-array"; depth: number; offset: number }
   | { type: "property"; key: string; offset: number }
-  | { type: "primitive"; primitiveType: JsonPrimitiveType; raw: string; offset: number };
+  | {
+      type: "primitive";
+      primitiveType: JsonPrimitiveType;
+      raw: string;
+      offset: number;
+    };
 
-interface ObjectFrame { kind: "object"; state: "key-or-end" | "colon" | "value" | "comma-or-end"; }
-interface ArrayFrame { kind: "array"; state: "value-or-end" | "comma-or-end"; }
+interface ObjectFrame {
+  kind: "object";
+  state: "key-or-end" | "colon" | "value" | "comma-or-end";
+}
+interface ArrayFrame {
+  kind: "array";
+  state: "value-or-end" | "comma-or-end";
+}
 type Frame = ObjectFrame | ArrayFrame;
 
 export interface ParseStructureOptions {
@@ -20,26 +31,53 @@ export interface ParseStructureOptions {
 }
 
 function syntax(message: string, token: JsonToken): JsonSyntaxError {
-  return new JsonSyntaxError(message, token.offset);
+  return new JsonSyntaxError(message, token.startOffset);
 }
 
-function consumeValueToken(token: JsonToken, stack: Frame[]): JsonStructureEvent | undefined {
-  if (token.type === "punctuation") {
-    if (token.value === "{") {
-      stack.push({ kind: "object", state: "key-or-end" });
-      return { type: "start-object", depth: stack.length - 1, offset: token.offset };
-    }
-    if (token.value === "[") {
-      stack.push({ kind: "array", state: "value-or-end" });
-      return { type: "start-array", depth: stack.length - 1, offset: token.offset };
-    }
+function consumeValueToken(
+  token: JsonToken,
+  stack: Frame[],
+): JsonStructureEvent | undefined {
+  if (token.kind === "startObject") {
+    stack.push({ kind: "object", state: "key-or-end" });
+    return {
+      type: "start-object",
+      depth: stack.length - 1,
+      offset: token.startOffset,
+    };
+  }
+  if (token.kind === "startArray") {
+    stack.push({ kind: "array", state: "value-or-end" });
+    return {
+      type: "start-array",
+      depth: stack.length - 1,
+      offset: token.startOffset,
+    };
   }
 
-  if (token.type === "string") return { type: "primitive", primitiveType: "string", raw: token.value, offset: token.offset };
-  if (token.type === "number") return { type: "primitive", primitiveType: "number", raw: token.value, offset: token.offset };
-  if (token.type === "literal") {
-    const primitiveType: JsonPrimitiveType = token.value === "null" ? "null" : "boolean";
-    return { type: "primitive", primitiveType, raw: token.value, offset: token.offset };
+  if (token.kind === "string")
+    return {
+      type: "primitive",
+      primitiveType: "string",
+      raw: token.value ?? "",
+      offset: token.startOffset,
+    };
+  if (token.kind === "number")
+    return {
+      type: "primitive",
+      primitiveType: "number",
+      raw: token.value ?? "",
+      offset: token.startOffset,
+    };
+  if (token.kind === "literal") {
+    const primitiveType: JsonPrimitiveType =
+      token.value === "null" ? "null" : "boolean";
+    return {
+      type: "primitive",
+      primitiveType,
+      raw: token.value ?? "",
+      offset: token.startOffset,
+    };
   }
   return undefined;
 }
@@ -53,7 +91,8 @@ export async function* parseJsonStructure(
   let rootComplete = false;
 
   const checkAbort = () => {
-    if (options.signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
+    if (options.signal?.aborted)
+      throw new DOMException("The operation was aborted.", "AbortError");
   };
 
   const completeValue = () => {
@@ -66,7 +105,7 @@ export async function* parseJsonStructure(
     else parent.state = "comma-or-end";
   };
 
-  for await (const token of tokenizeJson(chunks, options)) {
+  for await (const token of scanJson(chunks, options)) {
     checkAbort();
     const parent = stack[stack.length - 1];
 
@@ -74,7 +113,7 @@ export async function* parseJsonStructure(
 
     if (!parent) {
       if (rootSeen) throw syntax("Unexpected root value", token);
-      if (token.type === "punctuation" && (token.value === "]" || token.value === "}" || token.value === "," || token.value === ":")) {
+      if (["endArray", "endObject", "comma", "colon"].includes(token.kind)) {
         throw syntax("Expected a JSON value", token);
       }
       const event = consumeValueToken(token, stack);
@@ -87,20 +126,26 @@ export async function* parseJsonStructure(
 
     if (parent.kind === "object") {
       if (parent.state === "key-or-end") {
-        if (token.type === "punctuation" && token.value === "}") {
+        if (token.kind === "endObject") {
           const depth = stack.length - 1;
           stack.pop();
-          yield { type: "end-object", depth, offset: token.offset };
+          yield { type: "end-object", depth, offset: token.startOffset };
           completeValue();
           continue;
         }
-        if (token.type !== "string") throw syntax("Expected object property name", token);
+        if (token.kind !== "string")
+          throw syntax("Expected object property name", token);
         parent.state = "colon";
-        yield { type: "property", key: token.value, offset: token.offset };
+        yield {
+          type: "property",
+          key: token.value ?? "",
+          offset: token.startOffset,
+        };
         continue;
       }
       if (parent.state === "colon") {
-        if (token.type !== "punctuation" || token.value !== ":") throw syntax("Expected ':' after property name", token);
+        if (token.kind !== "colon")
+          throw syntax("Expected ':' after property name", token);
         parent.state = "value";
         continue;
       }
@@ -111,14 +156,14 @@ export async function* parseJsonStructure(
         if (event.type === "primitive") completeValue();
         continue;
       }
-      if (token.type === "punctuation" && token.value === ",") {
+      if (token.kind === "comma") {
         parent.state = "key-or-end";
         continue;
       }
-      if (token.type === "punctuation" && token.value === "}") {
+      if (token.kind === "endObject") {
         const depth = stack.length - 1;
         stack.pop();
-        yield { type: "end-object", depth, offset: token.offset };
+        yield { type: "end-object", depth, offset: token.startOffset };
         completeValue();
         continue;
       }
@@ -126,10 +171,10 @@ export async function* parseJsonStructure(
     }
 
     if (parent.state === "value-or-end") {
-      if (token.type === "punctuation" && token.value === "]") {
+      if (token.kind === "endArray") {
         const depth = stack.length - 1;
         stack.pop();
-        yield { type: "end-array", depth, offset: token.offset };
+        yield { type: "end-array", depth, offset: token.startOffset };
         completeValue();
         continue;
       }
@@ -139,14 +184,14 @@ export async function* parseJsonStructure(
       if (event.type === "primitive") completeValue();
       continue;
     }
-    if (token.type === "punctuation" && token.value === ",") {
+    if (token.kind === "comma") {
       parent.state = "value-or-end";
       continue;
     }
-    if (token.type === "punctuation" && token.value === "]") {
+    if (token.kind === "endArray") {
       const depth = stack.length - 1;
       stack.pop();
-      yield { type: "end-array", depth, offset: token.offset };
+      yield { type: "end-array", depth, offset: token.startOffset };
       completeValue();
       continue;
     }
@@ -155,5 +200,6 @@ export async function* parseJsonStructure(
 
   checkAbort();
   if (!rootSeen) throw new JsonSyntaxError("JSON input is empty", 0);
-  if (!rootComplete || stack.length !== 0) throw new JsonSyntaxError("Unexpected end of JSON input", 0);
+  if (!rootComplete || stack.length !== 0)
+    throw new JsonSyntaxError("Unexpected end of JSON input", 0);
 }
