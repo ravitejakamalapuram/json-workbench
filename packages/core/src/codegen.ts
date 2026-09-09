@@ -5,6 +5,7 @@ export type CodegenTarget =
   "jsonata" | "jq" | "javascript" | "typescript" | "python" | "sql";
 
 function json(value: unknown): string {
+  if (value === undefined) return "null";
   return stringifyJsonValue(value as never, true);
 }
 

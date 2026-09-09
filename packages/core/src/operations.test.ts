@@ -131,4 +131,19 @@ describe("native operations", () => {
       "900719925474099312347",
     );
   });
+
+  it("sorts numeric lexemes numerically", async () => {
+    const sort = createNativeStep({
+      id: "sort",
+      type: "sort",
+      enabled: true,
+      config: { key: "value" },
+    });
+    await expect(
+      sort.execute([{ value: 10 }, { value: 2 }], {
+        mode: "full",
+        stepIndex: 0,
+      }),
+    ).resolves.toEqual([{ value: 2 }, { value: 10 }]);
+  });
 });

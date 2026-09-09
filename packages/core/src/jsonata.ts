@@ -11,6 +11,7 @@ export class ExpressionError extends Error {
     message: string,
     readonly expression: string,
     readonly cause?: unknown,
+    readonly position?: number,
   ) {
     super(message);
     this.name = "ExpressionError";
@@ -49,6 +50,12 @@ export function createJsonataStep(
           `JSONata evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
           expression,
           error,
+          typeof error === "object" &&
+            error !== null &&
+            "position" in error &&
+            typeof error.position === "number"
+            ? error.position
+            : undefined,
         );
       }
     },

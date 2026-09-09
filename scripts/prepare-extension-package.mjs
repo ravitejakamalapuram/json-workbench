@@ -1,4 +1,10 @@
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
@@ -18,6 +24,8 @@ copyFileSync(
   resolve(extension, "background.js"),
   resolve(dist, "background.js"),
 );
+const jqWasm = resolve(root, "node_modules/jq-web/jq.wasm");
+if (existsSync(jqWasm)) copyFileSync(jqWasm, resolve(dist, "jq.wasm"));
 console.log(
   `Prepared Chrome package in ${dirname(resolve(dist, "manifest.json"))}`,
 );

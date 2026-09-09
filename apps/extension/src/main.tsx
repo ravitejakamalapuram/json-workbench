@@ -2,14 +2,13 @@ import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { isLosslessNumber } from "lossless-json";
 import {
-  createDefaultStepFactory,
   createPipeline,
   exportData,
   generatePipelineCode,
   parseJsonValue,
   parsePipeline,
   PipelineHistory,
-  runPipeline,
+  suggestPipeline,
   stringifyJsonValue,
   validateJson,
   type JsonObject,
@@ -147,7 +146,7 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const taskRef = useRef<IngestTask | undefined>(undefined);
   const historyRef = useRef(new PipelineHistory(createPipeline()));
-  const runController = useRef<AbortController | undefined>(undefined);
+  const pipelineWorkerRef = useRef<Worker | undefined>(undefined);
   const [fileName, setFileName] = useState<string>();
   const [status, setStatus] = useState("Ready");
   const [progress, setProgress] = useState(0);
@@ -173,6 +172,9 @@ function App() {
   const [diagnostics, setDiagnostics] = useState<
     readonly ValidationDiagnostic[]
   >([]);
+  const [assistantPrompt, setAssistantPrompt] = useState("");
+  const [assistantSuggestion, setAssistantSuggestion] =
+    useState<ReturnType<typeof suggestPipeline>>();
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   const [sortColumn, setSortColumn] = useState<string>();
@@ -304,23 +306,53 @@ function App() {
               return records;
             }
           })();
-    runController.current?.abort();
-    runController.current = new AbortController();
+    pipelineWorkerRef.current?.terminate();
     setPipelineError(undefined);
     setPipelineStats([]);
     setStatus("Running preview…");
     try {
-      const result = await runPipeline(
-        input,
-        pipeline,
-        createDefaultStepFactory(),
-        {
+      const result = await new Promise<JsonValue>((resolve, reject) => {
+        const worker = new Worker(
+          new URL("./pipeline.worker.ts", import.meta.url),
+          { type: "module" },
+        );
+        pipelineWorkerRef.current = worker;
+        worker.onmessage = (message: MessageEvent) => {
+          const data = message.data as {
+            type: "stat" | "progress" | "complete" | "error";
+            stat?: PipelineStepStat;
+            resultText?: string;
+            name?: string;
+            message?: string;
+          };
+          if (data.type === "stat" && data.stat)
+            setPipelineStats((current) => [...current, data.stat!]);
+          else if (data.type === "complete" && data.resultText !== undefined) {
+            worker.terminate();
+            resolve(parseJsonValue(data.resultText));
+          } else if (data.type === "error") {
+            worker.terminate();
+            const error = new Error(
+              data.message ?? "Pipeline execution failed",
+            );
+            error.name = data.name ?? "PipelineError";
+            reject(error);
+          }
+        };
+        worker.onerror = (event) => {
+          worker.terminate();
+          reject(new Error(event.message || "Pipeline worker failed"));
+        };
+        worker.postMessage({
+          type: "run",
+          inputText: stringifyJsonValue(input, false),
+          pipelineText: stringifyJsonValue(
+            pipeline as unknown as JsonValue,
+            false,
+          ),
           mode: runMode,
-          signal: runController.current.signal,
-          onStepStat: (stat) =>
-            setPipelineStats((current) => [...current, stat]),
-        },
-      );
+        });
+      });
       setPipelineResult(result);
       setStatus("Preview ready");
     } catch (error) {
@@ -328,6 +360,24 @@ function App() {
       setStatus("Preview failed");
     }
   }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "o") {
+        event.preventDefault();
+        inputRef.current?.click();
+      } else if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        void runPreview();
+      } else if (event.key === "Escape") {
+        taskRef.current?.cancel();
+        pipelineWorkerRef.current?.terminate();
+        setStatus("Cancelled");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [format, pipeline, rawPreview, records, runMode]);
 
   function addStep(type: string) {
     const defaults: Record<string, JsonObject> = {
@@ -877,6 +927,53 @@ function App() {
                       Schema checks stay local and point back to JSON Pointer
                       paths.
                     </p>
+                  )}
+                </section>
+                <section className="panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">ASSISTANT</span>
+                      <h2>Build a recipe locally</h2>
+                    </div>
+                  </div>
+                  <input
+                    className="assistant-input"
+                    value={assistantPrompt}
+                    onChange={(event) => setAssistantPrompt(event.target.value)}
+                    placeholder="e.g. filter active = true"
+                  />
+                  <button
+                    className="run-button"
+                    type="button"
+                    onClick={() =>
+                      setAssistantSuggestion(suggestPipeline(assistantPrompt))
+                    }
+                  >
+                    Generate suggestion
+                  </button>
+                  {assistantSuggestion && (
+                    <div className="assistant-result">
+                      <p className="muted">{assistantSuggestion.explanation}</p>
+                      <code>
+                        {JSON.stringify(assistantSuggestion.definition.steps)}
+                      </code>
+                      {assistantSuggestion.supported && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updatePipeline(
+                              createPipeline([
+                                ...pipeline.steps,
+                                ...assistantSuggestion.definition.steps,
+                              ]),
+                            );
+                            setStatus("Suggestion added for review");
+                          }}
+                        >
+                          Review and add
+                        </button>
+                      )}
+                    </div>
                   )}
                 </section>
               </aside>

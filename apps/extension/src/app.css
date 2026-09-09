@@ -456,6 +456,37 @@ button:hover {
   background: var(--panel-2);
   font-size: 11px;
 }
+.assistant-input {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 12px 14px 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  outline: 0;
+  color: var(--text);
+  background: var(--panel-2);
+  font-size: 11px;
+}
+.assistant-result {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+.assistant-result code {
+  overflow: auto;
+  padding: 8px;
+  color: #c4b5fd;
+  background: #090e1a;
+  font:
+    10px/1.45 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.assistant-result button {
+  justify-self: start;
+}
 .run-controls .run-button {
   flex: 1;
   width: auto;

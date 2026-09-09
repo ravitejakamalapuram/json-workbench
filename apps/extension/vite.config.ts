@@ -1,13 +1,16 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+
+const extensionRoot = fileURLToPath(new URL(".", import.meta.url));
+const shim = resolve(extensionRoot, "src/browser-shims.ts");
 
 export default defineConfig({
-  plugins: [react()],
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    rollupOptions: {
-      input: "index.html",
+  resolve: {
+    alias: {
+      fs: shim,
+      path: shim,
+      crypto: shim,
     },
   },
 });

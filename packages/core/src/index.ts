@@ -22,3 +22,6 @@ export * from "./paths";
 export * from "./structure-index";
 export * from "./jq";
 export * from "./codegen";
+export * from "./analytics";
+export * from "./assistant";
+export * from "./embedded";

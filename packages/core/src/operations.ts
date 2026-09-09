@@ -219,6 +219,23 @@ function decimalText(value: DecimalValue): string {
     .replace(/\.$/, "");
 }
 
+function compareValues(
+  left: JsonValue | undefined,
+  right: JsonValue | undefined,
+): number {
+  const a = left === undefined ? undefined : decimal(left);
+  const b = right === undefined ? undefined : decimal(right);
+  if (a && b) {
+    const scale = Math.max(a.scale, b.scale);
+    const leftValue = a.coefficient * 10n ** BigInt(scale - a.scale);
+    const rightValue = b.coefficient * 10n ** BigInt(scale - b.scale);
+    return leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
+  }
+  const leftText = comparable(left);
+  const rightText = comparable(right);
+  return leftText === rightText ? 0 : leftText < rightText ? -1 : 1;
+}
+
 function convert(value: JsonValue | undefined, target: string): JsonValue {
   if (value === undefined) return null;
   switch (target) {
@@ -377,9 +394,9 @@ export function createNativeStep(
         const key = stringConfig(config, "key");
         const direction = config.direction === "desc" ? -1 : 1;
         return [...asArray(input)].sort((left, right) => {
-          const a = comparable(getPath(left, key));
-          const b = comparable(getPath(right, key));
-          return (a === b ? 0 : a < b ? -1 : 1) * direction;
+          return (
+            compareValues(getPath(left, key), getPath(right, key)) * direction
+          );
         });
       }
       case "distinct":

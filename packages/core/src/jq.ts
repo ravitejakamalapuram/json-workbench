@@ -19,6 +19,12 @@ export class JqError extends Error {
   }
 }
 
+interface JqRuntime {
+  promised?: { json(value: unknown, filter: string): Promise<unknown> };
+  json?: (value: unknown, filter: string) => unknown;
+  default?: unknown;
+}
+
 function path(value: JsonValue, expression: string): JsonValue | undefined {
   let current: JsonValue | undefined = value;
   for (const segment of expression.replace(/^\./, "").split(".")) {
@@ -144,4 +150,51 @@ export function createJqStep(definition: PipelineStepDefinition): PipelineStep {
       }
     },
   };
+}
+
+export async function evaluateJqWasm(
+  input: JsonValue,
+  expression: string,
+): Promise<JsonValue> {
+  if (!expression.trim())
+    throw new JqError("jq expression is empty", expression);
+  try {
+    const module = (await import("jq-web")) as unknown as {
+      default?: {
+        promised?: { json(value: unknown, filter: string): Promise<unknown> };
+        json(value: unknown, filter: string): unknown;
+      };
+      promised?: { json(value: unknown, filter: string): Promise<unknown> };
+      json?: (value: unknown, filter: string) => unknown;
+    };
+    let runtime = module as unknown as JqRuntime;
+    for (
+      let attempt = 0;
+      attempt < 3 && typeof runtime?.json !== "function";
+      attempt++
+    ) {
+      if (runtime?.default !== undefined && runtime.default !== runtime) {
+        runtime = runtime.default as JqRuntime;
+        continue;
+      }
+      if (Object.prototype.toString.call(runtime) === "[object Promise]") {
+        runtime = (await runtime) as unknown as JqRuntime;
+        continue;
+      }
+      break;
+    }
+    const result = runtime.promised
+      ? await runtime.promised.json(input, expression)
+      : runtime.json
+        ? await runtime.json(input, expression)
+        : undefined;
+    if (result === undefined) throw new Error("jq runtime returned no result");
+    return result as JsonValue;
+  } catch (error) {
+    if (error instanceof JqError) throw error;
+    throw new JqError(
+      `jq/WASM execution failed: ${error instanceof Error ? error.message : String(error)}`,
+      expression,
+    );
+  }
 }

@@ -34,6 +34,8 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "@duckdb/duckdb-wasm": "^1.32.0",
+    "jq-web": "^0.6.2",
     "jsonata": "^2.1.0",
     "lossless-json": "^4.3.1",
     "react": "^19.1.1",

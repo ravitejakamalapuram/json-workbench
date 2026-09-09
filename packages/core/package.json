@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@duckdb/duckdb-wasm": "1.32.0",
+    "jq-web": "0.6.2",
     "lossless-json": "^4.3.1"
   }
 }

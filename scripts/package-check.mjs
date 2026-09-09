@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const dist = join(root, "apps/extension/dist");
-const required = ["manifest.json", "index.html", "background.js"];
+const required = ["manifest.json", "index.html", "background.js", "jq.wasm"];
 for (const file of required)
   if (!existsSync(join(dist, file)))
     throw new Error(`Missing packaged extension file: ${file}`);
