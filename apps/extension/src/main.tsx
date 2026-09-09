@@ -1,12 +1,11 @@
 import { StrictMode, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { JsonStructureEvent } from "@json-workbench/core";
-import { ingestFile } from "./ingest";
+import { ingestFile, type IngestTask } from "./ingest";
 import "./app.css";
 
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const taskRef = useRef<{ cancel: () => void }>();
+  const taskRef = useRef<IngestTask | undefined>(undefined);
   const [fileName, setFileName] = useState<string>();
   const [status, setStatus] = useState("Ready");
   const [progress, setProgress] = useState(0);
@@ -21,7 +20,7 @@ function App() {
     setEventCount(0);
     let count = 0;
     taskRef.current = ingestFile(file, {
-      onEvent: (_event: JsonStructureEvent) => {
+      onEvent: () => {
         count++;
         setEventCount(count);
       },
@@ -67,7 +66,7 @@ function App() {
           />
           {fileName && (
             <div className="progress" aria-live="polite">
-              <div className="progress-bar" style={{ width: `${progress}%` }} />
+              <div className="progress-track"><div className="progress-bar" style={{ width: `${progress}%` }} /></div>
               <span>{progress}% · {eventCount.toLocaleString()} structural events</span>
             </div>
           )}
