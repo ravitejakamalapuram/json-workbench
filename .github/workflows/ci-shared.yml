@@ -13,6 +13,7 @@ jobs:
       manifest-version: "3"
       strict-mode: "true"
       release-compliance: false
-      run-lint: true
-      run-unit-tests: true
-      run-e2e-tests: false
+    run-lint: true
+    run-unit-tests: true
+    run-e2e-tests: true
+    e2e-test-script: tests/smoke_extension.py
