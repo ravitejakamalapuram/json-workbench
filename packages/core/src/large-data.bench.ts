@@ -23,11 +23,14 @@ describe(`large JSONL parser (${targetMegabytes} MB target)`, () => {
     "parse chunked JSONL without materializing records",
     async () => {
       let count = 0;
-      for await (const _record of parseJsonLines(
+      for await (const record of parseJsonLines(
         chunks(records, line),
         totalBytes,
-      ))
+      )) {
+        if (record.index < 0)
+          throw new Error("Parser emitted a negative index");
         count++;
+      }
       if (count !== records)
         throw new Error(`Expected ${records} records, got ${count}`);
     },
