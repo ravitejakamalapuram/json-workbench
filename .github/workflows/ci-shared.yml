@@ -1,0 +1,17 @@
+name: Shared Chrome Extension CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  chrome-extension-ci:
+    uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-ci.yml@main
+    with:
+      extension-dir: apps/extension
+      node-version: '20'
+      manifest-version: '3'
+      strict-mode: 'false'
+      run-lint: false
+      run-unit-tests: true
+      run-e2e-tests: false
