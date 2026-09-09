@@ -15,8 +15,9 @@ describe("tokenizeJson", () => {
   it("tokenizes punctuation, strings, literals and numbers across chunks", async () => {
     const result = await tokens(["{\"id\":9", "007,\"ok\":tr", "ue,\"x\":-1.25e+3}"]);
     expect(result.map((token) => [token.type, token.value])).toEqual([
-      ["punctuation", "{"], ["string", "id"], ["punctuation", ":"], ["number", "9"],
-      ["punctuation", "{"],
+      ["punctuation", "{"], ["string", "id"], ["punctuation", ":"], ["number", "9007"],
+      ["punctuation", ","], ["string", "ok"], ["punctuation", ":"], ["literal", "true"],
+      ["punctuation", ","], ["string", "x"], ["punctuation", ":"], ["number", "-1.25e+3"], ["punctuation", "}"],
     ]);
   });
 
@@ -27,8 +28,8 @@ describe("tokenizeJson", () => {
 
   it("handles escaped strings split across chunks", async () => {
     const result = await tokens(['{"message":"hello \\', '"world\\u263a"}']);
-    expect(result.find((token) => token.type === "string")?.value).toBe("message");
-    expect(result.find((token) => token.type === "string" && token.value !== "message")?.value).toBe('hello \\"world\\u263a');
+    const value = result.find((token) => token.type === "string" && token.value !== "message")?.value;
+    expect(value).toBe('hello \\"world\\u263a');
   });
 
   it("rejects malformed numbers", async () => {
@@ -42,6 +43,6 @@ describe("tokenizeJson", () => {
   it("supports cancellation", async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(tokens(['{}'])).rejects.toMatchObject({ name: "AbortError" });
+    await expect(tokenizeJson(chunks(["{}"]), { signal: controller.signal }).next()).rejects.toMatchObject({ name: "AbortError" });
   });
 });
