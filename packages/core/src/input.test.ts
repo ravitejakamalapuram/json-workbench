@@ -39,18 +39,20 @@ describe("input", () => {
   it("supports cancellation", async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(async () => {
+    const consume = async () => {
       for await (const _ of parseJsonLines(chunks(['{"id":1}\n']), 10, { signal: controller.signal })) {
         // unreachable
       }
-    }).rejects.toMatchObject({ name: "AbortError" });
+    };
+    await expect(consume()).rejects.toMatchObject({ name: "AbortError" });
   });
 
   it("reports malformed records", async () => {
-    await expect(async () => {
+    const consume = async () => {
       for await (const _ of parseJsonLines(chunks(['{"id":oops}\n']), 12)) {
         // consume
       }
-    }).rejects.toMatchObject({ name: "ParseError", offset: 0 });
+    };
+    await expect(consume()).rejects.toMatchObject({ name: "ParseError", offset: 0 });
   });
 });
