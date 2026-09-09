@@ -1,0 +1,18 @@
+name: Shared Chrome Extension CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  chrome-extension-ci:
+    uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-ci.yml@fix/chrome-ci-ts-and-release-gates
+    with:
+      extension-dir: apps/extension
+      node-version: '22'
+      manifest-version: '3'
+      strict-mode: 'true'
+      release-compliance: false
+      run-lint: true
+      run-unit-tests: true
+      run-e2e-tests: false
