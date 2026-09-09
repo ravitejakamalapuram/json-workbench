@@ -1,15 +1,213 @@
-import { StrictMode, useRef, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { isLosslessNumber } from "lossless-json";
+import {
+  createDefaultStepFactory,
+  createPipeline,
+  exportData,
+  generatePipelineCode,
+  parseJsonValue,
+  parsePipeline,
+  PipelineHistory,
+  runPipeline,
+  stringifyJsonValue,
+  validateJson,
+  type JsonObject,
+  type JsonStructureEvent,
+  type JsonValue,
+  type PipelineDefinition,
+  type PipelineStepStat,
+  type JsonSchema,
+  type ValidationDiagnostic,
+} from "@json-workbench/core";
 import { ingestFile, type IngestTask } from "./ingest";
 import "./app.css";
+
+type View = "tree" | "raw" | "table";
+type NodeKind = "object" | "array" | "primitive";
+interface ViewerNode {
+  readonly path: string;
+  readonly key?: string | number;
+  readonly kind: NodeKind;
+  readonly primitiveType?: string;
+  readonly raw?: string;
+  readonly children: ViewerNode[];
+}
+
+function pointerSegment(value: string | number): string {
+  return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+function buildTree(events: readonly JsonStructureEvent[]): ViewerNode[] {
+  const roots: ViewerNode[] = [];
+  const stack: ViewerNode[] = [];
+  const nextIndexes: number[] = [];
+  let pendingKey: string | undefined;
+  const add = (node: ViewerNode) => {
+    const parent = stack.at(-1);
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  };
+  const nodePath = (): string => {
+    const parent = stack.at(-1);
+    if (!parent) return "";
+    const segment = parent.kind === "object" ? pendingKey : nextIndexes.at(-1);
+    if (segment === undefined) return parent.path;
+    return `${parent.path}/${pointerSegment(segment)}`;
+  };
+  for (const event of events) {
+    if (event.type === "property") {
+      pendingKey = event.key;
+      continue;
+    }
+    if (event.type === "start-object" || event.type === "start-array") {
+      const kind = event.type === "start-object" ? "object" : "array";
+      const path = nodePath();
+      const node: ViewerNode = {
+        path,
+        kind,
+        children: [],
+        ...(pendingKey !== undefined ? { key: pendingKey } : {}),
+      };
+      add(node);
+      if (stack.at(-1)?.kind === "array")
+        nextIndexes[nextIndexes.length - 1] = (nextIndexes.at(-1) ?? 0) + 1;
+      pendingKey = undefined;
+      stack.push(node);
+      nextIndexes.push(0);
+      continue;
+    }
+    if (event.type === "primitive") {
+      const path = nodePath();
+      const node: ViewerNode = {
+        path,
+        kind: "primitive",
+        primitiveType: event.primitiveType,
+        raw: event.raw,
+        children: [],
+        ...(pendingKey !== undefined ? { key: pendingKey } : {}),
+      };
+      add(node);
+      if (stack.at(-1)?.kind === "array")
+        nextIndexes[nextIndexes.length - 1] = (nextIndexes.at(-1) ?? 0) + 1;
+      pendingKey = undefined;
+      continue;
+    }
+    if (event.type === "end-object" || event.type === "end-array") {
+      stack.pop();
+      nextIndexes.pop();
+    }
+  }
+  return roots;
+}
+
+function nodeText(node: ViewerNode): string {
+  if (node.kind === "primitive") return node.raw ?? "";
+  return node.kind === "array" ? `Array(${node.children.length})` : "Object";
+}
+
+function visibleNodes(
+  nodes: readonly ViewerNode[],
+  expanded: ReadonlySet<string>,
+  query: string,
+  depth = 0,
+): Array<{ node: ViewerNode; depth: number }> {
+  const result: Array<{ node: ViewerNode; depth: number }> = [];
+  const needle = query.trim().toLowerCase();
+  for (const node of nodes) {
+    const matches =
+      !needle ||
+      node.path.toLowerCase().includes(needle) ||
+      String(node.key ?? "")
+        .toLowerCase()
+        .includes(needle) ||
+      nodeText(node).toLowerCase().includes(needle);
+    const descendants = visibleNodes(node.children, expanded, query, depth + 1);
+    if (matches || descendants.length) result.push({ node, depth });
+    if (expanded.has(node.path) || needle) result.push(...descendants);
+  }
+  return result;
+}
+
+function displayValue(value: JsonValue): string {
+  if (isLosslessNumber(value)) return value.value;
+  return stringifyJsonValue(value, false);
+}
+
+function isObject(value: JsonValue): value is JsonObject {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    !isLosslessNumber(value)
+  );
+}
 
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const taskRef = useRef<IngestTask | undefined>(undefined);
+  const historyRef = useRef(new PipelineHistory(createPipeline()));
+  const runController = useRef<AbortController | undefined>(undefined);
   const [fileName, setFileName] = useState<string>();
   const [status, setStatus] = useState("Ready");
   const [progress, setProgress] = useState(0);
   const [eventCount, setEventCount] = useState(0);
+  const [recordCount, setRecordCount] = useState(0);
+  const [format, setFormat] = useState<"json" | "jsonl">("json");
+  const [events, setEvents] = useState<JsonStructureEvent[]>([]);
+  const [records, setRecords] = useState<JsonValue[]>([]);
+  const [rawPreview, setRawPreview] = useState("");
+  const [view, setView] = useState<View>("tree");
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set([""]));
+  const [pipeline, setPipeline] = useState<PipelineDefinition>(
+    historyRef.current.snapshot.present,
+  );
+  const [pipelineResult, setPipelineResult] = useState<JsonValue>();
+  const [pipelineStats, setPipelineStats] = useState<PipelineStepStat[]>([]);
+  const [pipelineError, setPipelineError] = useState<string>();
+  const [runMode, setRunMode] = useState<"preview" | "live" | "full">(
+    "preview",
+  );
+  const [schemaText, setSchemaText] = useState('{"type":"array"}');
+  const [diagnostics, setDiagnostics] = useState<
+    readonly ValidationDiagnostic[]
+  >([]);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<string>();
+  const [sortDescending, setSortDescending] = useState(false);
+  const [codeTarget, setCodeTarget] = useState<
+    "jsonata" | "jq" | "javascript" | "typescript" | "python" | "sql"
+  >("jsonata");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("json-workbench:pipeline");
+    if (saved) {
+      try {
+        const restored = parsePipeline(saved);
+        historyRef.current = new PipelineHistory(restored);
+        setPipeline(restored);
+      } catch {
+        localStorage.removeItem("json-workbench:pipeline");
+      }
+    }
+    if (localStorage.getItem("json-workbench:theme") === "light")
+      setTheme("light");
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "json-workbench:pipeline",
+      stringifyJsonValue(pipeline as unknown as JsonValue, false),
+    );
+  }, [pipeline]);
+
+  function updatePipeline(next: PipelineDefinition) {
+    setPipeline(historyRef.current.update(next));
+    setPipelineError(undefined);
+  }
 
   function onFile(file: File | undefined) {
     if (!file) return;
@@ -18,69 +216,749 @@ function App() {
     setStatus("Scanning…");
     setProgress(0);
     setEventCount(0);
+    setRecordCount(0);
+    setFormat("json");
+    setEvents([]);
+    setRecords([]);
+    setRawPreview("");
+    setPipelineResult(undefined);
+    setPipelineStats([]);
+    setView("tree");
+    setExpanded(new Set([""]));
     let count = 0;
     taskRef.current = ingestFile(file, {
-      onEvent: () => {
+      onEvent: (event) => {
         count++;
         setEventCount(count);
+        setEvents((current) =>
+          current.length < 5000 ? [...current, event] : current,
+        );
       },
-      onProgress: ({ loaded, total }) => setProgress(total ? Math.round((loaded / total) * 100) : 0),
+      onRecord: ({ index, valueText }) => {
+        setRecordCount(index + 1);
+        if (valueText !== undefined) {
+          try {
+            const value = parseJsonValue(valueText);
+            setRecords((current) =>
+              current.length < 1000 ? [...current, value] : current,
+            );
+          } catch {
+            setPipelineError(`Unable to decode preview record ${index}`);
+          }
+        }
+      },
+      onPreview: ({ text }) => setRawPreview(text),
+      onFormat: setFormat,
+      onProgress: ({ loaded, total }) =>
+        setProgress(total ? Math.round((loaded / total) * 100) : 0),
       onComplete: () => setStatus("Ready to explore"),
-      onError: (error) => setStatus(`${error.name}: ${error.message}`),
+      onError: (error) =>
+        setStatus(
+          `${error.name}: ${error.message}${
+            error.offset === undefined ? "" : ` at byte ${error.offset}`
+          }`,
+        ),
     });
   }
 
+  const tree = useMemo(() => buildTree(events), [events]);
+  const rows = useMemo(
+    () => visibleNodes(tree, expanded, query),
+    [tree, expanded, query],
+  );
+  const tableRecords = useMemo(
+    () =>
+      (pipelineResult !== undefined && Array.isArray(pipelineResult)
+        ? pipelineResult
+        : records
+      ).filter(isObject),
+    [pipelineResult, records],
+  );
+  const columns = useMemo(
+    () => [...new Set(tableRecords.flatMap((record) => Object.keys(record)))],
+    [tableRecords],
+  );
+  const sortedRecords = useMemo(() => {
+    if (!sortColumn) return tableRecords;
+    return [...tableRecords].sort((left, right) => {
+      const a = displayValue(left[sortColumn] ?? null);
+      const b = displayValue(right[sortColumn] ?? null);
+      const result = a === b ? 0 : a < b ? -1 : 1;
+      return sortDescending ? -result : result;
+    });
+  }, [tableRecords, sortColumn, sortDescending]);
+
+  async function copy(text: string) {
+    await navigator.clipboard?.writeText(text);
+    setStatus("Copied to clipboard");
+  }
+
+  async function runPreview() {
+    const input: JsonValue =
+      format === "jsonl"
+        ? records
+        : (() => {
+            try {
+              return parseJsonValue(rawPreview);
+            } catch {
+              return records;
+            }
+          })();
+    runController.current?.abort();
+    runController.current = new AbortController();
+    setPipelineError(undefined);
+    setPipelineStats([]);
+    setStatus("Running preview…");
+    try {
+      const result = await runPipeline(
+        input,
+        pipeline,
+        createDefaultStepFactory(),
+        {
+          mode: runMode,
+          signal: runController.current.signal,
+          onStepStat: (stat) =>
+            setPipelineStats((current) => [...current, stat]),
+        },
+      );
+      setPipelineResult(result);
+      setStatus("Preview ready");
+    } catch (error) {
+      setPipelineError(error instanceof Error ? error.message : String(error));
+      setStatus("Preview failed");
+    }
+  }
+
+  function addStep(type: string) {
+    const defaults: Record<string, JsonObject> = {
+      filter: { field: "id", equals: 1 },
+      map: { mapping: { value: "name" } },
+      add: { key: "reviewed", value: true },
+      jsonata: { expression: "$" },
+      jq: { expression: "." },
+    };
+    updatePipeline(
+      createPipeline([
+        ...pipeline.steps,
+        {
+          id: `${type}-${Date.now()}`,
+          type,
+          enabled: true,
+          config: defaults[type] ?? {},
+        },
+      ]),
+    );
+  }
+
+  function exportCurrent(
+    formatToExport: "json" | "jsonl" | "ndjson" | "csv" | "tsv",
+  ) {
+    const value =
+      pipelineResult ??
+      (format === "jsonl" ? records : parseJsonValue(rawPreview));
+    const text = exportData(value, formatToExport, { pretty: true });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(
+      new Blob([text], { type: "application/json" }),
+    );
+    link.download = `json-workbench.${formatToExport === "json" ? "json" : formatToExport}`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setStatus(`Exported ${formatToExport.toUpperCase()}`);
+  }
+
+  function validateCurrent() {
+    try {
+      const value =
+        pipelineResult ??
+        (format === "jsonl" ? records : parseJsonValue(rawPreview));
+      const schema = parseJsonValue(schemaText) as unknown as JsonSchema;
+      const result = validateJson(value, schema);
+      setDiagnostics(result);
+      setStatus(
+        result.length
+          ? `${result.length} validation issue${result.length === 1 ? "" : "s"}`
+          : "Validation passed",
+      );
+    } catch (error) {
+      setPipelineError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const shellClass = `shell ${theme}`;
   return (
-    <main className="shell">
+    <main className={shellClass}>
       <header className="topbar">
-        <div>
-          <div className="eyebrow">DEVELOPER TOOL</div>
+        <div className="brand">
+          <div className="eyebrow">LOCAL-FIRST DEVELOPER TOOL</div>
           <h1>JSON Workbench</h1>
         </div>
-        <span className="status">{status}</span>
-      </header>
-
-      <section className="workspace">
-        <div
-          className="dropzone"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault();
-            onFile(event.dataTransfer.files[0]);
-          }}
-        >
-          <div className="icon">{fileName ? "✓" : "{}"}</div>
-          <h2>{fileName ?? "Open a JSON file"}</h2>
-          <p>
-            Drag and drop a JSON, JSONL, or NDJSON file here. Processing stays on your device and runs off the UI thread.
-          </p>
-          <button type="button" onClick={() => inputRef.current?.click()}>
-            Choose file
+        <div className="top-actions">
+          <span className="status">{status}</span>
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => {
+              const next = theme === "dark" ? "light" : "dark";
+              setTheme(next);
+              localStorage.setItem("json-workbench:theme", next);
+            }}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? "☼" : "☾"}
           </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".json,.jsonl,.ndjson,application/json"
-            hidden
-            onChange={(event) => onFile(event.target.files?.[0])}
-          />
-          {fileName && (
-            <div className="progress" aria-live="polite">
-              <div className="progress-track"><div className="progress-bar" style={{ width: `${progress}%` }} /></div>
-              <span>{progress}% · {eventCount.toLocaleString()} structural events</span>
+        </div>
+      </header>
+      <section className="workspace">
+        <div className="source-bar">
+          <div className="source-file">
+            <span className="file-icon">{fileName ? "✓" : "{}"}</span>
+            <div>
+              <strong>{fileName ?? "No source loaded"}</strong>
+              <span>
+                {fileName
+                  ? `${format.toUpperCase()} · ${progress}% · ${format === "jsonl" ? `${recordCount.toLocaleString()} records` : `${eventCount.toLocaleString()} structural events`}`
+                  : "Choose a local JSON, JSONL, or NDJSON file"}
+              </span>
             </div>
-          )}
-        </div>
-
-        <div className="pipeline-card">
-          <div>
-            <span className="card-label">PIPELINE</span>
-            <h3>Source → Analyze → Transform → Validate → Export</h3>
           </div>
-          <span className="coming-soon">Foundation</span>
+          <div className="source-actions">
+            <button type="button" onClick={() => inputRef.current?.click()}>
+              Open file
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => taskRef.current?.cancel()}
+            >
+              Cancel
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".json,.jsonl,.ndjson,application/json"
+              hidden
+              onChange={(event) => onFile(event.target.files?.[0])}
+            />
+          </div>
         </div>
+        {!fileName ? (
+          <div
+            className="empty-state"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              onFile(event.dataTransfer.files[0]);
+            }}
+          >
+            <div className="empty-icon">{`{ }`}</div>
+            <h2>Open a JSON dataset</h2>
+            <p>
+              Drop a JSON, JSONL, or NDJSON file to inspect, transform,
+              validate, and export it. Parsing stays on-device and off the UI
+              thread.
+            </p>
+            <button type="button" onClick={() => inputRef.current?.click()}>
+              Choose file
+            </button>
+          </div>
+        ) : (
+          <>
+            <nav className="view-tabs" aria-label="Data views">
+              {(["tree", "raw", "table"] as const).map((item) => (
+                <button
+                  key={item}
+                  className={view === item ? "tab active" : "tab"}
+                  type="button"
+                  onClick={() => setView(item)}
+                >
+                  {item === "tree"
+                    ? "Tree"
+                    : item === "raw"
+                      ? "Raw / code"
+                      : "Table"}
+                </button>
+              ))}
+              <label className="search">
+                <span>⌕</span>
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search values or paths"
+                />
+              </label>
+            </nav>
+            <div className="content-grid">
+              <section className="viewer-card">
+                <div className="card-heading">
+                  <div>
+                    <span className="card-label">
+                      {view === "table"
+                        ? "TABULAR PREVIEW"
+                        : view === "raw"
+                          ? "SOURCE PREVIEW"
+                          : "STRUCTURE"}
+                    </span>
+                    <h2>
+                      {pipelineResult !== undefined
+                        ? "Pipeline result"
+                        : "Source preview"}
+                    </h2>
+                  </div>
+                  <span className="muted">
+                    {format === "jsonl" && records.length < recordCount
+                      ? "first 1,000 records"
+                      : "lossless preview"}
+                  </span>
+                </div>
+                {view === "tree" && (
+                  <div className="tree" role="tree">
+                    {rows.length ? (
+                      rows.map(({ node, depth }) => (
+                        <div
+                          className="tree-row"
+                          role="treeitem"
+                          key={`${node.path}-${depth}`}
+                          style={{ paddingLeft: `${16 + depth * 22}px` }}
+                        >
+                          <button
+                            className="expand"
+                            type="button"
+                            onClick={() =>
+                              setExpanded((current) => {
+                                const next = new Set(current);
+                                if (next.has(node.path)) next.delete(node.path);
+                                else next.add(node.path);
+                                return next;
+                              })
+                            }
+                          >
+                            {node.kind === "primitive"
+                              ? "·"
+                              : expanded.has(node.path)
+                                ? "⌄"
+                                : "›"}
+                          </button>
+                          <span className="type-pill">
+                            {node.kind === "primitive"
+                              ? node.primitiveType?.slice(0, 3)
+                              : node.kind === "array"
+                                ? "arr"
+                                : "obj"}
+                          </span>
+                          <button
+                            className="path-button"
+                            type="button"
+                            onClick={() => copy(node.path || "/")}
+                          >
+                            {node.key === undefined
+                              ? node.path || "$"
+                              : String(node.key)}
+                          </button>
+                          <span
+                            className={`value ${node.primitiveType === "null" ? "null-value" : ""}`}
+                          >
+                            {nodeText(node)}
+                          </span>
+                          <button
+                            className="copy-button"
+                            type="button"
+                            onClick={() =>
+                              copy(
+                                node.kind === "primitive"
+                                  ? (node.raw ?? "")
+                                  : node.path || "/",
+                              )
+                            }
+                            aria-label="Copy value"
+                          >
+                            ⧉
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="no-results">
+                        No preview rows yet. The parser may still be working, or
+                        the input is malformed.
+                      </div>
+                    )}
+                  </div>
+                )}
+                {view === "raw" && (
+                  <pre className="raw-view">
+                    {rawPreview || "No raw preview available."}
+                  </pre>
+                )}
+                {view === "table" && (
+                  <TableView
+                    records={sortedRecords}
+                    columns={columns}
+                    hiddenColumns={hiddenColumns}
+                    selectedRows={selectedRows}
+                    onToggleColumn={(column) =>
+                      setHiddenColumns((current) => {
+                        const next = new Set(current);
+                        if (next.has(column)) next.delete(column);
+                        else next.add(column);
+                        return next;
+                      })
+                    }
+                    onSort={(column) => {
+                      if (sortColumn === column)
+                        setSortDescending((current) => !current);
+                      else {
+                        setSortColumn(column);
+                        setSortDescending(false);
+                      }
+                    }}
+                    onSelect={(index) =>
+                      setSelectedRows((current) => {
+                        const next = new Set(current);
+                        if (next.has(index)) next.delete(index);
+                        else next.add(index);
+                        return next;
+                      })
+                    }
+                  />
+                )}
+              </section>
+              <aside className="side-column">
+                <section className="panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">TRANSFORM</span>
+                      <h2>Pipeline</h2>
+                    </div>
+                    <div className="inline-actions">
+                      <button
+                        className="icon-button"
+                        type="button"
+                        disabled={!historyRef.current.snapshot.past.length}
+                        onClick={() => setPipeline(historyRef.current.undo())}
+                      >
+                        ↶
+                      </button>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        disabled={!historyRef.current.snapshot.future.length}
+                        onClick={() => setPipeline(historyRef.current.redo())}
+                      >
+                        ↷
+                      </button>
+                    </div>
+                  </div>
+                  <div className="step-buttons">
+                    <button type="button" onClick={() => addStep("filter")}>
+                      + Filter
+                    </button>
+                    <button type="button" onClick={() => addStep("map")}>
+                      + Map
+                    </button>
+                    <button type="button" onClick={() => addStep("add")}>
+                      + Add
+                    </button>
+                    <button type="button" onClick={() => addStep("jsonata")}>
+                      + JSONata
+                    </button>
+                    <button type="button" onClick={() => addStep("jq")}>
+                      + jq
+                    </button>
+                  </div>
+                  {pipeline.steps.length === 0 ? (
+                    <p className="muted panel-copy">
+                      Add a step to preview a reproducible transformation.
+                      Disabled steps remain in the saved recipe.
+                    </p>
+                  ) : (
+                    <div className="steps">
+                      {pipeline.steps.map((step, index) => (
+                        <div
+                          className={`step ${step.enabled ? "" : "disabled"}`}
+                          key={step.id}
+                        >
+                          <div className="step-title">
+                            <button
+                              className="toggle"
+                              type="button"
+                              onClick={() =>
+                                setPipeline(
+                                  historyRef.current.setEnabled(
+                                    index,
+                                    !step.enabled,
+                                  ),
+                                )
+                              }
+                            >
+                              {step.enabled ? "●" : "○"}
+                            </button>
+                            <strong>
+                              {index + 1}. {step.type}
+                            </strong>
+                            <span className="muted">
+                              {step.execution?.kind ?? "materializing"}
+                            </span>
+                          </div>
+                          <code>{JSON.stringify(step.config)}</code>
+                          <div className="step-actions">
+                            <button
+                              className="link-button"
+                              type="button"
+                              onClick={() =>
+                                setPipeline(
+                                  historyRef.current.reorder(
+                                    index,
+                                    Math.max(0, index - 1),
+                                  ),
+                                )
+                              }
+                            >
+                              ↑
+                            </button>
+                            <button
+                              className="link-button"
+                              type="button"
+                              onClick={() =>
+                                setPipeline(
+                                  historyRef.current.reorder(
+                                    index,
+                                    Math.min(pipeline.steps.length, index + 1),
+                                  ),
+                                )
+                              }
+                            >
+                              ↓
+                            </button>
+                            <button
+                              className="link-button"
+                              type="button"
+                              onClick={() =>
+                                setPipeline(historyRef.current.duplicate(index))
+                              }
+                            >
+                              Duplicate
+                            </button>
+                            <button
+                              className="link-button"
+                              type="button"
+                              onClick={() =>
+                                setPipeline(historyRef.current.remove(index))
+                              }
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="run-controls">
+                    <label>
+                      Mode{" "}
+                      <select
+                        value={runMode}
+                        onChange={(event) =>
+                          setRunMode(event.target.value as typeof runMode)
+                        }
+                      >
+                        <option value="preview">Preview</option>
+                        <option value="live">Live sample</option>
+                        <option value="full">Full</option>
+                      </select>
+                    </label>
+                    <button
+                      className="run-button"
+                      type="button"
+                      onClick={runPreview}
+                    >
+                      Run preview
+                    </button>
+                  </div>
+                  {pipelineError && (
+                    <div className="error-box">{pipelineError}</div>
+                  )}
+                  {pipelineStats.length > 0 && (
+                    <div className="stats-list">
+                      {pipelineStats.map((stat) => (
+                        <span key={`${stat.stepId}-${stat.status}`}>
+                          {stat.type}: {stat.status} ·{" "}
+                          {stat.durationMs.toFixed(1)}ms
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </section>
+                <section className="panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">EXPORT</span>
+                      <h2>Download result</h2>
+                    </div>
+                  </div>
+                  <div className="export-grid">
+                    {(["json", "jsonl", "ndjson", "csv", "tsv"] as const).map(
+                      (item) => (
+                        <button
+                          className="secondary"
+                          type="button"
+                          key={item}
+                          onClick={() => exportCurrent(item)}
+                        >
+                          {item.toUpperCase()}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                  <div className="codegen">
+                    <label>
+                      Generate recipe for{" "}
+                      <select
+                        value={codeTarget}
+                        onChange={(event) =>
+                          setCodeTarget(event.target.value as typeof codeTarget)
+                        }
+                      >
+                        <option value="jsonata">JSONata</option>
+                        <option value="jq">jq</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="typescript">TypeScript</option>
+                        <option value="python">Python</option>
+                        <option value="sql">SQL</option>
+                      </select>
+                    </label>
+                    <pre>{generatePipelineCode(pipeline, codeTarget)}</pre>
+                    <button
+                      className="secondary"
+                      type="button"
+                      onClick={() =>
+                        copy(generatePipelineCode(pipeline, codeTarget))
+                      }
+                    >
+                      Copy generated code
+                    </button>
+                  </div>
+                </section>
+                <section className="panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">VALIDATE</span>
+                      <h2>JSON Schema</h2>
+                    </div>
+                  </div>
+                  <textarea
+                    className="schema-input"
+                    value={schemaText}
+                    onChange={(event) => setSchemaText(event.target.value)}
+                    spellCheck={false}
+                  />
+                  <button
+                    className="run-button"
+                    type="button"
+                    onClick={validateCurrent}
+                  >
+                    Validate current result
+                  </button>
+                  {diagnostics.length ? (
+                    <div className="diagnostic-list">
+                      {diagnostics.slice(0, 30).map((diagnostic) => (
+                        <button
+                          className="diagnostic"
+                          type="button"
+                          key={`${diagnostic.pointer}-${diagnostic.keyword}`}
+                          onClick={() => setQuery(diagnostic.pointer)}
+                        >
+                          <strong>{diagnostic.pointer}</strong>{" "}
+                          {diagnostic.message}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted panel-copy">
+                      Schema checks stay local and point back to JSON Pointer
+                      paths.
+                    </p>
+                  )}
+                </section>
+              </aside>
+            </div>
+          </>
+        )}
       </section>
     </main>
+  );
+}
+
+function TableView({
+  records,
+  columns,
+  hiddenColumns,
+  selectedRows,
+  onToggleColumn,
+  onSort,
+  onSelect,
+}: {
+  records: JsonObject[];
+  columns: string[];
+  hiddenColumns: ReadonlySet<string>;
+  selectedRows: ReadonlySet<number>;
+  onToggleColumn: (column: string) => void;
+  onSort: (column: string) => void;
+  onSelect: (index: number) => void;
+}) {
+  const visibleColumns = columns.filter((column) => !hiddenColumns.has(column));
+  return (
+    <div className="table-wrap">
+      <div className="column-controls">
+        {columns.map((column) => (
+          <label key={column}>
+            <input
+              type="checkbox"
+              checked={!hiddenColumns.has(column)}
+              onChange={() => onToggleColumn(column)}
+            />
+            {column}
+          </label>
+        ))}
+      </div>
+      {records.length ? (
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              {visibleColumns.map((column) => (
+                <th key={column}>
+                  <button
+                    className="table-sort"
+                    type="button"
+                    onClick={() => onSort(column)}
+                  >
+                    {column} ↕
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((record, index) => (
+              <tr
+                className={selectedRows.has(index) ? "selected" : ""}
+                key={index}
+                onClick={() => onSelect(index)}
+              >
+                <td>{index + 1}</td>
+                {visibleColumns.map((column) => (
+                  <td key={column}>{displayValue(record[column] ?? null)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="no-results">
+          Table view is available for arrays of object records.
+        </div>
+      )}
+    </div>
   );
 }
 
