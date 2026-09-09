@@ -16,7 +16,6 @@ self.onmessage = async (message: MessageEvent<IngestRequest>) => {
   const reader = file.stream().getReader();
   const decoder = new TextDecoder();
   let loaded = 0;
-
   async function* chunks(): AsyncGenerator<string> {
     while (true) {
       const result = await reader.read();
@@ -28,13 +27,14 @@ self.onmessage = async (message: MessageEvent<IngestRequest>) => {
     const tail = decoder.decode();
     if (tail) yield tail;
   }
-
   try {
     for await (const event of parseJsonStructure(chunks())) post({ type: "event", event });
     post({ type: "complete" });
   } catch (error) {
     const err = error as Error & { offset?: number };
-    post({ type: "error", name: err.name || "Error", message: err.message, offset: err.offset });
+    const response: IngestResponse = { type: "error", name: err.name || "Error", message: err.message };
+    if (err.offset !== undefined) Object.assign(response, { offset: err.offset });
+    post(response);
   } finally {
     reader.releaseLock();
   }
