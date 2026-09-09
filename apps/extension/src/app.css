@@ -25,3 +25,6 @@ button:hover { background: #6366f1; }
 .pipeline-card { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 18px; padding: 20px 22px; border: 1px solid #1f2937; border-radius: 14px; background: #0f172a; }
 h3 { margin: 7px 0 0; font-size: 14px; font-weight: 550; color: #cbd5e1; }
 .coming-soon { color: #64748b; font-size: 12px; }
+.progress { width: min(560px, 100%); margin-top: 24px; color: #94a3b8; font-size: 12px; }
+.progress-track { height: 6px; overflow: hidden; margin-bottom: 8px; border-radius: 999px; background: #1f2937; }
+.progress-bar { height: 100%; border-radius: inherit; background: #6366f1; transition: width .15s ease; }
