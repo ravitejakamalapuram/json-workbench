@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "JSON Workbench",
+  "version": "0.1.0",
+  "description": "Local-first developer workbench for exploring and transforming large JSON data.",
+  "action": {
+    "default_title": "Open JSON Workbench"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "permissions": ["sidePanel", "storage"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}
