@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   chrome-extension-ci:
     uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-ci.yml@a71d52b8a7c6f7ee6741603b479770db78dffc6b
