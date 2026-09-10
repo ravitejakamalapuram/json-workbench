@@ -35,7 +35,7 @@ criteria are met.
 ## Browser, integrations, and release hardening
 
 - [x] Minimal MV3 permissions and active-tab JSON-page import
-- [ ] Opt-in network-response body capture with its permission and privacy UX
+- [x] Opt-in network-response body capture with one-shot debugger permission, automatic detach, and privacy UX
 - [ ] VS Code/CLI package reusing the pipeline contract
 - [x] Playwright packaged-app smoke path and shared CI E2E gate
 - [ ] Broader primary-workflow E2E matrix, accessibility audit, browser compatibility matrix, store assets, and opt-in telemetry design

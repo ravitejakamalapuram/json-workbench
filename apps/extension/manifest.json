@@ -10,6 +10,7 @@
     "default_path": "index.html"
   },
   "permissions": ["activeTab", "sidePanel", "storage"],
+  "optional_permissions": ["debugger"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

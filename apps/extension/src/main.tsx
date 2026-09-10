@@ -40,6 +40,38 @@ interface ViewerNode {
   readonly children: ViewerNode[];
 }
 
+interface BridgeResponse {
+  readonly ok?: boolean;
+  readonly name?: string;
+  readonly text?: string;
+  readonly error?: string;
+}
+
+interface ChromeBridge {
+  readonly runtime?: {
+    sendMessage: (
+      message: unknown,
+      callback: (response?: BridgeResponse) => void,
+    ) => void;
+  };
+  readonly permissions?: {
+    request: (
+      permissions: { permissions: string[] },
+      callback: (granted: boolean) => void,
+    ) => void;
+  };
+  readonly tabs?: {
+    query: (
+      query: { active: boolean; lastFocusedWindow: boolean },
+      callback: (tabs: Array<{ id?: number }>) => void,
+    ) => void;
+  };
+}
+
+function chromeBridge(): ChromeBridge | undefined {
+  return (globalThis as typeof globalThis & { chrome?: ChromeBridge }).chrome;
+}
+
 function pointerSegment(value: string | number): string {
   return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
 }
@@ -335,23 +367,7 @@ function App() {
   }
 
   function readActiveJson() {
-    const runtime = (
-      globalThis as typeof globalThis & {
-        chrome?: {
-          runtime?: {
-            sendMessage: (
-              message: unknown,
-              callback: (response?: {
-                ok?: boolean;
-                name?: string;
-                text?: string;
-                error?: string;
-              }) => void,
-            ) => void;
-          };
-        };
-      }
-    ).chrome?.runtime;
+    const runtime = chromeBridge()?.runtime;
     if (!runtime) {
       setPipelineError("The active-tab bridge is only available in Chrome");
       return;
@@ -368,6 +384,48 @@ function App() {
           type: "application/json",
         }),
       );
+    });
+  }
+
+  function captureNextJsonResponse() {
+    const bridge = chromeBridge();
+    if (!bridge?.runtime || !bridge.permissions || !bridge.tabs) {
+      setPipelineError(
+        "Network capture is only available in the Chrome extension",
+      );
+      return;
+    }
+    setStatus("Requesting one-time network capture permission…");
+    bridge.permissions.request({ permissions: ["debugger"] }, (granted) => {
+      if (!granted) {
+        setStatus("Network capture permission was not granted");
+        return;
+      }
+      bridge.tabs!.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+        const tabId = tabs[0]?.id;
+        if (tabId === undefined) {
+          setPipelineError("No active tab was found");
+          return;
+        }
+        setStatus("Waiting for the next JSON response…");
+        bridge.runtime!.sendMessage(
+          { type: "capture-next-json-response", tabId },
+          (response) => {
+            if (!response?.ok || response.text === undefined) {
+              setPipelineError(response?.error ?? "Network capture failed");
+              setStatus("Network capture failed");
+              return;
+            }
+            onFile(
+              new File(
+                [response.text],
+                response.name ?? "captured-response.json",
+                { type: "application/json" },
+              ),
+            );
+          },
+        );
+      });
     });
   }
 
@@ -687,6 +745,13 @@ function App() {
               onClick={readActiveJson}
             >
               Active JSON tab
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              onClick={captureNextJsonResponse}
+            >
+              Capture next JSON response
             </button>
             <button className="secondary" type="button" onClick={cancelWork}>
               Cancel
