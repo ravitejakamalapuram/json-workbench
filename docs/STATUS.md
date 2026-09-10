@@ -16,7 +16,7 @@ The chunked JSONL benchmark was run locally on 2026-09-10 with one iteration per
 
 ## Deliberate limitations
 
-- The UI preview is capped at 5,000 structural events and 1,000 records to protect responsiveness. Full-file execution still needs a dedicated execution worker with backpressure and memory accounting.
+- The UI preview is capped at 5,000 structural events and 1,000 records to protect responsiveness. Explicit Full pipeline mode now reads the source in a dedicated worker, but global/materializing operations still need backpressure and memory accounting for very large results.
 - jq/WASM and DuckDB-WASM are available as optional lazy engines; the default UI stays dependency-light and the DuckDB query surface is currently a core API rather than a dedicated UI tab.
 - Network-response capture, Monaco editing, and broader behavioral E2E coverage beyond the packaged-app smoke path are not part of this branch.
 - Benchmarks are opt-in; run `npm run bench` for the 10 MB default or `JSON_WORKBENCH_BENCH_MB=100 npm run bench` for a larger run. Results must be recorded before making multi-GB support claims.

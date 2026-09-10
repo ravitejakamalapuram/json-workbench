@@ -2,6 +2,7 @@ import {
   parse as parseLossless,
   stringify as stringifyLossless,
 } from "lossless-json";
+import { parseJsonStructure, type JsonStructureEvent } from "./structure";
 import type { JsonValue } from "./types";
 
 export type InputFormat = "json" | "jsonl";
@@ -27,6 +28,7 @@ export interface ParsedRecord {
 
 export interface ParseOptions {
   readonly signal?: AbortSignal;
+  readonly totalBytes?: number;
   readonly onProgress?: (progress: ParseProgress) => void;
 }
 
@@ -112,6 +114,86 @@ export function createInputSource(
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted)
     throw new DOMException("The operation was aborted.", "AbortError");
+}
+
+function primitiveFromStructure(
+  event: Extract<JsonStructureEvent, { type: "primitive" }>,
+): JsonValue {
+  if (event.primitiveType === "string") return event.raw;
+  return parseJsonValue(event.raw);
+}
+
+/**
+ * Materialize one JSON document from the canonical streaming structure parser.
+ * This is intentionally separate from `parseJsonValue`: callers that choose
+ * full execution can retain streaming reads, cancellation, and progress while
+ * making the materialization trade-off explicit at the execution boundary.
+ */
+export async function readJsonDocumentStream(
+  chunks: AsyncIterable<string>,
+  options: ParseOptions = {},
+): Promise<JsonValue> {
+  let root: JsonValue | undefined;
+  const stack: Array<{
+    value: JsonValue[] | Record<string, JsonValue>;
+    key?: string;
+  }> = [];
+  let pendingKey: string | undefined;
+  let bytesRead = 0;
+  const encoder = new TextEncoder();
+
+  const append = (value: JsonValue): void => {
+    const frame = stack.at(-1);
+    if (!frame) {
+      if (root !== undefined) throw new ParseError("Multiple root values", 0);
+      root = value;
+      return;
+    }
+    if (Array.isArray(frame.value)) {
+      frame.value.push(value);
+      return;
+    }
+    if (pendingKey === undefined)
+      throw new ParseError("Object value is missing its property name", 0);
+    frame.value[pendingKey] = value;
+    pendingKey = undefined;
+  };
+
+  async function* trackedChunks(): AsyncGenerator<string> {
+    for await (const chunk of chunks) {
+      throwIfAborted(options.signal);
+      bytesRead += encoder.encode(chunk).byteLength;
+      yield chunk;
+      options.onProgress?.({
+        bytesRead,
+        totalBytes: options.totalBytes ?? 0,
+        recordsEmitted: root === undefined ? 0 : 1,
+      });
+    }
+  }
+
+  for await (const event of parseJsonStructure(trackedChunks(), options)) {
+    throwIfAborted(options.signal);
+    if (event.type === "property") {
+      pendingKey = event.key;
+    } else if (event.type === "start-object") {
+      const value: Record<string, JsonValue> = {};
+      append(value);
+      stack.push({ value });
+    } else if (event.type === "start-array") {
+      const value: JsonValue[] = [];
+      append(value);
+      stack.push({ value });
+    } else if (event.type === "primitive") {
+      append(primitiveFromStructure(event));
+    } else if (event.type === "end-object" || event.type === "end-array") {
+      stack.pop();
+    }
+  }
+  throwIfAborted(options.signal);
+  if (root === undefined || stack.length !== 0)
+    throw new ParseError("JSON input is empty or incomplete", bytesRead);
+  return root;
 }
 
 export async function* parseJsonLines(

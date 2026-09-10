@@ -4,6 +4,7 @@ import {
   detectInputFormat,
   parseJsonLines,
   parseJsonValue,
+  readJsonDocumentStream,
   stringifyJsonValue,
 } from "./input";
 
@@ -79,5 +80,28 @@ describe("input", () => {
     const source =
       '{"integer":900719925474099312345,"decimal":-123.4500000000000000001e+8}';
     expect(stringifyJsonValue(parseJsonValue(source))).toBe(source);
+  });
+
+  it("materializes a lossless document from arbitrarily split chunks", async () => {
+    const progress: number[] = [];
+    const value = await readJsonDocumentStream(
+      chunks(['{"items":[{"n":9007199254', '740993,"text":"hel', 'lo"}]}']),
+      {
+        totalBytes: 49,
+        onProgress: (update) => progress.push(update.bytesRead),
+      },
+    );
+    expect(stringifyJsonValue(value)).toBe(
+      '{"items":[{"n":9007199254740993,"text":"hello"}]}',
+    );
+    expect(progress.at(-1)).toBe(49);
+  });
+
+  it("cancels a streaming document materialization", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      readJsonDocumentStream(chunks(["{}"]), { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
   });
 });

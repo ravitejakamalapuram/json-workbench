@@ -83,6 +83,7 @@ export async function runPipeline(
     };
     options.onStepStart?.(index, definitionStep);
     const startedAt = performance.now();
+    const inputItems = Array.isArray(value) ? value.length : undefined;
 
     try {
       value = await step.execute(value, context);
@@ -93,6 +94,7 @@ export async function runPipeline(
         type: definitionStep.type,
         status: "completed",
         durationMs: performance.now() - startedAt,
+        ...(inputItems === undefined ? {} : { inputItems }),
         ...(Array.isArray(value) ? { outputItems: value.length } : {}),
       });
       options.onProgress?.({
@@ -107,6 +109,7 @@ export async function runPipeline(
         type: definitionStep.type,
         status: "failed",
         durationMs: performance.now() - startedAt,
+        ...(inputItems === undefined ? {} : { inputItems }),
         error: error instanceof Error ? error.message : String(error),
       });
       if (error instanceof PipelineError) throw error;

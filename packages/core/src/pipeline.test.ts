@@ -72,7 +72,11 @@ describe("runPipeline", () => {
   });
 
   it("reports step timing and progress", async () => {
-    const stats: string[] = [];
+    const stats: Array<{
+      status: string;
+      inputItems?: number;
+      outputItems?: number;
+    }> = [];
     const progress: number[] = [];
     await runPipeline(
       [1],
@@ -81,11 +85,17 @@ describe("runPipeline", () => {
       ]),
       factory,
       {
-        onStepStat: (stat) => stats.push(stat.status),
+        onStepStat: (stat) => stats.push(stat),
         onProgress: (event) => progress.push(event.completed),
       },
     );
-    expect(stats).toEqual(["completed"]);
+    expect(stats).toEqual([
+      expect.objectContaining({
+        status: "completed",
+        inputItems: 1,
+        outputItems: 2,
+      }),
+    ]);
     expect(progress).toEqual([1]);
   });
 });

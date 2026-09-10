@@ -20,7 +20,7 @@ def main() -> None:
     )
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as source:
-            source.write('{"users":[{"id":900719925474099312345,"name":"Ada"}]}')
+            source.write('[{"id":900719925474099312345,"name":"Ada"}]')
             source_path = source.name
         try:
             with sync_playwright() as playwright:
@@ -31,10 +31,19 @@ def main() -> None:
                 page.locator('input[type="file"]').set_input_files(source_path)
                 page.get_by_text("Ready to explore").wait_for(timeout=15_000)
                 assert page.get_by_role("button", name="Tree").is_visible()
+                page.locator(".expand").nth(1).click()
+                page.get_by_text("900719925474099312345").wait_for(timeout=5_000)
+                page.get_by_placeholder("Search values or paths").fill("Ada")
                 page.get_by_role("button", name="Table").click()
-                page.get_by_text("Table view is available for arrays of object records.").wait_for(timeout=5_000)
+                assert page.get_by_text("Ada").is_visible()
+                page.get_by_role("button", name="+ Add").click()
+                page.locator("select").first.select_option("full")
+                page.get_by_role("button", name="Run preview").click()
+                page.get_by_text("Preview ready").wait_for(timeout=15_000)
+                page.get_by_text("900719925474099312345").wait_for(timeout=5_000)
+                page.get_by_role("button", name="JSON", exact=True).click()
                 page.get_by_role("button", name="Tree").click()
-                assert page.get_by_text("users").is_visible()
+                page.get_by_text("Ada").wait_for(timeout=5_000)
                 browser.close()
         finally:
             Path(source_path).unlink(missing_ok=True)

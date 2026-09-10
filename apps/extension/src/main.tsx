@@ -1,4 +1,11 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  StrictMode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createRoot } from "react-dom/client";
 import { isLosslessNumber } from "lossless-json";
 import {
@@ -109,19 +116,33 @@ function visibleNodes(
   nodes: readonly ViewerNode[],
   expanded: ReadonlySet<string>,
   query: string,
+  regexSearch = false,
   depth = 0,
 ): Array<{ node: ViewerNode; depth: number }> {
   const result: Array<{ node: ViewerNode; depth: number }> = [];
   const needle = query.trim().toLowerCase();
+  let matcher: RegExp | undefined;
+  if (regexSearch && query.trim()) {
+    try {
+      matcher = new RegExp(query, "i");
+    } catch {
+      matcher = undefined;
+    }
+  }
   for (const node of nodes) {
+    const searchable = `${node.path} ${String(node.key ?? "")} ${nodeText(node)}`;
     const matches =
       !needle ||
-      node.path.toLowerCase().includes(needle) ||
-      String(node.key ?? "")
-        .toLowerCase()
-        .includes(needle) ||
-      nodeText(node).toLowerCase().includes(needle);
-    const descendants = visibleNodes(node.children, expanded, query, depth + 1);
+      (matcher
+        ? matcher.test(searchable)
+        : searchable.toLowerCase().includes(needle));
+    const descendants = visibleNodes(
+      node.children,
+      expanded,
+      query,
+      regexSearch,
+      depth + 1,
+    );
     if (matches || descendants.length) result.push({ node, depth });
     if (expanded.has(node.path) || needle) result.push(...descendants);
   }
@@ -131,6 +152,46 @@ function visibleNodes(
 function displayValue(value: JsonValue): string {
   if (isLosslessNumber(value)) return value.value;
   return stringifyJsonValue(value, false);
+}
+
+function VirtualList<T>({
+  items,
+  itemHeight,
+  height,
+  render,
+}: {
+  items: readonly T[];
+  itemHeight: number;
+  height: number;
+  render: (item: T, index: number) => ReactNode;
+}) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const viewportItems = Math.ceil(height / itemHeight);
+  const overscan = 8;
+  const start = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+  const end = Math.min(items.length, start + viewportItems + overscan * 2);
+  return (
+    <div
+      className="virtual-list"
+      style={{ maxHeight: height, overflowY: "auto" }}
+      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+    >
+      <div style={{ height: items.length * itemHeight, position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: start * itemHeight,
+            left: 0,
+            right: 0,
+          }}
+        >
+          {items
+            .slice(start, end)
+            .map((item, index) => render(item, start + index))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function isObject(value: JsonValue): value is JsonObject {
@@ -144,10 +205,13 @@ function isObject(value: JsonValue): value is JsonObject {
 
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const recipeInputRef = useRef<HTMLInputElement>(null);
   const taskRef = useRef<IngestTask | undefined>(undefined);
   const historyRef = useRef(new PipelineHistory(createPipeline()));
   const pipelineWorkerRef = useRef<Worker | undefined>(undefined);
   const [fileName, setFileName] = useState<string>();
+  const [sourceFile, setSourceFile] = useState<File>();
+  const [pasteText, setPasteText] = useState("");
   const [status, setStatus] = useState("Ready");
   const [progress, setProgress] = useState(0);
   const [eventCount, setEventCount] = useState(0);
@@ -158,6 +222,7 @@ function App() {
   const [rawPreview, setRawPreview] = useState("");
   const [view, setView] = useState<View>("tree");
   const [query, setQuery] = useState("");
+  const [regexSearch, setRegexSearch] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set([""]));
   const [pipeline, setPipeline] = useState<PipelineDefinition>(
     historyRef.current.snapshot.present,
@@ -214,6 +279,7 @@ function App() {
   function onFile(file: File | undefined) {
     if (!file) return;
     taskRef.current?.cancel();
+    setSourceFile(file);
     setFileName(file.name);
     setStatus("Scanning…");
     setProgress(0);
@@ -263,19 +329,65 @@ function App() {
     });
   }
 
+  function loadPastedText() {
+    if (!pasteText.trim()) return;
+    onFile(new File([pasteText], "pasted.json", { type: "application/json" }));
+  }
+
+  function readActiveJson() {
+    const runtime = (
+      globalThis as typeof globalThis & {
+        chrome?: {
+          runtime?: {
+            sendMessage: (
+              message: unknown,
+              callback: (response?: {
+                ok?: boolean;
+                name?: string;
+                text?: string;
+                error?: string;
+              }) => void,
+            ) => void;
+          };
+        };
+      }
+    ).chrome?.runtime;
+    if (!runtime) {
+      setPipelineError("The active-tab bridge is only available in Chrome");
+      return;
+    }
+    setStatus("Reading active JSON tab…");
+    runtime.sendMessage({ type: "read-active-json" }, (response) => {
+      if (!response?.ok || response.text === undefined) {
+        setPipelineError(response?.error ?? "Unable to read the active tab");
+        setStatus("Active tab read failed");
+        return;
+      }
+      onFile(
+        new File([response.text], response.name ?? "active.json", {
+          type: "application/json",
+        }),
+      );
+    });
+  }
+
   const tree = useMemo(() => buildTree(events), [events]);
   const rows = useMemo(
-    () => visibleNodes(tree, expanded, query),
-    [tree, expanded, query],
+    () => visibleNodes(tree, expanded, query, regexSearch),
+    [tree, expanded, query, regexSearch],
   );
-  const tableRecords = useMemo(
-    () =>
-      (pipelineResult !== undefined && Array.isArray(pipelineResult)
-        ? pipelineResult
-        : records
-      ).filter(isObject),
-    [pipelineResult, records],
-  );
+  const sourceValue = useMemo<JsonValue>(() => {
+    if (format === "jsonl") return records;
+    try {
+      return parseJsonValue(rawPreview);
+    } catch {
+      return records;
+    }
+  }, [format, rawPreview, records]);
+  const tableRecords = useMemo(() => {
+    const value = pipelineResult ?? sourceValue;
+    return (Array.isArray(value) ? value : []).filter(isObject);
+  }, [pipelineResult, sourceValue]);
   const columns = useMemo(
     () => [...new Set(tableRecords.flatMap((record) => Object.keys(record)))],
     [tableRecords],
@@ -296,16 +408,18 @@ function App() {
   }
 
   async function runPreview() {
-    const input: JsonValue =
-      format === "jsonl"
-        ? records
-        : (() => {
-            try {
-              return parseJsonValue(rawPreview);
-            } catch {
-              return records;
-            }
-          })();
+    const input: JsonValue | undefined =
+      runMode === "full"
+        ? undefined
+        : format === "jsonl"
+          ? records
+          : (() => {
+              try {
+                return parseJsonValue(rawPreview);
+              } catch {
+                return records;
+              }
+            })();
     pipelineWorkerRef.current?.terminate();
     setPipelineError(undefined);
     setPipelineStats([]);
@@ -324,10 +438,24 @@ function App() {
             resultText?: string;
             name?: string;
             message?: string;
+            completed?: number;
+            total?: number;
+            stepIndex?: number;
           };
           if (data.type === "stat" && data.stat)
             setPipelineStats((current) => [...current, data.stat!]);
-          else if (data.type === "complete" && data.resultText !== undefined) {
+          else if (
+            data.type === "progress" &&
+            data.stepIndex === -1 &&
+            data.total
+          ) {
+            setStatus(
+              `Reading full file… ${Math.round(((data.completed ?? 0) / data.total) * 100)}%`,
+            );
+          } else if (
+            data.type === "complete" &&
+            data.resultText !== undefined
+          ) {
             worker.terminate();
             resolve(parseJsonValue(data.resultText));
           } else if (data.type === "error") {
@@ -345,7 +473,9 @@ function App() {
         };
         worker.postMessage({
           type: "run",
-          inputText: stringifyJsonValue(input, false),
+          ...(runMode === "full" && sourceFile
+            ? { file: sourceFile }
+            : { inputText: stringifyJsonValue(input ?? [], false) }),
           pipelineText: stringifyJsonValue(
             pipeline as unknown as JsonValue,
             false,
@@ -377,13 +507,27 @@ function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [format, pipeline, rawPreview, records, runMode]);
+  }, [format, pipeline, rawPreview, records, runMode, sourceFile]);
 
   function addStep(type: string) {
     const defaults: Record<string, JsonObject> = {
       filter: { field: "id", equals: 1 },
       map: { mapping: { value: "name" } },
+      pick: { fields: ["id", "name"] },
+      remove: { fields: ["internal"] },
+      rename: { from: "name", to: "label" },
       add: { key: "reviewed", value: true },
+      sort: { field: "id", descending: false },
+      distinct: { field: "id" },
+      deduplicate: { field: "id" },
+      group: { field: "status" },
+      flatten: { prefix: "" },
+      unflatten: { separator: "." },
+      replace: { field: "status", from: "draft", to: "review" },
+      regex: { field: "name", pattern: "^", replacement: "", flags: "g" },
+      "type-convert": { field: "id", target: "string" },
+      extract: { field: "name" },
+      aggregate: { field: "id", operation: "sum" },
       jsonata: { expression: "$" },
       jq: { expression: "." },
     };
@@ -398,6 +542,47 @@ function App() {
         },
       ]),
     );
+  }
+
+  function updateStepConfig(index: number, text: string) {
+    try {
+      const value = parseJsonValue(text);
+      if (!isObject(value)) throw new Error("Step config must be an object");
+      updatePipeline(
+        createPipeline(
+          pipeline.steps.map((step, stepIndex) =>
+            stepIndex === index ? { ...step, config: value } : step,
+          ),
+        ),
+      );
+    } catch (error) {
+      setPipelineError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function exportRecipe() {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(
+      new Blob([stringifyJsonValue(pipeline as unknown as JsonValue, true)], {
+        type: "application/json",
+      }),
+    );
+    link.download = "json-workbench.recipe.json";
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setStatus("Recipe exported");
+  }
+
+  async function importRecipe(file: File | undefined) {
+    if (!file) return;
+    try {
+      const restored = parsePipeline(await file.text());
+      historyRef.current = new PipelineHistory(restored);
+      setPipeline(restored);
+      setStatus("Recipe loaded");
+    } catch (error) {
+      setPipelineError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   function exportCurrent(
@@ -479,6 +664,13 @@ function App() {
             <button
               className="secondary"
               type="button"
+              onClick={readActiveJson}
+            >
+              Active JSON tab
+            </button>
+            <button
+              className="secondary"
+              type="button"
               onClick={() => taskRef.current?.cancel()}
             >
               Cancel
@@ -511,6 +703,33 @@ function App() {
             <button type="button" onClick={() => inputRef.current?.click()}>
               Choose file
             </button>
+            <div className="paste-box">
+              <textarea
+                value={pasteText}
+                onChange={(event) => setPasteText(event.target.value)}
+                placeholder="Or paste JSON / JSONL here"
+                spellCheck={false}
+              />
+              <div className="inline-actions">
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={loadPastedText}
+                >
+                  Load pasted text
+                </button>
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={async () => {
+                    const text = await navigator.clipboard?.readText();
+                    if (text) setPasteText(text);
+                  }}
+                >
+                  Paste from clipboard
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -529,14 +748,22 @@ function App() {
                       : "Table"}
                 </button>
               ))}
-              <label className="search">
+              <div className="search">
                 <span>⌕</span>
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search values or paths"
                 />
-              </label>
+                <label className="regex-toggle">
+                  <input
+                    type="checkbox"
+                    checked={regexSearch}
+                    onChange={(event) => setRegexSearch(event.target.checked)}
+                  />
+                  Regex
+                </label>
+              </div>
             </nav>
             <div className="content-grid">
               <section className="viewer-card">
@@ -564,68 +791,74 @@ function App() {
                 {view === "tree" && (
                   <div className="tree" role="tree">
                     {rows.length ? (
-                      rows.map(({ node, depth }) => (
-                        <div
-                          className="tree-row"
-                          role="treeitem"
-                          key={`${node.path}-${depth}`}
-                          style={{ paddingLeft: `${16 + depth * 22}px` }}
-                        >
-                          <button
-                            className="expand"
-                            type="button"
-                            onClick={() =>
-                              setExpanded((current) => {
-                                const next = new Set(current);
-                                if (next.has(node.path)) next.delete(node.path);
-                                else next.add(node.path);
-                                return next;
-                              })
-                            }
+                      <VirtualList
+                        items={rows}
+                        itemHeight={34}
+                        height={560}
+                        render={({ node, depth }) => (
+                          <div
+                            className="tree-row"
+                            role="treeitem"
+                            key={`${node.path}-${depth}`}
+                            style={{ paddingLeft: `${16 + depth * 22}px` }}
                           >
-                            {node.kind === "primitive"
-                              ? "·"
-                              : expanded.has(node.path)
-                                ? "⌄"
-                                : "›"}
-                          </button>
-                          <span className="type-pill">
-                            {node.kind === "primitive"
-                              ? node.primitiveType?.slice(0, 3)
-                              : node.kind === "array"
-                                ? "arr"
-                                : "obj"}
-                          </span>
-                          <button
-                            className="path-button"
-                            type="button"
-                            onClick={() => copy(node.path || "/")}
-                          >
-                            {node.key === undefined
-                              ? node.path || "$"
-                              : String(node.key)}
-                          </button>
-                          <span
-                            className={`value ${node.primitiveType === "null" ? "null-value" : ""}`}
-                          >
-                            {nodeText(node)}
-                          </span>
-                          <button
-                            className="copy-button"
-                            type="button"
-                            onClick={() =>
-                              copy(
-                                node.kind === "primitive"
-                                  ? (node.raw ?? "")
-                                  : node.path || "/",
-                              )
-                            }
-                            aria-label="Copy value"
-                          >
-                            ⧉
-                          </button>
-                        </div>
-                      ))
+                            <button
+                              className="expand"
+                              type="button"
+                              onClick={() =>
+                                setExpanded((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(node.path))
+                                    next.delete(node.path);
+                                  else next.add(node.path);
+                                  return next;
+                                })
+                              }
+                            >
+                              {node.kind === "primitive"
+                                ? "·"
+                                : expanded.has(node.path)
+                                  ? "⌄"
+                                  : "›"}
+                            </button>
+                            <span className="type-pill">
+                              {node.kind === "primitive"
+                                ? node.primitiveType?.slice(0, 3)
+                                : node.kind === "array"
+                                  ? "arr"
+                                  : "obj"}
+                            </span>
+                            <button
+                              className="path-button"
+                              type="button"
+                              onClick={() => copy(node.path || "/")}
+                            >
+                              {node.key === undefined
+                                ? node.path || "$"
+                                : String(node.key)}
+                            </button>
+                            <span
+                              className={`value ${node.primitiveType === "null" ? "null-value" : ""}`}
+                            >
+                              {nodeText(node)}
+                            </span>
+                            <button
+                              className="copy-button"
+                              type="button"
+                              onClick={() =>
+                                copy(
+                                  node.kind === "primitive"
+                                    ? (node.raw ?? "")
+                                    : node.path || "/",
+                                )
+                              }
+                              aria-label="Copy value"
+                            >
+                              ⧉
+                            </button>
+                          </div>
+                        )}
+                      />
                     ) : (
                       <div className="no-results">
                         No preview rows yet. The parser may still be working, or
@@ -696,6 +929,30 @@ function App() {
                       >
                         ↷
                       </button>
+                      <button
+                        className="link-button"
+                        type="button"
+                        onClick={exportRecipe}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="link-button"
+                        type="button"
+                        onClick={() => recipeInputRef.current?.click()}
+                      >
+                        Load
+                      </button>
+                      <input
+                        ref={recipeInputRef}
+                        type="file"
+                        accept="application/json,.json"
+                        hidden
+                        onChange={(event) => {
+                          void importRecipe(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
                     </div>
                   </div>
                   <div className="step-buttons">
@@ -707,6 +964,30 @@ function App() {
                     </button>
                     <button type="button" onClick={() => addStep("add")}>
                       + Add
+                    </button>
+                    <button type="button" onClick={() => addStep("pick")}>
+                      + Pick
+                    </button>
+                    <button type="button" onClick={() => addStep("remove")}>
+                      + Remove
+                    </button>
+                    <button type="button" onClick={() => addStep("rename")}>
+                      + Rename
+                    </button>
+                    <button type="button" onClick={() => addStep("sort")}>
+                      + Sort
+                    </button>
+                    <button type="button" onClick={() => addStep("distinct")}>
+                      + Distinct
+                    </button>
+                    <button type="button" onClick={() => addStep("group")}>
+                      + Group
+                    </button>
+                    <button type="button" onClick={() => addStep("flatten")}>
+                      + Flatten
+                    </button>
+                    <button type="button" onClick={() => addStep("regex")}>
+                      + Regex
                     </button>
                     <button type="button" onClick={() => addStep("jsonata")}>
                       + JSONata
@@ -749,7 +1030,16 @@ function App() {
                               {step.execution?.kind ?? "materializing"}
                             </span>
                           </div>
-                          <code>{JSON.stringify(step.config)}</code>
+                          <textarea
+                            key={`${step.id}-${stringifyJsonValue(step.config)}`}
+                            className="step-config"
+                            defaultValue={stringifyJsonValue(step.config, true)}
+                            aria-label={`Configuration for step ${index + 1}`}
+                            spellCheck={false}
+                            onBlur={(event) =>
+                              updateStepConfig(index, event.target.value)
+                            }
+                          />
                           <div className="step-actions">
                             <button
                               className="link-button"
@@ -1003,6 +1293,13 @@ function TableView({
   onSelect: (index: number) => void;
 }) {
   const visibleColumns = columns.filter((column) => !hiddenColumns.has(column));
+  const [scrollTop, setScrollTop] = useState(0);
+  const rowHeight = 34;
+  const viewportRows = 18;
+  const overscan = 8;
+  const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+  const end = Math.min(records.length, start + viewportRows + overscan * 2);
+  const visibleRecords = records.slice(start, end);
   return (
     <div className="table-wrap">
       <div className="column-controls">
@@ -1018,38 +1315,62 @@ function TableView({
         ))}
       </div>
       {records.length ? (
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              {visibleColumns.map((column) => (
-                <th key={column}>
-                  <button
-                    className="table-sort"
-                    type="button"
-                    onClick={() => onSort(column)}
-                  >
-                    {column} ↕
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {records.map((record, index) => (
-              <tr
-                className={selectedRows.has(index) ? "selected" : ""}
-                key={index}
-                onClick={() => onSelect(index)}
-              >
-                <td>{index + 1}</td>
+        <div
+          className="table-scroll"
+          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+        >
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
                 {visibleColumns.map((column) => (
-                  <td key={column}>{displayValue(record[column] ?? null)}</td>
+                  <th key={column}>
+                    <button
+                      className="table-sort"
+                      type="button"
+                      onClick={() => onSort(column)}
+                    >
+                      {column} ↕
+                    </button>
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {start > 0 && (
+                <tr aria-hidden="true">
+                  <td
+                    colSpan={visibleColumns.length + 1}
+                    style={{ height: start * rowHeight, padding: 0 }}
+                  />
+                </tr>
+              )}
+              {visibleRecords.map((record, index) => (
+                <tr
+                  className={selectedRows.has(start + index) ? "selected" : ""}
+                  key={start + index}
+                  onClick={() => onSelect(start + index)}
+                >
+                  <td>{start + index + 1}</td>
+                  {visibleColumns.map((column) => (
+                    <td key={column}>{displayValue(record[column] ?? null)}</td>
+                  ))}
+                </tr>
+              ))}
+              {end < records.length && (
+                <tr aria-hidden="true">
+                  <td
+                    colSpan={visibleColumns.length + 1}
+                    style={{
+                      height: (records.length - end) * rowHeight,
+                      padding: 0,
+                    }}
+                  />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="no-results">
           Table view is available for arrays of object records.

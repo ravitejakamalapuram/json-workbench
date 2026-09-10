@@ -207,6 +207,30 @@ button:hover {
   color: var(--muted);
   line-height: 1.6;
 }
+.paste-box {
+  width: min(620px, 100%);
+  margin-top: 22px;
+}
+.paste-box textarea,
+.step-config {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--panel-2);
+  font:
+    11px/1.45 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  resize: vertical;
+}
+.paste-box .inline-actions {
+  justify-content: center;
+  margin-top: 8px;
+}
 .view-tabs {
   display: flex;
   align-items: center;
@@ -274,8 +298,8 @@ button:hover {
 }
 .tree {
   min-height: 520px;
-  max-height: 680px;
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
   padding: 8px 0 18px;
   font:
     12px ui-monospace,
@@ -293,6 +317,9 @@ button:hover {
 }
 .tree-row:hover {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.virtual-list {
+  min-height: 520px;
 }
 .expand {
   width: 16px;
@@ -402,6 +429,10 @@ button:hover {
 }
 .step-title .muted {
   margin-left: auto;
+}
+.step-config {
+  min-height: 54px;
+  margin: 8px 0;
 }
 .toggle {
   padding: 0;
@@ -585,6 +616,10 @@ button:hover {
   max-height: 680px;
   overflow: auto;
 }
+.table-scroll {
+  max-height: 610px;
+  overflow: auto;
+}
 .column-controls {
   display: flex;
   flex-wrap: wrap;
@@ -631,6 +666,14 @@ tr.selected td {
   color: inherit;
   font: inherit;
   font-weight: 700;
+}
+.regex-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
 }
 @media (max-width: 1050px) {
   .content-grid {
