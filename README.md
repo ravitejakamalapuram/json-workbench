@@ -12,7 +12,17 @@ The core experience is local-only: user data is processed in the browser, with h
 
 ## Current status
 
-Project kickoff. See `docs/ROADMAP.md` and `docs/ARCHITECTURE.md`.
+The foundation and first vertical slice are implemented on `feat/m0-foundation`:
+
+- canonical chunk-safe scanner and structural parser for JSON, JSONL, and NDJSON
+- lossless numeric parsing/export, malformed-input diagnostics, progress, and cancellation
+- structure profiling, schema inference, JSON Pointer/JSONPath indexing, validation, and diff APIs
+- serializable pipelines with native transforms, JSONata, an offline jq preview subset, history, recipe import/export, code generation, and export
+- worker-backed extension ingestion with virtualized Tree/Table views, a lazy self-contained Monaco Raw editor, regex search, paste/clipboard support, and local recipe persistence
+- explicit full-file worker execution with bounded materialization, retained-memory telemetry, active JSON-page import, opt-in one-shot JSON network-response capture, and a local DuckDB SQL panel
+- a bundled local CLI and VS Code command package that reuse the versioned core pipeline contract
+
+Structural previews remain capped in the UI for responsiveness; explicit Full mode runs in a dedicated worker, reports retained bytes, and fails fast when a configured materialization cap is exceeded. See `docs/STATUS.md` and `docs/FEATURE_CHECKLIST.md` for verified scope and release evidence.
 
 ## Planned stack
 
@@ -25,7 +35,7 @@ Project kickoff. See `docs/ROADMAP.md` and `docs/ARCHITECTURE.md`.
 - JSON Schema validation
 - Lossless numeric handling
 - IndexedDB / OPFS for local persistence where appropriate
-- DuckDB-WASM as a later analytical/SQL capability
+- DuckDB-WASM as a local, packaged analytical/SQL capability
 
 ## Quality bar
 

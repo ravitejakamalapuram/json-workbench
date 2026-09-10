@@ -9,6 +9,7 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 ## Milestones
 
 ### M0 — Foundation
+
 - Repository conventions and architecture documentation
 - React + TypeScript + Vite + Manifest V3 shell
 - Unit/integration/E2E test infrastructure
@@ -17,6 +18,7 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - Fixture and benchmark harness
 
 ### M1 — Input and parsing
+
 - File picker and drag/drop
 - Paste/clipboard input
 - JSON, JSONL and NDJSON detection
@@ -26,6 +28,7 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - Lossless numeric representation
 
 ### M2 — Structure intelligence
+
 - Tree structure inference
 - Type inference and field presence statistics
 - Null/missing/type inconsistency detection
@@ -35,6 +38,7 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - JSON Schema generation
 
 ### M3 — Viewer
+
 - Virtualized tree
 - Virtualized table for tabular arrays
 - Raw Monaco editor
@@ -44,6 +48,7 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - Keyboard shortcuts and command palette
 
 ### M4 — Pipeline engine
+
 - Versioned serializable pipeline model
 - Step execution contract
 - Filter, map, rename, remove, add, sort
@@ -53,12 +58,14 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - Per-step statistics and errors
 
 ### M5 — Expression engines
+
 - JSONata integration as default advanced DSL
 - Syntax highlighting, autocomplete and diagnostics
 - Sample/live/full execution modes
 - jq integration for power users and streaming workloads
 
 ### M6 — Large data
+
 - Lazy structural indexing
 - Chunked execution and backpressure
 - Virtual rendering at scale
@@ -67,6 +74,7 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - Performance regression gates
 
 ### M7 — Validate, diff, export
+
 - JSON Schema validation
 - Jump-to-invalid-record
 - Tree/value/text diff
@@ -75,6 +83,7 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - Selection/result clipboard and downloads
 
 ### M8 — Recipes and developer productivity
+
 - Save/load pipeline recipes
 - Re-run recipe against another source
 - Import/export recipe format
@@ -83,24 +92,28 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 - Embedded JSON parse/extract helpers
 
 ### M9 — Analytical engine
+
 - DuckDB-WASM integration
 - SQL querying
 - Aggregation and joins over datasets
 - Query/result profiling
 
 ### M10 — Browser integration
+
 - Detect JSON pages/responses
 - Open current JSON in Workbench
 - Optional network-response capture with minimal permissions
 - Side panel workflow
 
 ### M11 — AI assistant
+
 - Natural language → explicit pipeline
 - Explain generated transformation
 - Preview before apply
 - Never silently upload or process data remotely
 
 ### M12 — Release hardening
+
 - Security review
 - Permission minimization
 - Accessibility audit

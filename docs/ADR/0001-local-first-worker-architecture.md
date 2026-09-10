@@ -1,6 +1,7 @@
 # ADR 0001: Local-first worker architecture
 
 ## Status
+
 Accepted
 
 ## Context

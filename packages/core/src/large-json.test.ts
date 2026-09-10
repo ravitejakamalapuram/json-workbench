@@ -7,8 +7,10 @@ async function* makeChunks(text: string, size: number): AsyncGenerator<string> {
 
 describe("large JSON scanner regression coverage", () => {
   it("tokenizes a large array without constructing the array in memory", async () => {
-    const items = Array.from({ length: 10_000 }, (_, index) =>
-      `{"id":${index},"active":${index % 2 === 0},"name":"user-${index}"}`,
+    const items = Array.from(
+      { length: 10_000 },
+      (_, index) =>
+        `{"id":${index},"active":${index % 2 === 0},"name":"user-${index}"}`,
     );
     const json = `[${items.join(",")}]`;
     let numberOfTokens = 0;

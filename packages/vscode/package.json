@@ -1,0 +1,28 @@
+{
+  "name": "@json-workbench/vscode",
+  "version": "0.1.0",
+  "description": "VS Code command surface for JSON Workbench pipelines",
+  "publisher": "json-workbench",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "type": "module",
+  "main": "dist/extension.cjs",
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs"
+  },
+  "activationEvents": [
+    "onCommand:jsonWorkbench.runPipeline"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "jsonWorkbench.runPipeline",
+        "title": "JSON Workbench: Run Pipeline"
+      }
+    ]
+  },
+  "dependencies": {
+    "@json-workbench/core": "0.1.0"
+  }
+}

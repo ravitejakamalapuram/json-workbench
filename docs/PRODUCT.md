@@ -7,6 +7,7 @@ Developers debugging API responses, manipulating fixtures, cleaning logs, valida
 ## MVP
 
 ### Input
+
 - Open local JSON/JSONL/NDJSON
 - Drag and drop
 - Paste/clipboard
@@ -14,6 +15,7 @@ Developers debugging API responses, manipulating fixtures, cleaning logs, valida
 - Do not upload user data
 
 ### Understand
+
 - Validity status
 - Structure tree
 - Array/object cardinality
@@ -22,6 +24,7 @@ Developers debugging API responses, manipulating fixtures, cleaning logs, valida
 - Path copying
 
 ### Explore
+
 - Virtualized tree
 - Table view for tabular arrays
 - Raw view
@@ -29,6 +32,7 @@ Developers debugging API responses, manipulating fixtures, cleaning logs, valida
 - Keyboard navigation
 
 ### Manipulate
+
 - Filter
 - Map
 - Rename
@@ -39,6 +43,7 @@ Developers debugging API responses, manipulating fixtures, cleaning logs, valida
 - Pipeline reorder/enable/disable
 
 ### Output
+
 - Copy result
 - JSON/JSONL/CSV export
 
