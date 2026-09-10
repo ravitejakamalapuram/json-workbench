@@ -4,6 +4,7 @@ import {
   parseJsonLines,
   parseJsonValue,
   parsePipeline,
+  PipelineMemoryLimitError,
   readJsonDocumentStream,
   runPipeline,
   stringifyJsonValue,
@@ -89,6 +90,16 @@ async function readFullInput(
 self.onmessage = async (message: MessageEvent<RunRequest>) => {
   if (message.data?.type !== "run") return;
   try {
+    if (message.data.maxMaterializedBytes !== undefined) {
+      const observedBytes = message.data.file
+        ? message.data.file.size
+        : new TextEncoder().encode(message.data.inputText ?? "").byteLength;
+      if (observedBytes > message.data.maxMaterializedBytes)
+        throw new PipelineMemoryLimitError(
+          message.data.maxMaterializedBytes,
+          observedBytes,
+        );
+    }
     const input = message.data.file
       ? await readFullInput(message.data.file, message.data.format)
       : parseJsonValue(message.data.inputText ?? "");
