@@ -24,6 +24,7 @@ import {
   profileJsonStructure,
   inferJsonSchema,
   diffJson,
+  detectEmbeddedJson,
   type JsonObject,
   type JsonStructureEvent,
   type JsonValue,
@@ -32,6 +33,7 @@ import {
   type JsonSchema,
   type JsonProfile,
   type JsonDiff,
+  type EmbeddedJsonMatch,
   type AnalyticsQueryResult,
   type ValidationDiagnostic,
 } from "@json-workbench/core";
@@ -587,6 +589,13 @@ function App() {
   const tableRecords = useMemo(() => {
     const value = pipelineResult ?? sourceValue;
     return (Array.isArray(value) ? value : []).filter(isObject);
+  }, [pipelineResult, sourceValue]);
+  const embeddedMatches = useMemo<readonly EmbeddedJsonMatch[]>(() => {
+    try {
+      return detectEmbeddedJson(pipelineResult ?? sourceValue);
+    } catch {
+      return [];
+    }
   }, [pipelineResult, sourceValue]);
   const columns = useMemo(
     () => [...new Set(tableRecords.flatMap((record) => Object.keys(record)))],
@@ -1343,6 +1352,55 @@ function App() {
                     <p className="muted panel-copy">
                       Load JSON to profile field types, presence, null counts,
                       and type inconsistencies.
+                    </p>
+                  )}
+                </section>
+                <section className="panel" data-testid="embedded-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">EMBEDDED</span>
+                      <h2>Stringified JSON</h2>
+                    </div>
+                    <span className="muted">
+                      {embeddedMatches.length || "none"}
+                    </span>
+                  </div>
+                  {embeddedMatches.length ? (
+                    <div
+                      className="diagnostic-list"
+                      data-testid="embedded-list"
+                    >
+                      {embeddedMatches.slice(0, 30).map((match) => (
+                        <div className="embedded-row" key={match.pointer}>
+                          <button
+                            className="diagnostic"
+                            type="button"
+                            onClick={() => setQuery(match.pointer)}
+                            title="Search this path"
+                          >
+                            <strong>{match.pointer || "/"}</strong>{" "}
+                            <span className="muted">
+                              {match.text.slice(0, 60)}
+                              {match.text.length > 60 ? "…" : ""}
+                            </span>
+                          </button>
+                          <button
+                            className="link-button"
+                            type="button"
+                            onClick={() =>
+                              copy(stringifyJsonValue(match.value, true))
+                            }
+                          >
+                            Copy parsed
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted panel-copy">
+                      No JSON hidden inside string fields. When an API
+                      double-encodes JSON, the escaped payloads show up here to
+                      copy out as real JSON.
                     </p>
                   )}
                 </section>

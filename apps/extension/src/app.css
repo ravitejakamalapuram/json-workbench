@@ -896,3 +896,17 @@ tr.selected td {
   font-size: 11px;
   line-height: 1.5;
 }
+
+/* Embedded JSON */
+.embedded-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.embedded-row .diagnostic {
+  flex: 1;
+  min-width: 0;
+}
+.embedded-row .link-button {
+  white-space: nowrap;
+}
