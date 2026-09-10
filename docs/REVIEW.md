@@ -201,3 +201,22 @@ polished and actually published.**
 - Re-ran and confirmed every documented gate stays green, including the E2E smoke.
 - Updated `STATUS.md` and `FEATURE_CHECKLIST.md` to describe the now-surfaced UI
   (previously these features were tested in core but unreachable by users).
+
+## 9. Addendum — P0 #1 implemented (auto-render JSON pages)
+
+Delivered the top adoption gap after the initial review:
+
+- **In-page JSON rendering.** A self-contained content script
+  (`apps/extension/src/content/json-render.ts`, backed by a new pure, unit-tested
+  `renderJsonTreeHtml` in core) pretty-prints any JSON document/tab into a
+  collapsible, syntax-highlighted tree with expand/collapse-all, a raw toggle,
+  copy, and an **Open in Workbench** handoff into the full power tools.
+- **Option C permissions (as chosen):** default install asks for **no host
+  permissions**. "Format current tab now" works on demand via `activeTab` +
+  `scripting`; a settings toggle enables full auto-render by requesting
+  `<all_urls>` at that moment (via `optional_host_permissions`) and revoking it
+  when turned off. `package-check.mjs` now enforces this posture.
+- Verified: the packaged content script renders correctly against a real
+  `application/json` page (lossless big integers preserved, HTML escaped), the
+  settings panel loads with no page errors, unit tests grew to 65, and all release
+  gates plus the E2E smoke stay green.

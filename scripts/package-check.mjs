@@ -9,6 +9,7 @@ const required = [
   "manifest.json",
   "index.html",
   "background.js",
+  "json-render.js",
   "jq.wasm",
   "duckdb-mvp.wasm",
   "duckdb-browser-mvp.worker.js",
@@ -21,7 +22,7 @@ if (manifest.manifest_version !== 3)
   throw new Error("Packaged manifest is not MV3");
 if (manifest.host_permissions?.length)
   throw new Error("Packaged manifest must not request host permissions");
-const expectedPermissions = ["activeTab", "sidePanel", "storage"];
+const expectedPermissions = ["activeTab", "sidePanel", "storage", "scripting"];
 if (
   JSON.stringify(manifest.permissions ?? []) !==
   JSON.stringify(expectedPermissions)
@@ -32,6 +33,11 @@ if (
   JSON.stringify(["debugger"])
 )
   throw new Error("Debugger capture must remain opt-in");
+if (
+  JSON.stringify(manifest.optional_host_permissions ?? []) !==
+  JSON.stringify(["<all_urls>"])
+)
+  throw new Error("Auto-render host access must remain an optional permission");
 const archive = join(tmpdir(), `json-workbench-${process.pid}.zip`);
 try {
   execFileSync("zip", ["-qr", archive, "."], { cwd: dist, stdio: "ignore" });

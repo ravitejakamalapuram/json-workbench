@@ -25,3 +25,4 @@ export * from "./codegen";
 export * from "./analytics";
 export * from "./assistant";
 export * from "./embedded";
+export * from "./render";

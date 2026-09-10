@@ -60,6 +60,7 @@ interface BridgeResponse {
   readonly name?: string;
   readonly text?: string;
   readonly error?: string;
+  readonly pending?: { readonly name: string; readonly text: string } | null;
 }
 
 interface ChromeBridge {
@@ -71,8 +72,16 @@ interface ChromeBridge {
   };
   readonly permissions?: {
     request: (
-      permissions: { permissions: string[] },
+      permissions: { permissions?: string[]; origins?: string[] },
       callback: (granted: boolean) => void,
+    ) => void;
+    contains: (
+      permissions: { permissions?: string[]; origins?: string[] },
+      callback: (result: boolean) => void,
+    ) => void;
+    remove: (
+      permissions: { permissions?: string[]; origins?: string[] },
+      callback: (removed: boolean) => void,
     ) => void;
   };
   readonly tabs?: {
@@ -314,6 +323,8 @@ function App() {
   const [profile, setProfile] = useState<JsonProfile>();
   const [diffText, setDiffText] = useState("");
   const [diffResult, setDiffResult] = useState<readonly JsonDiff[]>();
+  const [autoRender, setAutoRender] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("json-workbench:pipeline");
@@ -328,6 +339,25 @@ function App() {
     }
     if (localStorage.getItem("json-workbench:theme") === "light")
       setTheme("light");
+  }, []);
+
+  useEffect(() => {
+    const bridge = chromeBridge();
+    bridge?.permissions?.contains?.({ origins: ["<all_urls>"] }, (granted) =>
+      setAutoRender(Boolean(granted)),
+    );
+    bridge?.runtime?.sendMessage?.(
+      { type: "take-pending-json" },
+      (response) => {
+        if (response?.pending?.text) {
+          onFile(
+            new File([response.pending.text], response.pending.name, {
+              type: "application/json",
+            }),
+          );
+        }
+      },
+    );
   }, []);
 
   useEffect(() => {
@@ -487,6 +517,58 @@ function App() {
     taskRef.current?.cancel();
     pipelineWorkerRef.current?.terminate();
     setStatus("Cancelled");
+  }
+
+  function formatActiveTab() {
+    const runtime = chromeBridge()?.runtime;
+    if (!runtime) {
+      setPipelineError(
+        "Formatting the current tab is only available in the Chrome extension",
+      );
+      return;
+    }
+    setStatus("Formatting the current tab…");
+    runtime.sendMessage({ type: "format-active-tab" }, (response) => {
+      if (!response?.ok) {
+        setPipelineError(response?.error ?? "Unable to format the active tab");
+        setStatus("Format failed");
+        return;
+      }
+      setStatus("Formatted JSON in the current tab");
+    });
+  }
+
+  function toggleAutoRender(enabled: boolean) {
+    const bridge = chromeBridge();
+    if (!bridge?.runtime || !bridge.permissions) {
+      setPipelineError("Auto-render is only available in the Chrome extension");
+      return;
+    }
+    if (enabled) {
+      bridge.permissions.request({ origins: ["<all_urls>"] }, (granted) => {
+        if (!granted) {
+          setStatus("Auto-render permission was not granted");
+          return;
+        }
+        bridge.runtime!.sendMessage(
+          { type: "set-auto-render", enabled: true },
+          () => {
+            setAutoRender(true);
+            setStatus("Auto-render enabled for JSON pages");
+          },
+        );
+      });
+    } else {
+      bridge.runtime.sendMessage(
+        { type: "set-auto-render", enabled: false },
+        () => {
+          bridge.permissions!.remove({ origins: ["<all_urls>"] }, () => {
+            setAutoRender(false);
+            setStatus("Auto-render disabled");
+          });
+        },
+      );
+    }
   }
 
   const tree = useMemo(() => buildTree(events), [events]);
@@ -847,6 +929,46 @@ function App() {
           >
             {theme === "dark" ? "☼" : "☾"}
           </button>
+          <div className="settings-wrap">
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => setSettingsOpen((open) => !open)}
+              aria-label="Settings"
+              aria-expanded={settingsOpen}
+              data-testid="settings-button"
+            >
+              ⚙
+            </button>
+            {settingsOpen && (
+              <div className="settings-panel" data-testid="settings-panel">
+                <div className="card-label">PAGE INTEGRATION</div>
+                <label className="settings-row">
+                  <input
+                    type="checkbox"
+                    checked={autoRender}
+                    onChange={(event) => toggleAutoRender(event.target.checked)}
+                    data-testid="auto-render-toggle"
+                  />
+                  <span>
+                    <strong>Auto-render JSON pages</strong>
+                    <span className="muted">
+                      Format any JSON page you open, in place. Requests access
+                      to all sites (granted at toggle time, revoked when off).
+                    </span>
+                  </span>
+                </label>
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={formatActiveTab}
+                  data-testid="format-tab-button"
+                >
+                  Format current tab now
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
       <section className="workspace">

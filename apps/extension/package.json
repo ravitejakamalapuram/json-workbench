@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node ../../scripts/prepare-extension-package.mjs"
+    "build": "vite build && esbuild src/content/json-render.ts --bundle --format=iife --outfile=dist/json-render.js && node ../../scripts/prepare-extension-package.mjs"
   },
   "dependencies": {
     "@json-workbench/core": "0.1.0",

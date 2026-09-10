@@ -9,8 +9,9 @@
   "side_panel": {
     "default_path": "index.html"
   },
-  "permissions": ["activeTab", "sidePanel", "storage"],
+  "permissions": ["activeTab", "sidePanel", "storage", "scripting"],
   "optional_permissions": ["debugger"],
+  "optional_host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

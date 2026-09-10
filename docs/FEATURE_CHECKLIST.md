@@ -36,6 +36,7 @@ criteria are met.
 ## Browser, integrations, and release hardening
 
 - [x] Minimal MV3 permissions and active-tab JSON-page import
+- [x] In-page JSON rendering: on-demand "Format current tab" (activeTab + scripting) and opt-in auto-render of JSON pages via runtime-granted host access, with a collapsible highlighted tree and "Open in Workbench" handoff
 - [x] Opt-in network-response body capture with one-shot debugger permission, automatic detach, and privacy UX
 - [x] VS Code/CLI package reusing the pipeline contract
 - [x] Playwright packaged-app smoke path and shared CI E2E gate
