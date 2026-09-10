@@ -392,15 +392,31 @@ function App() {
     () => [...new Set(tableRecords.flatMap((record) => Object.keys(record)))],
     [tableRecords],
   );
+  const filteredTableRecords = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return tableRecords;
+    let matcher: RegExp | undefined;
+    if (regexSearch) {
+      try {
+        matcher = new RegExp(query, "i");
+      } catch {
+        return [];
+      }
+    }
+    return tableRecords.filter((record) => {
+      const text = stringifyJsonValue(record, false);
+      return matcher ? matcher.test(text) : text.toLowerCase().includes(needle);
+    });
+  }, [query, regexSearch, tableRecords]);
   const sortedRecords = useMemo(() => {
-    if (!sortColumn) return tableRecords;
-    return [...tableRecords].sort((left, right) => {
+    if (!sortColumn) return filteredTableRecords;
+    return [...filteredTableRecords].sort((left, right) => {
       const a = displayValue(left[sortColumn] ?? null);
       const b = displayValue(right[sortColumn] ?? null);
       const result = a === b ? 0 : a < b ? -1 : 1;
       return sortDescending ? -result : result;
     });
-  }, [tableRecords, sortColumn, sortDescending]);
+  }, [filteredTableRecords, sortColumn, sortDescending]);
 
   async function copy(text: string) {
     await navigator.clipboard?.writeText(text);
