@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -22,6 +23,12 @@ def main() -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as source:
             source.write('[{"id":900719925474099312345,"name":"Ada"}]')
             source_path = source.name
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as jsonl:
+            jsonl.write('{"id":1,"name":"One"}\n{"id":2,"name":"Two"}\n')
+            jsonl_path = jsonl.name
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as malformed:
+            malformed.write('{"id":oops}\n')
+            malformed_path = malformed.name
         try:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=os.getenv("HEADLESS", "true") == "true")
@@ -44,9 +51,15 @@ def main() -> None:
                 page.get_by_role("button", name="JSON", exact=True).click()
                 page.get_by_role("button", name="Tree").click()
                 page.get_by_text("Ada").wait_for(timeout=5_000)
+                page.locator('input[type="file"]').first.set_input_files(jsonl_path)
+                page.get_by_text(re.compile(r"JSONL .*2 records")).wait_for(timeout=15_000)
+                page.locator('input[type="file"]').first.set_input_files(malformed_path)
+                page.get_by_text(re.compile(r"(ParseError|JsonSyntaxError):")).wait_for(timeout=15_000)
                 browser.close()
         finally:
             Path(source_path).unlink(missing_ok=True)
+            Path(jsonl_path).unlink(missing_ok=True)
+            Path(malformed_path).unlink(missing_ok=True)
     finally:
         server.terminate()
         server.wait(timeout=5)

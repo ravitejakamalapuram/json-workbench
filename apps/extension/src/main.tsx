@@ -371,6 +371,12 @@ function App() {
     });
   }
 
+  function cancelWork() {
+    taskRef.current?.cancel();
+    pipelineWorkerRef.current?.terminate();
+    setStatus("Cancelled");
+  }
+
   const tree = useMemo(() => buildTree(events), [events]);
   const rows = useMemo(
     () => visibleNodes(tree, expanded, query, regexSearch),
@@ -516,9 +522,7 @@ function App() {
         event.preventDefault();
         void runPreview();
       } else if (event.key === "Escape") {
-        taskRef.current?.cancel();
-        pipelineWorkerRef.current?.terminate();
-        setStatus("Cancelled");
+        cancelWork();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -684,11 +688,7 @@ function App() {
             >
               Active JSON tab
             </button>
-            <button
-              className="secondary"
-              type="button"
-              onClick={() => taskRef.current?.cancel()}
-            >
+            <button className="secondary" type="button" onClick={cancelWork}>
               Cancel
             </button>
             <input
