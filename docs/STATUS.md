@@ -7,6 +7,7 @@
 - JSON, JSONL, and NDJSON inputs preserve numeric lexemes through parsing and export.
 - The extension routes structured JSON and line-oriented records through different worker parsers.
 - The workbench exposes Tree, Raw/code, and Table views, search, pointer copying, capped preview rendering, pipeline controls, schema validation, generated code, and JSON/JSONL/NDJSON/CSV/TSV downloads.
+- The workbench surfaces a live Structure Insights panel (object/array/value counts, max depth, and per-field type/presence/null/type-inconsistency profiling), one-click JSON Schema inference into the validator, and a Diff panel that reports JSON Patch style changes between the source and the pipeline result (or pasted JSON) with click-to-navigate JSON Pointer paths.
 - Pipeline definitions are versioned JSON, persisted locally, and support enable/disable, reorder, duplicate, delete, undo, redo, preview modes, cancellation, per-step characteristics, timing, and errors.
 - Pipeline preview now executes in its own worker, while the optional jq/WASM and DuckDB-WASM adapters remain lazy-loaded from the core package.
 - The local assistant only generates explicit, reviewable pipelines and never applies a suggestion without a user action.

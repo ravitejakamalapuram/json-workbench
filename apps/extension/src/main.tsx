@@ -21,12 +21,17 @@ import {
   suggestPipeline,
   stringifyJsonValue,
   validateJson,
+  profileJsonStructure,
+  inferJsonSchema,
+  diffJson,
   type JsonObject,
   type JsonStructureEvent,
   type JsonValue,
   type PipelineDefinition,
   type PipelineStepStat,
   type JsonSchema,
+  type JsonProfile,
+  type JsonDiff,
   type AnalyticsQueryResult,
   type ValidationDiagnostic,
 } from "@json-workbench/core";
@@ -147,6 +152,12 @@ function buildTree(events: readonly JsonStructureEvent[]): ViewerNode[] {
     }
   }
   return roots;
+}
+
+async function* toAsyncEvents(
+  events: readonly JsonStructureEvent[],
+): AsyncGenerator<JsonStructureEvent> {
+  for (const event of events) yield event;
 }
 
 function nodeText(node: ViewerNode): string {
@@ -300,6 +311,9 @@ function App() {
     "jsonata" | "jq" | "javascript" | "typescript" | "python" | "sql"
   >("jsonata");
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [profile, setProfile] = useState<JsonProfile>();
+  const [diffText, setDiffText] = useState("");
+  const [diffResult, setDiffResult] = useState<readonly JsonDiff[]>();
 
   useEffect(() => {
     const saved = localStorage.getItem("json-workbench:pipeline");
@@ -322,6 +336,25 @@ function App() {
       stringifyJsonValue(pipeline as unknown as JsonValue, false),
     );
   }, [pipeline]);
+
+  useEffect(() => {
+    if (!events.length) {
+      setProfile(undefined);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await profileJsonStructure(toAsyncEvents(events));
+        if (!cancelled) setProfile(result);
+      } catch {
+        if (!cancelled) setProfile(undefined);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [events]);
 
   function updatePipeline(next: PipelineDefinition) {
     setPipeline(historyRef.current.update(next));
@@ -756,6 +789,40 @@ function App() {
     }
   }
 
+  async function inferSchemaFromSource() {
+    try {
+      const generated = await inferJsonSchema(toAsyncEvents(events));
+      setSchemaText(
+        stringifyJsonValue(generated as unknown as JsonValue, true),
+      );
+      setStatus("Schema inferred from preview");
+    } catch (error) {
+      setPipelineError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function runDiff() {
+    try {
+      const left = sourceValue;
+      const right = diffText.trim() ? parseJsonValue(diffText) : pipelineResult;
+      if (right === undefined) {
+        setPipelineError(
+          "Run a pipeline preview or paste JSON to compare against the source.",
+        );
+        return;
+      }
+      const changes = diffJson(left, right);
+      setDiffResult(changes);
+      setStatus(
+        changes.length
+          ? `${changes.length} difference${changes.length === 1 ? "" : "s"} found`
+          : "No differences",
+      );
+    } catch (error) {
+      setPipelineError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   const shellClass = `shell ${theme}`;
   return (
     <main className={shellClass}>
@@ -1065,6 +1132,98 @@ function App() {
                 )}
               </section>
               <aside className="side-column">
+                <section className="panel" data-testid="insights-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">INSIGHTS</span>
+                      <h2>Structure profile</h2>
+                    </div>
+                    <span className="muted">from preview</span>
+                  </div>
+                  {profile ? (
+                    <>
+                      <div
+                        className="metric-grid"
+                        data-testid="insights-metrics"
+                      >
+                        <div className="metric">
+                          <span className="metric-value">
+                            {profile.objects.toLocaleString()}
+                          </span>
+                          <span className="metric-label">objects</span>
+                        </div>
+                        <div className="metric">
+                          <span className="metric-value">
+                            {profile.arrays.toLocaleString()}
+                          </span>
+                          <span className="metric-label">arrays</span>
+                        </div>
+                        <div className="metric">
+                          <span className="metric-value">
+                            {profile.primitives.toLocaleString()}
+                          </span>
+                          <span className="metric-label">values</span>
+                        </div>
+                        <div className="metric">
+                          <span className="metric-value">
+                            {profile.maxDepth.toLocaleString()}
+                          </span>
+                          <span className="metric-label">max depth</span>
+                        </div>
+                      </div>
+                      {Object.keys(profile.fieldStats).length > 0 && (
+                        <div
+                          className="field-stats"
+                          data-testid="insights-fields"
+                        >
+                          <div className="field-stats-head">
+                            <span>field</span>
+                            <span>types</span>
+                            <span>present</span>
+                          </div>
+                          {Object.entries(profile.fieldStats)
+                            .sort((a, b) => b[1].occurrences - a[1].occurrences)
+                            .slice(0, 40)
+                            .map(([field, stat]) => (
+                              <button
+                                className="field-row"
+                                type="button"
+                                key={field}
+                                onClick={() => setQuery(field)}
+                                title="Search this field"
+                              >
+                                <span className="field-name">{field}</span>
+                                <span className="field-types">
+                                  {stat.types.join(", ") || "—"}
+                                  {stat.inconsistent && (
+                                    <span className="badge warn">mixed</span>
+                                  )}
+                                  {stat.nulls > 0 && (
+                                    <span className="badge">
+                                      {stat.nulls} null
+                                    </span>
+                                  )}
+                                </span>
+                                <span
+                                  className={`field-present ${stat.missing > 0 ? "partial" : ""}`}
+                                >
+                                  {stat.occurrences}
+                                  {stat.missing > 0
+                                    ? ` / ${stat.occurrences + stat.missing}`
+                                    : ""}
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="muted panel-copy">
+                      Load JSON to profile field types, presence, null counts,
+                      and type inconsistencies.
+                    </p>
+                  )}
+                </section>
                 <section className="panel">
                   <div className="panel-heading">
                     <div>
@@ -1433,13 +1592,23 @@ function App() {
                     onChange={(event) => setSchemaText(event.target.value)}
                     spellCheck={false}
                   />
-                  <button
-                    className="run-button"
-                    type="button"
-                    onClick={validateCurrent}
-                  >
-                    Validate current result
-                  </button>
+                  <div className="inline-actions">
+                    <button
+                      className="secondary"
+                      type="button"
+                      onClick={() => void inferSchemaFromSource()}
+                      data-testid="infer-schema-button"
+                    >
+                      Infer schema
+                    </button>
+                    <button
+                      className="run-button"
+                      type="button"
+                      onClick={validateCurrent}
+                    >
+                      Validate current result
+                    </button>
+                  </div>
                   {diagnostics.length ? (
                     <div className="diagnostic-list">
                       {diagnostics.slice(0, 30).map((diagnostic) => (
@@ -1460,6 +1629,71 @@ function App() {
                       paths.
                     </p>
                   )}
+                </section>
+                <section className="panel" data-testid="diff-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">DIFF</span>
+                      <h2>Compare &amp; patch</h2>
+                    </div>
+                    <span className="muted">JSON Patch</span>
+                  </div>
+                  <p className="muted panel-copy">
+                    Compares the source against your pipeline result. Paste JSON
+                    below to compare against that instead.
+                  </p>
+                  <textarea
+                    className="schema-input"
+                    value={diffText}
+                    onChange={(event) => setDiffText(event.target.value)}
+                    placeholder="Optional: paste JSON to compare against the source"
+                    spellCheck={false}
+                    data-testid="diff-input"
+                  />
+                  <button
+                    className="run-button"
+                    type="button"
+                    onClick={runDiff}
+                    data-testid="diff-run-button"
+                  >
+                    Compute diff
+                  </button>
+                  {diffResult &&
+                    (diffResult.length ? (
+                      <div
+                        className="diagnostic-list"
+                        data-testid="diff-results"
+                      >
+                        {diffResult.slice(0, 50).map((change, index) => (
+                          <button
+                            className="diagnostic"
+                            type="button"
+                            key={`${change.op}-${change.path}-${index}`}
+                            onClick={() => setQuery(change.path)}
+                          >
+                            <span className={`badge op-${change.op}`}>
+                              {change.op}
+                            </span>{" "}
+                            <strong>{change.path || "/"}</strong>{" "}
+                            {change.op !== "remove" &&
+                              change.value !== undefined && (
+                                <span className="muted">
+                                  → {displayValue(change.value)}
+                                </span>
+                              )}
+                          </button>
+                        ))}
+                        {diffResult.length > 50 && (
+                          <p className="muted panel-copy">
+                            Showing first 50 of {diffResult.length} changes.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="muted panel-copy">
+                        No differences between the two inputs.
+                      </p>
+                    ))}
                 </section>
                 <section className="panel">
                   <div className="panel-heading">

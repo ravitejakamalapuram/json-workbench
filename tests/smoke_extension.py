@@ -64,6 +64,25 @@ def main() -> None:
                 page.get_by_text(re.compile(r"JSONL .*2 records")).wait_for(timeout=15_000)
                 page.locator('input[type="file"]').first.set_input_files(malformed_path)
                 page.get_by_text(re.compile(r"(ParseError|JsonSyntaxError):")).wait_for(timeout=15_000)
+                # Reload clean source, then exercise the newly wired features.
+                page.locator('input[type="file"]').first.set_input_files(source_path)
+                page.get_by_text("Ready to explore").wait_for(timeout=15_000)
+                assert page.get_by_test_id("insights-panel").is_visible()
+                page.get_by_test_id("insights-fields").get_by_text(
+                    "name", exact=True
+                ).wait_for(timeout=5_000)
+                page.get_by_test_id("infer-schema-button").click()
+                page.wait_for_timeout(500)
+                schema_value = page.locator(".schema-input").first.input_value()
+                assert '"properties"' in schema_value, schema_value
+                page.get_by_test_id("diff-input").fill(
+                    '[{"id":1,"name":"Zed"},{"id":3,"name":"Nine"}]'
+                )
+                page.get_by_test_id("diff-run-button").click()
+                page.get_by_test_id("diff-results").wait_for(timeout=5_000)
+                assert page.get_by_test_id("diff-results").get_by_text(
+                    re.compile(r"replace|add|remove")
+                ).first.is_visible()
                 browser.close()
         finally:
             Path(source_path).unlink(missing_ok=True)
