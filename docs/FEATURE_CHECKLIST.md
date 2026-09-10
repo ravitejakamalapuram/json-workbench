@@ -28,7 +28,7 @@ criteria are met.
 - [x] Lazy jq/WASM adapter and DuckDB-WASM core query API
 - [x] Dedicated full-file pipeline worker using the streaming parser and explicit materialization boundary
 - [x] 10 MB, 100 MB, 500 MB, and 1 GB parser benchmark harness
-- [ ] Monaco editor with syntax diagnostics and completion
+- [x] Self-contained lazy Monaco editor with JSON worker diagnostics and completion
 - [ ] Backpressure/memory accounting for global/materializing operations and multi-gigabyte result handling
 - [ ] Dedicated DuckDB SQL UI with local asset routing and query/result profiling
 

@@ -51,6 +51,8 @@ def main() -> None:
                 page.get_by_role("button", name="JSON", exact=True).click()
                 page.get_by_role("button", name="Tree").click()
                 page.get_by_text("Ada").wait_for(timeout=5_000)
+                page.get_by_role("button", name="Raw / code").click()
+                page.locator(".monaco-editor").wait_for(timeout=15_000)
                 page.locator('input[type="file"]').first.set_input_files(jsonl_path)
                 page.get_by_text(re.compile(r"JSONL .*2 records")).wait_for(timeout=15_000)
                 page.locator('input[type="file"]').first.set_input_files(malformed_path)

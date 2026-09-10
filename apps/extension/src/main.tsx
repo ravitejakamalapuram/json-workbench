@@ -1,5 +1,7 @@
 import {
   StrictMode,
+  Suspense,
+  lazy,
   useEffect,
   useMemo,
   useRef,
@@ -28,6 +30,12 @@ import {
 } from "@json-workbench/core";
 import { ingestFile, type IngestTask } from "./ingest";
 import "./app.css";
+
+const MonacoRawEditor = lazy(() =>
+  import("./MonacoRawEditor").then((module) => ({
+    default: module.MonacoRawEditor,
+  })),
+);
 
 type View = "tree" | "raw" | "table";
 type NodeKind = "object" | "array" | "primitive";
@@ -949,9 +957,19 @@ function App() {
                   </div>
                 )}
                 {view === "raw" && (
-                  <pre className="raw-view">
-                    {rawPreview || "No raw preview available."}
-                  </pre>
+                  <div className="raw-view">
+                    <Suspense
+                      fallback={<pre>{rawPreview || "Loading editor…"}</pre>}
+                    >
+                      <MonacoRawEditor
+                        dark={theme === "dark"}
+                        value={rawPreview}
+                        onChange={(value) => {
+                          if (value !== undefined) setRawPreview(value);
+                        }}
+                      />
+                    </Suspense>
+                  </div>
                 )}
                 {view === "table" && (
                   <TableView

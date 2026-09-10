@@ -17,10 +17,11 @@ The foundation and first vertical slice are implemented on `feat/m0-foundation`:
 - canonical chunk-safe scanner and structural parser for JSON, JSONL, and NDJSON
 - lossless numeric parsing/export, malformed-input diagnostics, progress, and cancellation
 - structure profiling, schema inference, JSON Pointer/JSONPath indexing, validation, and diff APIs
-- serializable pipelines with native transforms, JSONata, an offline jq preview subset, history, telemetry, code generation, and export
-- worker-backed extension ingestion with Tree, Raw, and Table views plus local recipe persistence
+- serializable pipelines with native transforms, JSONata, an offline jq preview subset, history, recipe import/export, code generation, and export
+- worker-backed extension ingestion with virtualized Tree/Table views, a lazy self-contained Monaco Raw editor, regex search, paste/clipboard support, and local recipe persistence
+- explicit full-file worker execution, active JSON-page import, and opt-in one-shot JSON network-response capture
 
-Large-file execution is intentionally preview-capped in the UI until benchmark gates demonstrate safe full-file materialization. See `docs/STATUS.md` for the verified scope and remaining release work.
+Structural previews remain capped in the UI for responsiveness; explicit Full mode runs in a dedicated worker and makes materialization visible in the execution model. See `docs/STATUS.md` and `docs/FEATURE_CHECKLIST.md` for verified scope and remaining release work.
 
 ## Planned stack
 
@@ -33,7 +34,7 @@ Large-file execution is intentionally preview-capped in the UI until benchmark g
 - JSON Schema validation
 - Lossless numeric handling
 - IndexedDB / OPFS for local persistence where appropriate
-- DuckDB-WASM as a later analytical/SQL capability
+- DuckDB-WASM as a lazy core analytical/SQL capability; the dedicated SQL UI remains planned
 
 ## Quality bar
 

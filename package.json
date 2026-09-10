@@ -35,9 +35,11 @@
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.32.0",
+    "@monaco-editor/react": "^4.7.0",
     "jq-web": "^0.6.2",
     "jsonata": "^2.1.0",
     "lossless-json": "^4.3.1",
+    "monaco-editor": "^0.53.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   }
