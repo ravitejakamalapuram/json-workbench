@@ -26,6 +26,10 @@ copyFileSync(
 );
 const jqWasm = resolve(root, "node_modules/jq-web/jq.wasm");
 if (existsSync(jqWasm)) copyFileSync(jqWasm, resolve(dist, "jq.wasm"));
+for (const asset of ["duckdb-mvp.wasm", "duckdb-browser-mvp.worker.js"]) {
+  const source = resolve(root, "node_modules/@duckdb/duckdb-wasm/dist", asset);
+  if (existsSync(source)) copyFileSync(source, resolve(dist, asset));
+}
 console.log(
   `Prepared Chrome package in ${dirname(resolve(dist, "manifest.json"))}`,
 );

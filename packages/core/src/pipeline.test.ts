@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createPipeline, runPipeline } from "./pipeline";
+import {
+  createPipeline,
+  estimateJsonBytes,
+  PipelineMemoryLimitError,
+  runPipeline,
+  runPipelineStream,
+} from "./pipeline";
 import type { JsonValue, PipelineStep } from "./types";
 
 const factory = (definition: {
@@ -97,5 +103,100 @@ describe("runPipeline", () => {
       }),
     ]);
     expect(progress).toEqual([1]);
+  });
+
+  it("reports retained bytes and enforces materialization limits", async () => {
+    const memory: number[] = [];
+    const pipeline = createPipeline([
+      { id: "a", type: "append", enabled: true, config: { value: "large" } },
+    ]);
+    await expect(
+      runPipeline([1], pipeline, factory, {
+        maxMaterializedBytes: estimateJsonBytes([1]),
+        onMemory: (event) => memory.push(event.bytes),
+      }),
+    ).rejects.toBeInstanceOf(PipelineMemoryLimitError);
+    expect(memory[0]).toBe(3);
+    expect(memory.at(-1)).toBeGreaterThan(memory[0]!);
+  });
+});
+
+describe("runPipelineStream", () => {
+  async function* values(values: JsonValue[]): AsyncGenerator<JsonValue> {
+    yield* values;
+  }
+
+  it("keeps streaming steps record-oriented", async () => {
+    const output: JsonValue[] = [];
+    const definition = createPipeline([
+      { id: "stream", type: "stream", enabled: true, config: {} },
+    ]);
+    const factory = (): PipelineStep => ({
+      id: "stream",
+      type: "stream",
+      enabled: true,
+      execution: { kind: "streaming" },
+      execute(input) {
+        return (input as JsonValue[]).filter((item) => item !== null);
+      },
+    });
+    for await (const item of runPipelineStream(
+      values([1, null, 2]),
+      definition,
+      factory,
+      { maxMaterializedBytes: 4 },
+    ))
+      output.push(item);
+    expect(output).toEqual([1, 2]);
+  });
+
+  it("accounts for the retained streamed item, not the full output history", async () => {
+    const definition = createPipeline([
+      { id: "stream", type: "stream", enabled: true, config: {} },
+    ]);
+    const factory = (): PipelineStep => ({
+      id: "stream",
+      type: "stream",
+      enabled: true,
+      execution: { kind: "streaming" },
+      execute(input) {
+        return input;
+      },
+    });
+    const output: JsonValue[] = [];
+    for await (const item of runPipelineStream(
+      values(["one", "two"]),
+      definition,
+      factory,
+      { maxMaterializedBytes: 5 },
+    ))
+      output.push(item);
+    expect(output).toEqual(["one", "two"]);
+  });
+
+  it("bounds buffers before a global operation", async () => {
+    const definition = createPipeline([
+      { id: "global", type: "global", enabled: true, config: {} },
+    ]);
+    const factory = (): PipelineStep => ({
+      id: "global",
+      type: "global",
+      enabled: true,
+      execution: { kind: "global-state" },
+      execute(input) {
+        return input;
+      },
+    });
+    await expect(
+      (async () => {
+        for await (const ignored of runPipelineStream(
+          values(["one", "two"]),
+          definition,
+          factory,
+          { maxMaterializedBytes: 5 },
+        ))
+          void ignored;
+      })(),
+    ).rejects.toBeInstanceOf(PipelineMemoryLimitError);
   });
 });

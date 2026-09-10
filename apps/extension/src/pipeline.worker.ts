@@ -18,11 +18,18 @@ type RunRequest = {
   format?: "json" | "jsonl";
   pipelineText: string;
   mode: "preview" | "live" | "full";
+  maxMaterializedBytes?: number;
 };
 
 type RunResponse =
   | { type: "stat"; stat: PipelineStepStat }
   | { type: "progress"; completed: number; total: number; stepIndex: number }
+  | {
+      type: "memory";
+      stepIndex: number;
+      bytes: number;
+      limitBytes?: number;
+    }
   | { type: "complete"; resultText: string }
   | { type: "error"; name: string; message: string };
 
@@ -94,6 +101,10 @@ self.onmessage = async (message: MessageEvent<RunRequest>) => {
         mode: message.data.mode,
         onStepStat: (stat) => post({ type: "stat", stat }),
         onProgress: (progress) => post({ type: "progress", ...progress }),
+        ...(message.data.maxMaterializedBytes === undefined
+          ? {}
+          : { maxMaterializedBytes: message.data.maxMaterializedBytes }),
+        onMemory: (memory) => post({ type: "memory", ...memory }),
       },
     );
     post({ type: "complete", resultText: stringifyJsonValue(result, false) });

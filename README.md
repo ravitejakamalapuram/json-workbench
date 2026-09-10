@@ -19,9 +19,10 @@ The foundation and first vertical slice are implemented on `feat/m0-foundation`:
 - structure profiling, schema inference, JSON Pointer/JSONPath indexing, validation, and diff APIs
 - serializable pipelines with native transforms, JSONata, an offline jq preview subset, history, recipe import/export, code generation, and export
 - worker-backed extension ingestion with virtualized Tree/Table views, a lazy self-contained Monaco Raw editor, regex search, paste/clipboard support, and local recipe persistence
-- explicit full-file worker execution, active JSON-page import, and opt-in one-shot JSON network-response capture
+- explicit full-file worker execution with bounded materialization, retained-memory telemetry, active JSON-page import, opt-in one-shot JSON network-response capture, and a local DuckDB SQL panel
+- a bundled local CLI and VS Code command package that reuse the versioned core pipeline contract
 
-Structural previews remain capped in the UI for responsiveness; explicit Full mode runs in a dedicated worker and makes materialization visible in the execution model. See `docs/STATUS.md` and `docs/FEATURE_CHECKLIST.md` for verified scope and remaining release work.
+Structural previews remain capped in the UI for responsiveness; explicit Full mode runs in a dedicated worker, reports retained bytes, and fails fast when a configured materialization cap is exceeded. See `docs/STATUS.md` and `docs/FEATURE_CHECKLIST.md` for verified scope and release evidence.
 
 ## Planned stack
 
@@ -34,7 +35,7 @@ Structural previews remain capped in the UI for responsiveness; explicit Full mo
 - JSON Schema validation
 - Lossless numeric handling
 - IndexedDB / OPFS for local persistence where appropriate
-- DuckDB-WASM as a lazy core analytical/SQL capability; the dedicated SQL UI remains planned
+- DuckDB-WASM as a local, packaged analytical/SQL capability
 
 ## Quality bar
 

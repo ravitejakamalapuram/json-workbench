@@ -38,7 +38,12 @@ def main() -> None:
                 page.locator('input[type="file"]').set_input_files(source_path)
                 page.get_by_text("Ready to explore").wait_for(timeout=15_000)
                 assert page.get_by_role("button", name="Tree").is_visible()
+                page.get_by_label("Search values or paths").focus()
+                assert page.get_by_label("Search values or paths").evaluate(
+                    "element => element === document.activeElement"
+                )
                 page.locator(".expand").nth(1).click()
+                assert page.locator('[role="treeitem"]').first.get_attribute("aria-level") == "1"
                 page.get_by_text("900719925474099312345").wait_for(timeout=5_000)
                 page.get_by_placeholder("Search values or paths").fill("Ada")
                 page.get_by_role("button", name="Table").click()
@@ -53,6 +58,8 @@ def main() -> None:
                 page.get_by_text("Ada").wait_for(timeout=5_000)
                 page.get_by_role("button", name="Raw / code").click()
                 page.locator(".monaco-editor").wait_for(timeout=15_000)
+                page.get_by_role("button", name="Run local SQL").click()
+                page.get_by_text(re.compile(r"SQL complete")).wait_for(timeout=30_000)
                 page.locator('input[type="file"]').first.set_input_files(jsonl_path)
                 page.get_by_text(re.compile(r"JSONL .*2 records")).wait_for(timeout=15_000)
                 page.locator('input[type="file"]').first.set_input_files(malformed_path)

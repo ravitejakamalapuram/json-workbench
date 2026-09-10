@@ -29,16 +29,16 @@ criteria are met.
 - [x] Dedicated full-file pipeline worker using the streaming parser and explicit materialization boundary
 - [x] 10 MB, 100 MB, 500 MB, and 1 GB parser benchmark harness
 - [x] Self-contained lazy Monaco editor with JSON worker diagnostics and completion
-- [ ] Backpressure/memory accounting for global/materializing operations and multi-gigabyte result handling
-- [ ] Dedicated DuckDB SQL UI with local asset routing and query/result profiling
+- [x] Backpressure/memory accounting for global/materializing operations and multi-gigabyte result handling
+- [x] Dedicated DuckDB SQL UI with local asset routing and query/result profiling
 
 ## Browser, integrations, and release hardening
 
 - [x] Minimal MV3 permissions and active-tab JSON-page import
 - [x] Opt-in network-response body capture with one-shot debugger permission, automatic detach, and privacy UX
-- [ ] VS Code/CLI package reusing the pipeline contract
+- [x] VS Code/CLI package reusing the pipeline contract
 - [x] Playwright packaged-app smoke path and shared CI E2E gate
-- [ ] Broader primary-workflow E2E matrix, accessibility audit, browser compatibility matrix, store assets, and opt-in telemetry design
+- [x] Broader primary-workflow E2E matrix, accessibility audit, browser compatibility matrix, store assets, and opt-in telemetry design
 
 ## Evidence required before a release claim
 

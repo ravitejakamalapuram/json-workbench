@@ -11,8 +11,11 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build --workspace @json-workbench/extension",
+    "build:cli": "npm run build --workspace @json-workbench/cli",
+    "build:vscode": "npm run build --workspace @json-workbench/vscode",
     "package:check": "node scripts/package-check.mjs",
     "test": "vitest run",
+    "test:cli": "node tests/cli_smoke.mjs",
     "test:watch": "vitest",
     "bench": "vitest bench packages/core/src/large-data.bench.ts",
     "typecheck": "tsc --noEmit",
@@ -23,9 +26,12 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@types/node": "^22.20.2",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "@types/vscode": "^1.137.0",
     "@vitejs/plugin-react": "^5.0.2",
+    "esbuild": "^0.28.2",
     "eslint": "^9.35.0",
     "prettier": "^3.6.2",
     "typescript": "^5.8.3",

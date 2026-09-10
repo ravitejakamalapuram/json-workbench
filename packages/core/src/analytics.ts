@@ -4,12 +4,21 @@ import type { JsonObject, JsonValue } from "./types";
 export interface AnalyticsQueryResult {
   readonly columns: readonly string[];
   readonly rows: readonly JsonObject[];
+  readonly durationMs?: number;
+}
+
+export interface DuckDbBundle {
+  readonly mainModule: string;
+  readonly mainWorker: string;
+  readonly pthreadWorker?: string;
 }
 
 export interface AnalyticsOptions {
   readonly fileName?: string;
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: { phase: string; value: number }) => void;
+  /** Optional locally packaged bundle. When omitted, the CDN bundle is used. */
+  readonly bundle?: DuckDbBundle;
 }
 
 function abortIfNeeded(signal?: AbortSignal): void {
@@ -45,9 +54,12 @@ export async function queryJsonWithDuckDb(
   if (!sql.trim()) throw new Error("SQL query is required");
   abortIfNeeded(options.signal);
   options.onProgress?.({ phase: "loading DuckDB-WASM", value: 0.1 });
+  const startedAt = performance.now();
   const duckdb = await import("@duckdb/duckdb-wasm");
   abortIfNeeded(options.signal);
-  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+  const bundle =
+    options.bundle ??
+    ((await duckdb.selectBundle(duckdb.getJsDelivrBundles())) as DuckDbBundle);
   if (!bundle.mainWorker)
     throw new Error("DuckDB-WASM worker bundle is unavailable");
   const worker = new Worker(bundle.mainWorker);
@@ -64,7 +76,7 @@ export async function queryJsonWithDuckDb(
       const rows = table.toArray().map((row) => jsonValue(row) as JsonObject);
       const columns = rows.length ? Object.keys(rows[0]!) : [];
       options.onProgress?.({ phase: "query complete", value: 1 });
-      return { columns, rows };
+      return { columns, rows, durationMs: performance.now() - startedAt };
     } finally {
       await connection.close();
     }

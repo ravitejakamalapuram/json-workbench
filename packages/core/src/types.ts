@@ -30,6 +30,7 @@ export interface PipelineStepStat {
   readonly durationMs: number;
   readonly inputItems?: number;
   readonly outputItems?: number;
+  readonly memoryBytes?: number;
   readonly error?: string;
 }
 

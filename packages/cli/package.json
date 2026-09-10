@@ -1,0 +1,15 @@
+{
+  "name": "@json-workbench/cli",
+  "version": "0.1.0",
+  "description": "Local JSON Workbench pipeline runner",
+  "type": "module",
+  "bin": {
+    "json-workbench": "dist/index.js"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --sourcemap"
+  },
+  "dependencies": {
+    "@json-workbench/core": "0.1.0"
+  }
+}

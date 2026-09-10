@@ -32,6 +32,21 @@ export class PipelineDefinitionError extends Error {
   }
 }
 
+export class PipelineMemoryLimitError extends Error {
+  constructor(
+    readonly limitBytes: number,
+    readonly observedBytes: number,
+    readonly stepIndex?: number,
+    readonly stepId?: string,
+  ) {
+    super(
+      `Pipeline materialization exceeded ${limitBytes} bytes ` +
+        `(observed ${observedBytes} bytes)`,
+    );
+    this.name = "PipelineMemoryLimitError";
+  }
+}
+
 export interface RunOptions {
   readonly mode?: PipelineMode;
   readonly signal?: AbortSignal;
@@ -46,6 +61,18 @@ export interface RunOptions {
     stepIndex: number;
   }) => void;
   readonly onStepStat?: (stat: PipelineStepStat) => void;
+  /** Maximum serialized bytes retained by a materializing step. */
+  readonly maxMaterializedBytes?: number;
+  readonly onMemory?: (memory: {
+    readonly stepIndex: number;
+    readonly bytes: number;
+    readonly limitBytes?: number;
+  }) => void;
+}
+
+/** Estimate retained JSON size without converting lossless numbers to doubles. */
+export function estimateJsonBytes(value: JsonValue): number {
+  return new TextEncoder().encode(stringifyJsonValue(value, false)).byteLength;
 }
 
 export async function runPipeline(
@@ -56,6 +83,20 @@ export async function runPipeline(
 ): Promise<JsonValue> {
   let value = input;
   const mode = options.mode ?? "full";
+
+  if (options.maxMaterializedBytes !== undefined) {
+    const initialBytes = estimateJsonBytes(value);
+    options.onMemory?.({
+      stepIndex: -1,
+      bytes: initialBytes,
+      limitBytes: options.maxMaterializedBytes,
+    });
+    if (initialBytes > options.maxMaterializedBytes)
+      throw new PipelineMemoryLimitError(
+        options.maxMaterializedBytes,
+        initialBytes,
+      );
+  }
 
   for (let index = 0; index < definition.steps.length; index += 1) {
     if (options.signal?.aborted) {
@@ -87,6 +128,30 @@ export async function runPipeline(
 
     try {
       value = await step.execute(value, context);
+      const memoryBytes = estimateJsonBytes(value);
+      const executionKind =
+        step.execution?.kind ??
+        definitionStep.execution?.kind ??
+        "materializing";
+      options.onMemory?.({
+        stepIndex: index,
+        bytes: memoryBytes,
+        ...(options.maxMaterializedBytes === undefined
+          ? {}
+          : { limitBytes: options.maxMaterializedBytes }),
+      });
+      if (
+        options.maxMaterializedBytes !== undefined &&
+        executionKind !== "streaming" &&
+        memoryBytes > options.maxMaterializedBytes
+      ) {
+        throw new PipelineMemoryLimitError(
+          options.maxMaterializedBytes,
+          memoryBytes,
+          index,
+          definitionStep.id,
+        );
+      }
       options.onStepComplete?.(index, value);
       options.onStepStat?.({
         stepIndex: index,
@@ -96,6 +161,7 @@ export async function runPipeline(
         durationMs: performance.now() - startedAt,
         ...(inputItems === undefined ? {} : { inputItems }),
         ...(Array.isArray(value) ? { outputItems: value.length } : {}),
+        memoryBytes,
       });
       options.onProgress?.({
         completed: index + 1,
@@ -112,7 +178,11 @@ export async function runPipeline(
         ...(inputItems === undefined ? {} : { inputItems }),
         error: error instanceof Error ? error.message : String(error),
       });
-      if (error instanceof PipelineError) throw error;
+      if (
+        error instanceof PipelineError ||
+        error instanceof PipelineMemoryLimitError
+      )
+        throw error;
       throw new PipelineError(
         `Pipeline step failed: ${definitionStep.type}`,
         index,
@@ -123,6 +193,182 @@ export async function runPipeline(
   }
 
   return value;
+}
+
+/**
+ * Execute a record stream without collecting it for streaming-capable steps.
+ * Global/materializing steps deliberately create a bounded buffer and fail
+ * before exceeding `maxMaterializedBytes`, which gives callers backpressure
+ * and an explicit safety boundary for multi-gigabyte sources.
+ */
+export async function* runPipelineStream(
+  input: AsyncIterable<JsonValue>,
+  definition: PipelineDefinition,
+  factory: StepFactory,
+  options: RunOptions = {},
+): AsyncGenerator<JsonValue> {
+  let stream: AsyncIterable<JsonValue> = input;
+
+  for (let index = 0; index < definition.steps.length; index += 1) {
+    if (options.signal?.aborted)
+      throw new DOMException("Pipeline execution was cancelled", "AbortError");
+    const definitionStep = definition.steps[index];
+    if (!definitionStep || !definitionStep.enabled) continue;
+
+    const step = factory(definitionStep);
+    const executionKind =
+      step.execution?.kind ?? definitionStep.execution?.kind ?? "materializing";
+    const context: PipelineStepContext = {
+      mode: options.mode ?? "full",
+      stepIndex: index,
+      ...(options.signal ? { signal: options.signal } : {}),
+    };
+    const startedAt = performance.now();
+    options.onStepStart?.(index, definitionStep);
+
+    if (executionKind === "streaming") {
+      stream = streamStreamingStep(
+        stream,
+        step,
+        definitionStep,
+        context,
+        options,
+        startedAt,
+      );
+      continue;
+    }
+
+    const buffered: JsonValue[] = [];
+    let bufferedBytes = 0;
+    for await (const item of stream) {
+      if (options.signal?.aborted)
+        throw new DOMException(
+          "Pipeline execution was cancelled",
+          "AbortError",
+        );
+      buffered.push(item);
+      bufferedBytes += estimateJsonBytes(item);
+      options.onMemory?.({
+        stepIndex: index,
+        bytes: bufferedBytes,
+        ...(options.maxMaterializedBytes === undefined
+          ? {}
+          : { limitBytes: options.maxMaterializedBytes }),
+      });
+      if (
+        options.maxMaterializedBytes !== undefined &&
+        bufferedBytes > options.maxMaterializedBytes
+      )
+        throw new PipelineMemoryLimitError(
+          options.maxMaterializedBytes,
+          bufferedBytes,
+          index,
+          definitionStep.id,
+        );
+    }
+    const result = await step.execute(buffered, context);
+    const output = Array.isArray(result) ? result : [result];
+    const outputBytes = estimateJsonBytes(output);
+    if (
+      options.maxMaterializedBytes !== undefined &&
+      outputBytes > options.maxMaterializedBytes
+    )
+      throw new PipelineMemoryLimitError(
+        options.maxMaterializedBytes,
+        outputBytes,
+        index,
+        definitionStep.id,
+      );
+    options.onStepComplete?.(index, result);
+    options.onStepStat?.({
+      stepIndex: index,
+      stepId: definitionStep.id,
+      type: definitionStep.type,
+      status: "completed",
+      durationMs: performance.now() - startedAt,
+      inputItems: buffered.length,
+      outputItems: output.length,
+      memoryBytes: outputBytes,
+    });
+    options.onProgress?.({
+      completed: output.length,
+      total: output.length,
+      stepIndex: index,
+    });
+    stream = fromValues(output);
+  }
+
+  for await (const item of stream) yield item;
+}
+
+function fromValues(values: readonly JsonValue[]): AsyncIterable<JsonValue> {
+  return (async function* () {
+    yield* values;
+  })();
+}
+
+function streamStreamingStep(
+  input: AsyncIterable<JsonValue>,
+  step: PipelineStep,
+  definition: PipelineStepDefinition,
+  context: PipelineStepContext,
+  options: RunOptions,
+  startedAt: number,
+): AsyncIterable<JsonValue> {
+  return (async function* () {
+    let inputItems = 0;
+    let outputItems = 0;
+    let peakOutputBytes = 0;
+    for await (const item of input) {
+      if (options.signal?.aborted)
+        throw new DOMException(
+          "Pipeline execution was cancelled",
+          "AbortError",
+        );
+      inputItems += 1;
+      const stepInput = step.type === "jq" ? item : [item];
+      const result = await step.execute(stepInput, context);
+      const values = Array.isArray(result) ? result : [result];
+      for (const value of values) {
+        outputItems += 1;
+        const itemBytes = estimateJsonBytes(value);
+        peakOutputBytes = Math.max(peakOutputBytes, itemBytes);
+        if (
+          options.maxMaterializedBytes !== undefined &&
+          itemBytes > options.maxMaterializedBytes
+        )
+          throw new PipelineMemoryLimitError(
+            options.maxMaterializedBytes,
+            itemBytes,
+            context.stepIndex,
+            definition.id,
+          );
+        options.onMemory?.({
+          stepIndex: context.stepIndex,
+          bytes: itemBytes,
+          ...(options.maxMaterializedBytes === undefined
+            ? {}
+            : { limitBytes: options.maxMaterializedBytes }),
+        });
+        options.onProgress?.({
+          completed: outputItems,
+          total: -1,
+          stepIndex: context.stepIndex,
+        });
+        yield value;
+      }
+    }
+    options.onStepStat?.({
+      stepIndex: context.stepIndex,
+      stepId: definition.id,
+      type: definition.type,
+      status: "completed",
+      durationMs: performance.now() - startedAt,
+      inputItems,
+      outputItems,
+      memoryBytes: peakOutputBytes,
+    });
+  })();
 }
 
 export function createPipeline(

@@ -14,6 +14,7 @@ import {
   createPipeline,
   exportData,
   generatePipelineCode,
+  queryJsonWithDuckDb,
   parseJsonValue,
   parsePipeline,
   PipelineHistory,
@@ -26,6 +27,7 @@ import {
   type PipelineDefinition,
   type PipelineStepStat,
   type JsonSchema,
+  type AnalyticsQueryResult,
   type ValidationDiagnostic,
 } from "@json-workbench/core";
 import { ingestFile, type IngestTask } from "./ingest";
@@ -273,6 +275,16 @@ function App() {
   const [runMode, setRunMode] = useState<"preview" | "live" | "full">(
     "preview",
   );
+  const [memoryLimitMb, setMemoryLimitMb] = useState<
+    "unlimited" | "256" | "1024"
+  >("unlimited");
+  const [memoryBytes, setMemoryBytes] = useState(0);
+  const [sqlQuery, setSqlQuery] = useState(
+    "SELECT * FROM read_json_auto('source.json') LIMIT 100",
+  );
+  const [sqlResult, setSqlResult] = useState<AnalyticsQueryResult>();
+  const [sqlError, setSqlError] = useState<string>();
+  const [sqlRunning, setSqlRunning] = useState(false);
   const [schemaText, setSchemaText] = useState('{"type":"array"}');
   const [diagnostics, setDiagnostics] = useState<
     readonly ValidationDiagnostic[]
@@ -331,6 +343,7 @@ function App() {
     setRawPreview("");
     setPipelineResult(undefined);
     setPipelineStats([]);
+    setMemoryBytes(0);
     setView("tree");
     setExpanded(new Set([""]));
     let count = 0;
@@ -495,6 +508,36 @@ function App() {
     setStatus("Copied to clipboard");
   }
 
+  async function runSql() {
+    setSqlRunning(true);
+    setSqlError(undefined);
+    try {
+      const source = sourceFile
+        ? await sourceFile.text()
+        : stringifyJsonValue(sourceValue, false);
+      const base = globalThis.location.origin.endsWith("/")
+        ? globalThis.location.origin
+        : `${globalThis.location.origin}/`;
+      const result = await queryJsonWithDuckDb(source, sqlQuery, {
+        fileName: "source.json",
+        bundle: {
+          mainModule: `${base}duckdb-mvp.wasm`,
+          mainWorker: `${base}duckdb-browser-mvp.worker.js`,
+        },
+        onProgress: ({ phase }) => setStatus(`SQL: ${phase}`),
+      });
+      setSqlResult(result);
+      setStatus(
+        `SQL complete · ${result.rows.length.toLocaleString()} rows · ${Math.round(result.durationMs ?? 0)}ms`,
+      );
+    } catch (error) {
+      setSqlError(error instanceof Error ? error.message : String(error));
+      setStatus("SQL failed");
+    } finally {
+      setSqlRunning(false);
+    }
+  }
+
   async function runPreview() {
     const input: JsonValue | undefined =
       runMode === "full"
@@ -511,6 +554,7 @@ function App() {
     pipelineWorkerRef.current?.terminate();
     setPipelineError(undefined);
     setPipelineStats([]);
+    setMemoryBytes(0);
     setStatus("Running preview…");
     try {
       const result = await new Promise<JsonValue>((resolve, reject) => {
@@ -521,7 +565,7 @@ function App() {
         pipelineWorkerRef.current = worker;
         worker.onmessage = (message: MessageEvent) => {
           const data = message.data as {
-            type: "stat" | "progress" | "complete" | "error";
+            type: "stat" | "progress" | "memory" | "complete" | "error";
             stat?: PipelineStepStat;
             resultText?: string;
             name?: string;
@@ -529,9 +573,12 @@ function App() {
             completed?: number;
             total?: number;
             stepIndex?: number;
+            bytes?: number;
           };
           if (data.type === "stat" && data.stat)
             setPipelineStats((current) => [...current, data.stat!]);
+          else if (data.type === "memory" && data.bytes !== undefined)
+            setMemoryBytes(data.bytes);
           else if (
             data.type === "progress" &&
             data.stepIndex === -1 &&
@@ -569,6 +616,9 @@ function App() {
             false,
           ),
           mode: runMode,
+          ...(memoryLimitMb === "unlimited"
+            ? {}
+            : { maxMaterializedBytes: Number(memoryLimitMb) * 1024 * 1024 }),
         });
       });
       setPipelineResult(result);
@@ -715,7 +765,9 @@ function App() {
           <h1>JSON Workbench</h1>
         </div>
         <div className="top-actions">
-          <span className="status">{status}</span>
+          <span className="status" role="status" aria-live="polite">
+            {status}
+          </span>
           <button
             className="icon-button"
             type="button"
@@ -843,6 +895,7 @@ function App() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search values or paths"
+                  aria-label="Search values or paths"
                 />
                 <label className="regex-toggle">
                   <input
@@ -888,6 +941,12 @@ function App() {
                           <div
                             className="tree-row"
                             role="treeitem"
+                            aria-expanded={
+                              node.kind === "primitive"
+                                ? undefined
+                                : expanded.has(node.path)
+                            }
+                            aria-level={depth + 1}
                             key={`${node.path}-${depth}`}
                             style={{ paddingLeft: `${16 + depth * 22}px` }}
                           >
@@ -903,6 +962,7 @@ function App() {
                                   return next;
                                 })
                               }
+                              aria-label={`${expanded.has(node.path) ? "Collapse" : "Expand"} ${node.path || "root"}`}
                             >
                               {node.kind === "primitive"
                                 ? "·"
@@ -1017,6 +1077,7 @@ function App() {
                         type="button"
                         disabled={!historyRef.current.snapshot.past.length}
                         onClick={() => setPipeline(historyRef.current.undo())}
+                        aria-label="Undo pipeline change"
                       >
                         ↶
                       </button>
@@ -1025,6 +1086,7 @@ function App() {
                         type="button"
                         disabled={!historyRef.current.snapshot.future.length}
                         onClick={() => setPipeline(historyRef.current.redo())}
+                        aria-label="Redo pipeline change"
                       >
                         ↷
                       </button>
@@ -1119,6 +1181,7 @@ function App() {
                                   ),
                                 )
                               }
+                              aria-label={`${step.enabled ? "Disable" : "Enable"} step ${index + 1}`}
                             >
                               {step.enabled ? "●" : "○"}
                             </button>
@@ -1151,6 +1214,7 @@ function App() {
                                   ),
                                 )
                               }
+                              aria-label={`Move step ${index + 1} up`}
                             >
                               ↑
                             </button>
@@ -1165,6 +1229,7 @@ function App() {
                                   ),
                                 )
                               }
+                              aria-label={`Move step ${index + 1} down`}
                             >
                               ↓
                             </button>
@@ -1205,6 +1270,21 @@ function App() {
                         <option value="full">Full</option>
                       </select>
                     </label>
+                    <label>
+                      Memory cap{" "}
+                      <select
+                        value={memoryLimitMb}
+                        onChange={(event) =>
+                          setMemoryLimitMb(
+                            event.target.value as typeof memoryLimitMb,
+                          )
+                        }
+                      >
+                        <option value="unlimited">Unlimited</option>
+                        <option value="256">256 MB</option>
+                        <option value="1024">1 GB</option>
+                      </select>
+                    </label>
                     <button
                       className="run-button"
                       type="button"
@@ -1222,8 +1302,16 @@ function App() {
                         <span key={`${stat.stepId}-${stat.status}`}>
                           {stat.type}: {stat.status} ·{" "}
                           {stat.durationMs.toFixed(1)}ms
+                          {stat.memoryBytes === undefined
+                            ? ""
+                            : ` · ${Math.ceil(stat.memoryBytes / 1024)} KiB`}
                         </span>
                       ))}
+                      {memoryBytes > 0 && (
+                        <span>
+                          retained: {Math.ceil(memoryBytes / 1024)} KiB
+                        </span>
+                      )}
                     </div>
                   )}
                 </section>
@@ -1276,6 +1364,61 @@ function App() {
                       Copy generated code
                     </button>
                   </div>
+                </section>
+                <section className="panel sql-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="card-label">ANALYZE</span>
+                      <h2>Local SQL</h2>
+                    </div>
+                    <span className="muted">DuckDB-WASM</span>
+                  </div>
+                  <textarea
+                    className="sql-input"
+                    value={sqlQuery}
+                    onChange={(event) => setSqlQuery(event.target.value)}
+                    spellCheck={false}
+                    aria-label="SQL query"
+                  />
+                  <button
+                    className="run-button"
+                    type="button"
+                    disabled={sqlRunning}
+                    onClick={() => void runSql()}
+                  >
+                    {sqlRunning ? "Running SQL…" : "Run local SQL"}
+                  </button>
+                  {sqlError && <div className="error-box">{sqlError}</div>}
+                  {sqlResult && (
+                    <div className="sql-result">
+                      <div className="muted">
+                        {sqlResult.rows.length.toLocaleString()} rows ·{" "}
+                        {Math.round(sqlResult.durationMs ?? 0)}ms
+                      </div>
+                      <div className="sql-table-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              {sqlResult.columns.map((column) => (
+                                <th key={column}>{column}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sqlResult.rows.slice(0, 100).map((row, index) => (
+                              <tr key={index}>
+                                {sqlResult.columns.map((column) => (
+                                  <td key={column}>
+                                    {displayValue(row[column] ?? null)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </section>
                 <section className="panel">
                   <div className="panel-heading">
