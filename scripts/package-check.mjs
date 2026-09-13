@@ -10,6 +10,7 @@ const required = [
   "index.html",
   "background.js",
   "json-render.js",
+  "icons/icon-128.png",
   "jq.wasm",
   "duckdb-mvp.wasm",
   "duckdb-browser-mvp.worker.js",
