@@ -995,3 +995,151 @@ tr.selected td {
 .embedded-row .link-button {
   white-space: nowrap;
 }
+
+/* Visual diff modal */
+.diff-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+.diff-modal-body {
+  display: flex;
+  flex-direction: column;
+  width: min(1200px, 96vw);
+  height: min(80vh, 900px);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.diff-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.diff-modal-head h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 17px;
+}
+.diff-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diff-columns {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  min-height: 0;
+  background: var(--line);
+}
+.diff-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+}
+.diff-column > .card-label {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.diff-visual {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 16px;
+}
+
+/* Scoped JSON tree (shared with the in-page renderer classes) */
+.jwb-scope {
+  font: 12px var(--font-mono);
+  color: var(--text);
+}
+.jwb-scope .jwb-root {
+  white-space: nowrap;
+}
+.jwb-scope .jwb-node {
+  padding-left: 14px;
+  border-left: 1px solid transparent;
+}
+.jwb-scope .jwb-node[open] {
+  border-left-color: var(--line);
+}
+.jwb-scope .jwb-children {
+  padding-left: 4px;
+}
+.jwb-scope .jwb-line {
+  padding-left: 26px;
+}
+.jwb-scope .jwb-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.jwb-scope .jwb-summary::-webkit-details-marker {
+  display: none;
+}
+.jwb-scope .jwb-summary::before {
+  content: "\25B8";
+  display: inline-block;
+  width: 14px;
+  color: var(--muted);
+  transition: transform 100ms ease;
+}
+.jwb-scope .jwb-node[open] > .jwb-summary::before {
+  transform: rotate(90deg);
+}
+.jwb-scope .jwb-key {
+  color: var(--syntax-key);
+}
+.jwb-scope .jwb-index,
+.jwb-scope .jwb-punc {
+  color: var(--muted);
+}
+.jwb-scope .jwb-meta {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0 4px;
+  opacity: 0.7;
+}
+.jwb-scope .jwb-str {
+  color: var(--syntax-string);
+}
+.jwb-scope .jwb-num {
+  color: var(--syntax-number);
+}
+.jwb-scope .jwb-bool {
+  color: var(--syntax-boolean);
+}
+.jwb-scope .jwb-null {
+  color: var(--syntax-null);
+  font-style: italic;
+}
+.jwb-scope .jwb-diff-add,
+.jwb-scope .jwb-diff-add.jwb-summary {
+  background: var(--diff-add-bg);
+  border-radius: 4px;
+}
+.jwb-scope .jwb-diff-remove,
+.jwb-scope .jwb-diff-remove.jwb-summary {
+  background: var(--diff-remove-bg);
+  border-radius: 4px;
+}
+.jwb-scope .jwb-diff-replace,
+.jwb-scope .jwb-diff-replace.jwb-summary {
+  background: color-mix(in srgb, var(--syntax-number) 20%, transparent);
+  border-radius: 4px;
+}

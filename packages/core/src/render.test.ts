@@ -32,4 +32,16 @@ describe("renderJsonTreeHtml", () => {
       '<span class="jwb-punc">{}</span>',
     );
   });
+
+  it("tints nodes by JSON Pointer for a visual diff", () => {
+    const value = parseJsonValue('{"a":1,"b":{"c":2}}');
+    const html = renderJsonTreeHtml(value, {
+      highlight: new Map([
+        ["/a", "replace"],
+        ["/b/c", "add"],
+      ]),
+    });
+    expect(html).toContain("jwb-line jwb-diff-replace");
+    expect(html).toContain("jwb-line jwb-diff-add");
+  });
 });

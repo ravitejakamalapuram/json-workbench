@@ -86,6 +86,13 @@ def main() -> None:
                 assert page.get_by_test_id("diff-results").get_by_text(
                     re.compile(r"replace|add|remove")
                 ).first.is_visible()
+                # Diff supports side-by-side visual diff and JSON Patch actions.
+                assert page.get_by_test_id("diff-apply-button").is_visible()
+                assert page.get_by_test_id("diff-export-button").is_visible()
+                page.get_by_test_id("diff-visual-button").click()
+                page.get_by_test_id("diff-visual-modal").wait_for(timeout=5_000)
+                assert page.locator(".jwb-diff-replace, .jwb-diff-add, .jwb-diff-remove").count() > 0
+                page.get_by_test_id("diff-visual-close").click()
                 # Embedded (stringified) JSON is detected and listed.
                 page.locator('input[type="file"]').first.set_input_files(embedded_path)
                 page.get_by_text("Ready to explore").wait_for(timeout=15_000)

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { applyJsonPatch, diffJson } from "./diff";
+import { applyJsonPatch, diffJson, toJsonPatch } from "./diff";
 
 describe("JSON diff", () => {
+  it("round-trips a diff as a JSON Patch that reproduces the target", () => {
+    const left = { user: { id: 1, tags: ["a"] }, drop: true };
+    const right = { user: { id: 2, tags: ["a", "b"] } };
+    const patch = toJsonPatch(diffJson(left, right));
+    expect(patch).toContainEqual({ op: "remove", path: "/drop" });
+    expect(applyJsonPatch(left, patch)).toEqual(right);
+  });
+
   it("emits structural paths and preserves changed values", () => {
     expect(
       diffJson({ user: { id: 1 } }, { user: { id: 2 }, ok: true }),

@@ -224,3 +224,21 @@ export function applyJsonPatch(
   }
   return result;
 }
+
+/**
+ * Convert the structural diff produced by {@link diffJson} into an
+ * RFC 6902 JSON Patch document that can be applied with {@link applyJsonPatch}.
+ */
+export function toJsonPatch(
+  diffs: readonly JsonDiff[],
+): readonly JsonPatchOperation[] {
+  return diffs.map((change) => {
+    if (change.op === "remove")
+      return { op: "remove", path: change.path } as const;
+    return {
+      op: change.op,
+      path: change.path,
+      value: change.value as JsonValue,
+    } as const;
+  });
+}

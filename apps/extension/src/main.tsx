@@ -24,6 +24,9 @@ import {
   profileJsonStructure,
   inferJsonSchema,
   diffJson,
+  toJsonPatch,
+  applyJsonPatch,
+  renderJsonTreeHtml,
   detectEmbeddedJson,
   type JsonObject,
   type JsonStructureEvent,
@@ -333,6 +336,8 @@ function App() {
   const [profile, setProfile] = useState<JsonProfile>();
   const [diffText, setDiffText] = useState("");
   const [diffResult, setDiffResult] = useState<readonly JsonDiff[]>();
+  const [diffRight, setDiffRight] = useState<JsonValue>();
+  const [diffVisualOpen, setDiffVisualOpen] = useState(false);
   const [autoRender, setAutoRender] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -912,11 +917,44 @@ function App() {
       }
       const changes = diffJson(left, right);
       setDiffResult(changes);
+      setDiffRight(right);
       setStatus(
         changes.length
           ? `${changes.length} difference${changes.length === 1 ? "" : "s"} found`
           : "No differences",
       );
+    } catch (error) {
+      setPipelineError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function exportPatch() {
+    if (!diffResult?.length) return;
+    const patch = toJsonPatch(diffResult);
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(
+      new Blob([stringifyJsonValue(patch as unknown as JsonValue, true)], {
+        type: "application/json",
+      }),
+    );
+    link.download = "json-workbench.patch.json";
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setStatus(`Exported ${diffResult.length}-op JSON Patch`);
+  }
+
+  function applyPatch() {
+    if (!diffResult?.length) return;
+    try {
+      const patched = applyJsonPatch(sourceValue, toJsonPatch(diffResult));
+      onFile(
+        new File(
+          [stringifyJsonValue(patched, true)],
+          "json-workbench.patched.json",
+          { type: "application/json" },
+        ),
+      );
+      setStatus("Applied patch — loaded the result as the active dataset");
     } catch (error) {
       setPipelineError(error instanceof Error ? error.message : String(error));
     }
@@ -1846,6 +1884,34 @@ function App() {
                   >
                     Compute diff
                   </button>
+                  {diffResult && diffResult.length > 0 && (
+                    <div className="inline-actions" data-testid="diff-actions">
+                      <button
+                        className="secondary"
+                        type="button"
+                        onClick={() => setDiffVisualOpen(true)}
+                        data-testid="diff-visual-button"
+                      >
+                        Side-by-side
+                      </button>
+                      <button
+                        className="secondary"
+                        type="button"
+                        onClick={applyPatch}
+                        data-testid="diff-apply-button"
+                      >
+                        Apply patch
+                      </button>
+                      <button
+                        className="secondary"
+                        type="button"
+                        onClick={exportPatch}
+                        data-testid="diff-export-button"
+                      >
+                        Export patch
+                      </button>
+                    </div>
+                  )}
                   {diffResult &&
                     (diffResult.length ? (
                       <div
@@ -1935,6 +2001,73 @@ function App() {
           </>
         )}
       </section>
+      {diffVisualOpen && diffResult && (
+        <div
+          className="diff-modal"
+          role="dialog"
+          aria-modal="true"
+          data-testid="diff-visual-modal"
+          onClick={() => setDiffVisualOpen(false)}
+        >
+          <div
+            className="diff-modal-body"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="diff-modal-head">
+              <div>
+                <span className="card-label">DIFF</span>
+                <h2>Side-by-side</h2>
+              </div>
+              <div className="diff-legend">
+                <span className="badge op-remove">removed</span>
+                <span className="badge op-add">added</span>
+                <span className="badge op-replace">changed</span>
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={() => setDiffVisualOpen(false)}
+                  aria-label="Close"
+                  data-testid="diff-visual-close"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="diff-columns">
+              <div className="diff-column">
+                <div className="card-label">SOURCE</div>
+                <div
+                  className="diff-visual jwb-scope"
+                  dangerouslySetInnerHTML={{
+                    __html: renderJsonTreeHtml(sourceValue, {
+                      highlight: new Map(
+                        diffResult
+                          .filter((c) => c.op !== "add")
+                          .map((c) => [c.path || "/", c.op] as const),
+                      ),
+                    }),
+                  }}
+                />
+              </div>
+              <div className="diff-column">
+                <div className="card-label">COMPARED</div>
+                <div
+                  className="diff-visual jwb-scope"
+                  dangerouslySetInnerHTML={{
+                    __html: renderJsonTreeHtml(diffRight ?? sourceValue, {
+                      highlight: new Map(
+                        diffResult
+                          .filter((c) => c.op !== "remove")
+                          .map((c) => [c.path || "/", c.op] as const),
+                      ),
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

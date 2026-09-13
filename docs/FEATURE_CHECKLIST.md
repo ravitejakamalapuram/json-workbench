@@ -21,7 +21,7 @@ criteria are met.
 - [x] Raw preview, search, regex search, copy path/value, table sorting, column hiding, and selection
 - [x] Serializable pipeline with native operations, JSONata, jq, history, recipe import/export, preview/live/full modes, cancellation, progress, and per-step statistics
 - [x] Validation, structural diff/JSON Patch, JSON/JSONL/NDJSON/CSV/TSV export, and code generation
-- [x] Structure Insights profiling panel (field type/presence/null/inconsistency), one-click JSON Schema inference, a UI Diff panel producing navigable JSON Patch output, and embedded (stringified) JSON detection with copy-as-parsed
+- [x] Structure Insights profiling panel (field type/presence/null/inconsistency), one-click JSON Schema inference, a UI Diff panel producing navigable JSON Patch output (apply + export patch, plus a side-by-side visual two-tree diff), and embedded (stringified) JSON detection with copy-as-parsed
 - [x] Local-only assistant that proposes explicit reviewable pipelines
 
 ## Engines and scale
