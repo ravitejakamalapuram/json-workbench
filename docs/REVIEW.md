@@ -220,3 +220,19 @@ Delivered the top adoption gap after the initial review:
   `application/json` page (lossless big integers preserved, HTML escaped), the
   settings panel loads with no page errors, unit tests grew to 65, and all release
   gates plus the E2E smoke stay green.
+
+## 10. Addendum — P0 #2 implemented (premium design pass)
+
+Restyled the entire extension to a distinctive "Technical Grid" aesthetic
+(zinc near-black surfaces, a single orange accent, 1px borders, no slop
+gradients) driven by an expert design blueprint (`/app/design_guidelines.json`):
+
+- **Self-hosted, offline/CSP-safe fonts** (honouring local-first): Bricolage
+  Grotesque for headings, IBM Plex Sans for UI, JetBrains Mono for all data/code.
+- Full **dark + light** CSS-variable themes with dedicated JSON **syntax token
+  colors** (key/string/number/boolean/null) applied consistently to the tree,
+  the in-page renderer, and a **custom Monaco theme** (`jwb-dark`/`jwb-light`).
+- Segmented view tabs, snappy hover/active micro-interactions, custom scrollbars,
+  a dashed empty state that lights up on hover, and mono-tabular metric tiles.
+- All release gates plus the E2E smoke stay green; verified across dark, light,
+  and the Monaco editor.

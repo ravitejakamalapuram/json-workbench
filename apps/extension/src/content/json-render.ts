@@ -15,48 +15,52 @@ const RENDERED_FLAG = "data-jwb-rendered";
 const STYLE = `
 :root { color-scheme: dark; }
 html.jwb-active, html.jwb-active body {
-  margin: 0; background: #0b1020; color: #e5e7eb;
-  font: 13px/1.6 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  margin: 0; background: #09090b; color: #fafafa;
+  font: 13px/1.6 "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 .jwb-bar {
   position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px; background: rgba(17,24,39,0.92); backdrop-filter: blur(10px);
-  border-bottom: 1px solid #253047;
+  padding: 10px 16px; background: rgba(9,9,11,0.82); backdrop-filter: blur(14px);
+  border-bottom: 1px solid #27272a;
 }
-.jwb-bar .jwb-brand { font-weight: 700; letter-spacing: 0.02em; color: #a5b4fc; }
-.jwb-bar .jwb-info { color: #8b99b3; font-size: 12px; }
+.jwb-bar .jwb-brand { font-weight: 700; letter-spacing: 0.02em; color: #f58220; }
+.jwb-bar .jwb-info { color: #a1a1aa; font-size: 12px; }
 .jwb-bar .jwb-spacer { flex: 1; }
 .jwb-btn {
-  border: 1px solid #253047; background: #0f172a; color: #e5e7eb;
+  border: 1px solid #27272a; background: #18181b; color: #fafafa;
   padding: 5px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12px;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 120ms ease;
 }
-.jwb-btn:hover { background: #16233d; border-color: #3b82f6; }
-.jwb-btn.jwb-primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
-.jwb-btn.jwb-primary:hover { background: #4338ca; }
+.jwb-btn:hover { background: #27272a; border-color: #3f3f46; }
+.jwb-btn:active { transform: scale(0.97); }
+.jwb-btn.jwb-primary { background: #f58220; border-color: #f58220; color: #09090b; font-weight: 600; }
+.jwb-btn.jwb-primary:hover { background: #ea580c; }
 .jwb-wrap { padding: 16px 20px 60px; max-width: 100%; overflow-x: auto; }
 .jwb-root { white-space: nowrap; }
 .jwb-node { padding-left: 14px; border-left: 1px solid transparent; }
-.jwb-node[open] { border-left-color: #1e293b; }
+.jwb-node[open] { border-left-color: #27272a; }
 .jwb-children { padding-left: 4px; }
 .jwb-line { padding-left: 26px; }
 .jwb-summary { cursor: pointer; list-style: none; padding: 1px 0; border-radius: 4px; }
-.jwb-summary:hover { background: rgba(129,140,248,0.10); }
+.jwb-summary:hover { background: rgba(245,130,32,0.10); }
 .jwb-summary::-webkit-details-marker { display: none; }
 .jwb-summary::before {
-  content: "\\25B8"; display: inline-block; width: 14px; color: #64748b;
+  content: "\\25B8"; display: inline-block; width: 14px; color: #71717a;
   transition: transform 100ms ease;
 }
 .jwb-node[open] > .jwb-summary::before { transform: rotate(90deg); }
-.jwb-key { color: #93c5fd; }
-.jwb-index { color: #64748b; }
-.jwb-punc { color: #64748b; }
-.jwb-meta { color: #475569; font-size: 11px; margin: 0 4px; }
-.jwb-str { color: #86efac; }
+.jwb-key { color: #d4d4d8; }
+.jwb-index { color: #71717a; }
+.jwb-punc { color: #71717a; }
+.jwb-meta { color: #52525b; font-size: 11px; margin: 0 4px; }
+.jwb-str { color: #4ade80; }
 .jwb-num { color: #fbbf24; }
-.jwb-bool { color: #f472b6; }
-.jwb-null { color: #94a3b8; font-style: italic; }
-.jwb-raw { white-space: pre-wrap; word-break: break-word; color: #cbd5e1; }
+.jwb-bool { color: #f87171; }
+.jwb-null { color: #71717a; font-style: italic; }
+.jwb-raw { white-space: pre-wrap; word-break: break-word; color: #d4d4d8; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
 `;
 
 function extractJsonText(): string | null {

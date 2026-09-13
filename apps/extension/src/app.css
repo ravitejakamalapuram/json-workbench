@@ -1,13 +1,15 @@
 :root {
   font-family:
-    Inter,
+    "IBM Plex Sans",
     ui-sans-serif,
     system-ui,
     -apple-system,
-    BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
   font-synthesis: none;
+  --font-heading: "Bricolage Grotesque Variable", "IBM Plex Sans", sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 * {
   box-sizing: border-box;
@@ -26,48 +28,102 @@ button {
   cursor: pointer;
 }
 .shell {
-  --bg: #0b1020;
-  --panel: #111827;
-  --panel-2: #0f172a;
-  --line: #253047;
-  --text: #e5e7eb;
-  --muted: #8b99b3;
-  --accent: #818cf8;
-  --accent-strong: #4f46e5;
+  --bg: #09090b;
+  --panel: #18181b;
+  --panel-2: #121214;
+  --panel-hover: #27272a;
+  --line: #27272a;
+  --line-strong: #3f3f46;
+  --text: #fafafa;
+  --muted: #a1a1aa;
+  --accent: #f58220;
+  --accent-strong: #ea580c;
+  --syntax-key: #d4d4d8;
+  --syntax-string: #4ade80;
+  --syntax-number: #fbbf24;
+  --syntax-boolean: #f87171;
+  --syntax-null: #71717a;
+  --diff-add-bg: rgba(74, 222, 128, 0.15);
+  --diff-add-text: #4ade80;
+  --diff-remove-bg: rgba(248, 113, 113, 0.15);
+  --diff-remove-text: #f87171;
   min-height: 100vh;
   color: var(--text);
-  background: radial-gradient(circle at 70% -20%, #182659, var(--bg) 48%);
+  background:
+    radial-gradient(
+      1200px 400px at 78% -10%,
+      rgba(245, 130, 32, 0.08),
+      transparent 60%
+    ),
+    var(--bg);
 }
 .shell.light {
-  --bg: #f1f5f9;
+  --bg: #fdfdfd;
   --panel: #ffffff;
-  --panel-2: #f8fafc;
-  --line: #d5dce8;
-  --text: #172033;
-  --muted: #64748b;
-  --accent: #4f46e5;
-  background: #f1f5f9;
+  --panel-2: #f4f4f5;
+  --panel-hover: #f4f4f5;
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+  --text: #09090b;
+  --muted: #71717a;
+  --accent: #f58220;
+  --accent-strong: #ea580c;
+  --syntax-key: #3f3f46;
+  --syntax-string: #16a34a;
+  --syntax-number: #d97706;
+  --syntax-boolean: #dc2626;
+  --syntax-null: #9ca3af;
+  --diff-add-bg: rgba(22, 163, 74, 0.1);
+  --diff-add-text: #16a34a;
+  --diff-remove-bg: rgba(220, 38, 38, 0.1);
+  --diff-remove-text: #dc2626;
+  background: var(--bg);
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 .topbar {
-  height: 72px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 28px;
+  padding: 0 24px;
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 .brand h1 {
   margin: 3px 0 0;
+  font-family: var(--font-heading);
   font-size: 20px;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
-.eyebrow,
-.card-label {
+.eyebrow {
   color: var(--accent);
   font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+.card-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
 }
 .top-actions,
 .source-actions,
@@ -77,12 +133,13 @@ button {
   gap: 8px;
 }
 .status {
-  padding: 6px 10px;
+  padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  color: #a7f3d0;
-  background: #0f1d1a;
+  color: var(--muted);
+  background: var(--panel-2);
   font-size: 12px;
+  font-family: var(--font-mono);
 }
 .icon-button,
 .secondary,
@@ -153,34 +210,54 @@ button {
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid #3b4660;
+  border: 1px solid var(--line-strong);
   border-radius: 9px;
   color: var(--accent);
   background: var(--panel-2);
-  font:
-    700 13px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 700 13px var(--font-mono);
 }
 button {
-  padding: 8px 12px;
+  padding: 8px 13px;
   border: 0;
   border-radius: 8px;
-  color: white;
-  background: var(--accent-strong);
+  color: #ffffff;
+  background: var(--accent);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
+  transition:
+    background-color 150ms ease,
+    transform 120ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
 }
 button:hover {
-  filter: brightness(1.12);
+  background: var(--accent-strong);
+}
+button:active {
+  transform: scale(0.97);
 }
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+.icon-button:hover,
+.secondary:hover,
+.tab:hover,
+.step-buttons button:hover,
+.link-button:hover,
+.table-sort:hover,
+.path-button:hover,
+.copy-button:hover,
+.toggle:hover,
+.expand:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+.icon-button:hover {
+  border-color: var(--line-strong);
 }
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -203,10 +280,16 @@ select:focus-visible {
   min-height: 430px;
   margin-top: 16px;
   padding: 70px 32px;
-  border: 1px dashed #52617d;
+  border: 1px dashed var(--line-strong);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  background: var(--panel-2);
   text-align: center;
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+.empty-state:hover {
+  border-color: var(--accent);
 }
 .empty-icon {
   width: 68px;
@@ -216,6 +299,9 @@ select:focus-visible {
 }
 .empty-state h2 {
   margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   font-size: 25px;
 }
 .empty-state p {
@@ -237,11 +323,7 @@ select:focus-visible {
   border-radius: 6px;
   color: var(--text);
   background: var(--panel-2);
-  font:
-    11px/1.45 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 11px/1.45 var(--font-mono);
   resize: vertical;
 }
 .paste-box .inline-actions {
@@ -260,10 +342,17 @@ select:focus-visible {
 }
 .tab {
   color: var(--muted);
+  border-radius: 7px;
+  padding: 7px 14px;
+  font-weight: 600;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
 }
 .tab.active {
   color: var(--text);
   background: var(--panel);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 .search {
   display: flex;
@@ -307,6 +396,9 @@ select:focus-visible {
 .card-heading h2,
 .panel-heading h2 {
   margin: 5px 0 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   font-size: 15px;
 }
 .muted {
@@ -318,11 +410,7 @@ select:focus-visible {
   max-height: none;
   overflow: visible;
   padding: 8px 0 18px;
-  font:
-    12px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 12px var(--font-mono);
 }
 .tree-row {
   display: flex;
@@ -333,7 +421,7 @@ select:focus-visible {
   padding-bottom: 3px;
 }
 .tree-row:hover {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .virtual-list {
   min-height: 520px;
@@ -362,11 +450,21 @@ select:focus-visible {
 .value {
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #a5b4fc;
+  color: var(--text);
   white-space: nowrap;
 }
-.null-value {
-  color: #fda4af;
+.value-string {
+  color: var(--syntax-string);
+}
+.value-number {
+  color: var(--syntax-number);
+}
+.value-boolean {
+  color: var(--syntax-boolean);
+}
+.null-value,
+.value-null {
+  color: var(--syntax-null);
 }
 .copy-button {
   margin-left: auto;
@@ -383,13 +481,9 @@ select:focus-visible {
   overflow: auto;
   margin: 0;
   padding: 18px;
-  color: #c4b5fd;
-  background: #090e1a;
-  font:
-    12px/1.6 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  color: var(--text);
+  background: var(--panel-2);
+  font: 12px/1.6 var(--font-mono);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -453,18 +547,14 @@ select:focus-visible {
 }
 .toggle {
   padding: 0;
-  color: #6ee7b7;
+  color: var(--syntax-string);
 }
 .step code {
   display: block;
   overflow: hidden;
   margin-top: 8px;
   color: var(--muted);
-  font:
-    10px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 10px var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -515,11 +605,7 @@ select:focus-visible {
   outline: 0;
   color: var(--text);
   background: var(--panel-2);
-  font:
-    11px/1.45 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 11px/1.45 var(--font-mono);
   resize: vertical;
 }
 .sql-result {
@@ -550,13 +636,11 @@ select:focus-visible {
 .assistant-result code {
   overflow: auto;
   padding: 8px;
-  color: #c4b5fd;
-  background: #090e1a;
-  font:
-    10px/1.45 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: 10px/1.45 var(--font-mono);
 }
 .assistant-result button {
   justify-self: start;
@@ -574,11 +658,7 @@ select:focus-visible {
   padding: 9px;
   outline: 0;
   resize: vertical;
-  font:
-    10px/1.45 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 10px/1.45 var(--font-mono);
 }
 .diagnostic-list {
   display: grid;
@@ -588,25 +668,34 @@ select:focus-visible {
 .diagnostic {
   overflow: hidden;
   padding: 6px 8px;
-  color: #fecaca;
-  border: 1px solid #7f1d1d;
-  background: #2a1118;
+  color: var(--text);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 6px;
   font-size: 10px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.diagnostic:hover {
+  border-color: var(--line-strong);
+  background: var(--panel-hover);
 }
 .diagnostic strong {
   margin-right: 5px;
-  color: #fda4af;
+  color: var(--accent);
+  font-family: var(--font-mono);
 }
 .error-box {
   margin: 0 14px 12px;
   padding: 9px;
-  border: 1px solid #7f1d1d;
+  border: 1px solid color-mix(in srgb, var(--diff-remove-text) 45%, transparent);
   border-radius: 7px;
-  color: #fecaca;
-  background: #2a1118;
+  color: var(--diff-remove-text);
+  background: var(--diff-remove-bg);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -643,13 +732,11 @@ select:focus-visible {
   overflow: auto;
   margin: 10px 0;
   padding: 9px;
-  color: #c4b5fd;
-  background: #090e1a;
-  font:
-    10px/1.45 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  color: var(--syntax-string);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: 10px/1.45 var(--font-mono);
   white-space: pre-wrap;
 }
 .codegen .secondary {
@@ -675,11 +762,7 @@ select:focus-visible {
 table {
   width: 100%;
   border-collapse: collapse;
-  font:
-    11px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 11px var(--font-mono);
 }
 th,
 td {
@@ -764,6 +847,7 @@ tr.selected td {
 .metric-value {
   font-size: 18px;
   font-weight: 700;
+  font-family: var(--font-mono);
   color: var(--text);
 }
 .metric-label {
@@ -830,7 +914,7 @@ tr.selected td {
   justify-self: end;
 }
 .field-present.partial {
-  color: #f59e0b;
+  color: var(--syntax-number);
 }
 .badge {
   display: inline-block;
@@ -838,24 +922,25 @@ tr.selected td {
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  font-family: var(--font-mono);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
   color: var(--accent);
 }
 .badge.warn {
-  background: color-mix(in srgb, #f59e0b 24%, transparent);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--syntax-number) 22%, transparent);
+  color: var(--syntax-number);
 }
 .badge.op-add {
-  background: color-mix(in srgb, #22c55e 24%, transparent);
-  color: #22c55e;
+  background: var(--diff-add-bg);
+  color: var(--diff-add-text);
 }
 .badge.op-remove {
-  background: color-mix(in srgb, #ef4444 24%, transparent);
-  color: #ef4444;
+  background: var(--diff-remove-bg);
+  color: var(--diff-remove-text);
 }
 .badge.op-replace {
-  background: color-mix(in srgb, #f59e0b 24%, transparent);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--syntax-number) 20%, transparent);
+  color: var(--syntax-number);
 }
 
 /* Settings dropdown */

@@ -38,6 +38,14 @@ import {
   type ValidationDiagnostic,
 } from "@json-workbench/core";
 import { ingestFile, type IngestTask } from "./ingest";
+import "@fontsource-variable/bricolage-grotesque";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+import "@fontsource/jetbrains-mono/700.css";
 import "./app.css";
 
 const MonacoRawEditor = lazy(() =>
@@ -1185,7 +1193,7 @@ function App() {
                                 : String(node.key)}
                             </button>
                             <span
-                              className={`value ${node.primitiveType === "null" ? "null-value" : ""}`}
+                              className={`value ${node.primitiveType ? `value-${node.primitiveType}` : ""} ${node.primitiveType === "null" ? "null-value" : ""}`}
                             >
                               {nodeText(node)}
                             </span>
