@@ -31,7 +31,8 @@
     "chrome-store:status": "cws-release status",
     "chrome-store:upload": "cws-release upload",
     "chrome-store:release": "cws-release release",
-    "chrome-store:dashboard": "cws-release dashboard"
+    "chrome-store:dashboard": "cws-release dashboard",
+    "chrome-store:onboard": "cws-release onboard"
   },
   "engines": {
     "node": ">=22"
