@@ -6,17 +6,18 @@
   "language": "en",
   "supportUrl": "https://github.com/ravitejakamalapuram/json-workbench/issues",
   "websiteUrl": "https://github.com/ravitejakamalapuram/json-workbench",
-  "privacyPolicyUrl": "https://github.com/ravitejakamalapuram/json-workbench",
+  "privacyPolicyUrl": "https://ravitejakamalapuram.github.io/json-workbench.html",
   "publisherId": "9637cb78-fa33-49dd-a4cb-91066ff182e3",
   "extensionId": "higmlhleblpmdogjccpmjlnilpmhohal",
   "visibility": "PUBLIC",
   "distribution": "",
   "screenshots": [
-    "assets/screenshots/01-main-screen.png"
+    "assets/screenshots/01-main-screen.png",
+    "assets/screenshots/02-raw-editor.png",
+    "assets/screenshots/03-table-view.png"
   ],
   "promotionalImages": {
     "smallTile": "assets/promo/small-tile.png",
-    "largeTile": "assets/promo/large-tile.png",
     "marquee": "assets/promo/marquee.png"
   }
 }
