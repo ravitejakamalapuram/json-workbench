@@ -1,0 +1,41 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-dist
+          path: apps/extension/dist
+          if-no-files-found: error
+
+  release:
+    name: Chrome Web Store Release
+    needs: build
+    uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-cd.yml@v1.1.9
+    with:
+      extension-dir: 'apps/extension/dist'
+    secrets:
+      chrome-extension-id: ${{ secrets.CWS_EXTENSION_ID }}
+      chrome-client-id: ${{ secrets.CWS_CLIENT_ID }}
+      chrome-client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
+      chrome-refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
