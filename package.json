@@ -26,6 +26,8 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tsconfig/strictest": "^2.0.8",
     "@types/node": "^22.20.2",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",

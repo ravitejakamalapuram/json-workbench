@@ -282,7 +282,6 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const recipeInputRef = useRef<HTMLInputElement>(null);
   const taskRef = useRef<IngestTask | undefined>(undefined);
-  const historyRef = useRef(new PipelineHistory(createPipeline()));
   const pipelineWorkerRef = useRef<Worker | undefined>(undefined);
   const [fileName, setFileName] = useState<string>();
   const [sourceFile, setSourceFile] = useState<File>();
@@ -299,9 +298,22 @@ function App() {
   const [query, setQuery] = useState("");
   const [regexSearch, setRegexSearch] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set([""]));
-  const [pipeline, setPipeline] = useState<PipelineDefinition>(
-    historyRef.current.snapshot.present,
-  );
+  // Hydrate the persisted recipe during the first render, not in an effect:
+  // under StrictMode's simulated remount the persist effect re-runs with the
+  // initial empty pipeline and would clobber the saved recipe before a
+  // restore effect could read it back.
+  const [pipeline, setPipeline] = useState<PipelineDefinition>(() => {
+    const saved = localStorage.getItem("json-workbench:pipeline");
+    if (saved) {
+      try {
+        return parsePipeline(saved);
+      } catch {
+        localStorage.removeItem("json-workbench:pipeline");
+      }
+    }
+    return createPipeline();
+  });
+  const historyRef = useRef(new PipelineHistory(pipeline));
   const [pipelineResult, setPipelineResult] = useState<JsonValue>();
   const [pipelineStats, setPipelineStats] = useState<PipelineStepStat[]>([]);
   const [pipelineError, setPipelineError] = useState<string>();
@@ -332,7 +344,9 @@ function App() {
   const [codeTarget, setCodeTarget] = useState<
     "jsonata" | "jq" | "javascript" | "typescript" | "python" | "sql"
   >("jsonata");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    localStorage.getItem("json-workbench:theme") === "light" ? "light" : "dark",
+  );
   const [profile, setProfile] = useState<JsonProfile>();
   const [diffText, setDiffText] = useState("");
   const [diffResult, setDiffResult] = useState<readonly JsonDiff[]>();
@@ -340,21 +354,6 @@ function App() {
   const [diffVisualOpen, setDiffVisualOpen] = useState(false);
   const [autoRender, setAutoRender] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("json-workbench:pipeline");
-    if (saved) {
-      try {
-        const restored = parsePipeline(saved);
-        historyRef.current = new PipelineHistory(restored);
-        setPipeline(restored);
-      } catch {
-        localStorage.removeItem("json-workbench:pipeline");
-      }
-    }
-    if (localStorage.getItem("json-workbench:theme") === "light")
-      setTheme("light");
-  }, []);
 
   useEffect(() => {
     const bridge = chromeBridge();
@@ -790,10 +789,10 @@ function App() {
       remove: { fields: ["internal"] },
       rename: { from: "name", to: "label" },
       add: { key: "reviewed", value: true },
-      sort: { field: "id", descending: false },
-      distinct: { field: "id" },
-      deduplicate: { field: "id" },
-      group: { field: "status" },
+      sort: { key: "id", direction: "asc" },
+      distinct: { key: "id" },
+      deduplicate: { key: "id" },
+      group: { key: "id" },
       flatten: { prefix: "" },
       unflatten: { separator: "." },
       replace: { field: "status", from: "draft", to: "review" },
@@ -1869,7 +1868,7 @@ function App() {
                     below to compare against that instead.
                   </p>
                   <textarea
-                    className="schema-input"
+                    className="diff-input"
                     value={diffText}
                     onChange={(event) => setDiffText(event.target.value)}
                     placeholder="Optional: paste JSON to compare against the source"

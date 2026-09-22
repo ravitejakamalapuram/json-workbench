@@ -12,7 +12,17 @@ Worker protocol, parser-to-profiler flow, pipeline execution, cancellation, resu
 
 ### E2E
 
-Install/build the extension and exercise the primary user journey: open workbench → load fixture → inspect → search → transform → preview → export.
+Playwright (`npx playwright test`) drives the workbench UI in Chromium against
+the Vite dev server (`playwright.config.ts`, port 4173). Specs cover the primary
+journeys: source loading and malformed-input diagnostics, Tree/Raw/Table views
+and search, pipeline step CRUD + history + failed-run surfacing, structure
+insights and schema validation, the local assistant, export/codegen downloads,
+JSON Patch diff, the local DuckDB SQL panel, embedded-JSON detection, and shell
+behaviors (theme and recipe persistence across reloads). Fixtures in
+`e2e/fixtures.ts` keep runs deterministic and offline.
+
+Install/build the extension and exercise the packaging path with
+`npm run package:check` after UI changes that touch the extension shell.
 
 ### Performance
 

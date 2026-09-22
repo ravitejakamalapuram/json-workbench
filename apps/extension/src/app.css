@@ -587,7 +587,8 @@ select:focus-visible {
   font-size: 11px;
 }
 .run-controls select,
-.schema-input {
+.schema-input,
+.diff-input {
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--text);
@@ -650,7 +651,8 @@ select:focus-visible {
   width: auto;
   margin-right: 14px;
 }
-.schema-input {
+.schema-input,
+.diff-input {
   display: block;
   width: calc(100% - 28px);
   min-height: 90px;

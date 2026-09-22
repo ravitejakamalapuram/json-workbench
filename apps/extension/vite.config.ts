@@ -19,4 +19,11 @@ export default defineConfig({
       "monaco-editor/esm/vs/language/json/json.worker.js?worker": `${resolve(monacoRoot, "language/json/json.worker.js")}?worker`,
     },
   },
+  // Monaco must not be pre-bundled: the dep optimizer mishandles `?worker`
+  // sub-imports ("optimized info should be defined"), which breaks the Raw
+  // view in dev. Excluded, the worker plugin handles the worker imports and
+  // production builds are unaffected.
+  optimizeDeps: {
+    exclude: ["monaco-editor"],
+  },
 });

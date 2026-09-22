@@ -15,7 +15,8 @@
 - Full pipeline execution has explicit retained-memory accounting and configurable materialization limits; streaming-capable steps can run through `runPipelineStream` without collecting the whole input, while global/materializing steps fail before crossing their bound.
 - The extension includes a dedicated local DuckDB SQL panel with packaged WASM/worker assets, local URL routing, result preview, row counts, and query duration.
 - The CLI and VS Code package bundle the same versioned core pipeline contract and have executable build/smoke coverage.
-- `npm run typecheck`, `npm test`, `npm run lint`, `npm run format:check`, `npm run build`, `npm run build:cli`, `npm run test:cli`, `npm run build:vscode`, `npm run package:check`, `python3 tests/smoke_extension.py`, and `npm audit --omit=dev --audit-level=moderate` are the local release gates.
+- A Playwright e2e suite (`npx playwright test`) covers 43 browser journeys across source loading, views/search, pipelines, insights/schema/assistant, export/codegen, diff, local SQL, embedded JSON, and shell persistence.
+- `npm run typecheck`, `npm test`, `npm run lint`, `npm run format:check`, `npx playwright test`, `npm run build`, `npm run build:cli`, `npm run test:cli`, `npm run build:vscode`, `npm run package:check`, `python3 tests/smoke_extension.py`, and `npm audit --omit=dev --audit-level=moderate` are the local release gates.
 - Release-hardening evidence is recorded in `docs/ACCESSIBILITY.md`, `docs/BROWSER_COMPATIBILITY.md`, `docs/STORE_LISTING.md`, and `docs/TELEMETRY.md`.
 
 The chunked JSONL benchmark was run locally on 2026-09-10 with one iteration per size: 10 MB in 244 ms, 100 MB in 2.29 s, 500 MB in 11.82 s, and 1,024 MB in 24.25 s. These measure parser throughput only; they are not claims about full UI materialization or pipeline throughput.

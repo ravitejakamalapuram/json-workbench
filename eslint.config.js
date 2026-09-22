@@ -1,7 +1,9 @@
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**"] },
+  // `apps/extension/public/` holds vendored minified assets (DuckDB-WASM
+  // worker, jq.wasm) that are not source files.
+  { ignores: ["**/dist/**", "**/node_modules/**", "apps/extension/public/**"] },
   ...tseslint.configs.recommended,
   {
     files: ["**/*.{js,jsx,ts,tsx}"],
