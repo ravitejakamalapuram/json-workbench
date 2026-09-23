@@ -20,7 +20,19 @@
     "bench": "vitest bench packages/core/src/large-data.bench.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "chrome-store": "cws-release",
+    "chrome-store:inspect": "cws-release inspect",
+    "chrome-store:validate": "cws-release validate",
+    "chrome-store:build": "cws-release build",
+    "chrome-store:test": "cws-release test",
+    "chrome-store:assets": "cws-release assets",
+    "chrome-store:package": "cws-release package",
+    "chrome-store:status": "cws-release status",
+    "chrome-store:upload": "cws-release upload",
+    "chrome-store:release": "cws-release release",
+    "chrome-store:dashboard": "cws-release dashboard",
+    "chrome-store:onboard": "cws-release onboard"
   },
   "engines": {
     "node": ">=22"

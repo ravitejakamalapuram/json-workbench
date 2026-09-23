@@ -8,3 +8,6 @@ test-results/
 .env
 .env.*
 !.env.example
+chrome-store/builds/
+chrome-store/*.zip
+logs/
