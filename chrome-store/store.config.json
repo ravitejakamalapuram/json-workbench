@@ -12,9 +12,11 @@
   "visibility": "PUBLIC",
   "distribution": "",
   "screenshots": [
-    "assets/screenshots/01-main-screen.png",
-    "assets/screenshots/02-raw-editor.png",
-    "assets/screenshots/03-table-view.png"
+    "../store/assets/screenshots/01-tree-insights.png",
+    "../store/assets/screenshots/02-table.png",
+    "../store/assets/screenshots/03-raw-monaco.png",
+    "../store/assets/screenshots/04-insights-pipeline.png",
+    "../store/assets/screenshots/05-local-sql.png"
   ],
   "promotionalImages": {
     "smallTile": "assets/promo/small-tile.png",
