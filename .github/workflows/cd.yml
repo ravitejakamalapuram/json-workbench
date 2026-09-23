@@ -1,39 +1,26 @@
 name: CD
 
+# Store releases are on demand only (Actions -> CD -> Run workflow). Publishing on
+# every push re-uploads while an item is in review and burns a version tag each time.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+
+# Never cancel a release mid-flight: half-created tags/releases are bad state.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build Extension
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: extension-dist
-          path: apps/extension/dist
-          if-no-files-found: error
-
   release:
     name: Chrome Web Store Release
-    needs: build
-    uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-cd.yml@v1.1.9
+    uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-cd.yml@v1
     with:
       extension-dir: 'apps/extension/dist'
+      build-command: 'npm run build'
+      node-version: '22'
     secrets:
       chrome-extension-id: ${{ secrets.CWS_EXTENSION_ID }}
       chrome-client-id: ${{ secrets.CWS_CLIENT_ID }}
