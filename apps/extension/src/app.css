@@ -326,6 +326,31 @@ select:focus-visible {
   font: 11px/1.45 var(--font-mono);
   resize: vertical;
 }
+.empty-actions {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.empty-state p.sample-hint {
+  max-width: 480px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.review-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  width: min(1440px, calc(100% - 40px));
+  margin: 12px auto 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  color: var(--text);
+  font-size: 13px;
+}
 .paste-box .inline-actions {
   justify-content: center;
   margin-top: 8px;
@@ -980,6 +1005,14 @@ tr.selected td {
 .settings-row .muted {
   font-size: 11px;
   line-height: 1.5;
+}
+.settings-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.settings-note a {
+  color: var(--accent);
 }
 
 /* Embedded JSON */
