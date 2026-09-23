@@ -41,6 +41,20 @@ import {
   type ValidationDiagnostic,
 } from "@json-workbench/core";
 import { ingestFile, type IngestTask } from "./ingest";
+import { createSampleWorkspace } from "./sample-data";
+import {
+  REVIEW_URL,
+  chromeLocalStorageArea,
+  initialReviewState,
+  loadReviewState,
+  markReviewPrompted,
+  mergeReviewStates,
+  recordReviewEvent,
+  saveReviewState,
+  shouldShowReviewPrompt,
+  type ReviewEvent,
+  type ReviewPromptState,
+} from "./review-prompt";
 import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
@@ -50,6 +64,9 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "./app.css";
+
+const ECHOKIT_URL =
+  "https://chromewebstore.google.com/detail/jndhbmaokpclbpjoogffaimahadpidcf";
 
 const MonacoRawEditor = lazy(() =>
   import("./MonacoRawEditor").then((module) => ({
@@ -340,6 +357,43 @@ function App() {
   const [diffVisualOpen, setDiffVisualOpen] = useState(false);
   const [autoRender, setAutoRender] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [sampleLoads, setSampleLoads] = useState(0);
+  const sampleRef = useRef(false);
+  const [reviewState, setReviewState] =
+    useState<ReviewPromptState>(initialReviewState);
+  const [reviewLoaded, setReviewLoaded] = useState(false);
+  const [reviewVisible, setReviewVisible] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadReviewState(chromeLocalStorageArea()).then((stored) => {
+      if (cancelled) return;
+      setReviewState((current) => mergeReviewStates(stored, current));
+      setReviewLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reviewLoaded)
+      void saveReviewState(chromeLocalStorageArea(), reviewState);
+  }, [reviewLoaded, reviewState]);
+
+  const busy = ingesting || pipelineRunning || sqlRunning;
+  useEffect(() => {
+    if (!reviewLoaded || !shouldShowReviewPrompt(reviewState, busy)) return;
+    setReviewVisible(true);
+    setReviewState(markReviewPrompted);
+  }, [busy, reviewLoaded, reviewState]);
+
+  function trackReview(event: ReviewEvent) {
+    if (sampleRef.current) return;
+    setReviewState((current) => recordReviewEvent(current, event));
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem("json-workbench:pipeline");
@@ -406,9 +460,11 @@ function App() {
     setPipelineError(undefined);
   }
 
-  function onFile(file: File | undefined) {
+  function onFile(file: File | undefined, options: { sample?: boolean } = {}) {
     if (!file) return;
     taskRef.current?.cancel();
+    sampleRef.current = options.sample === true;
+    setIngesting(true);
     setSourceFile(file);
     setFileName(file.name);
     setStatus("Scanning…");
@@ -450,14 +506,35 @@ function App() {
       onFormat: setFormat,
       onProgress: ({ loaded, total }) =>
         setProgress(total ? Math.round((loaded / total) * 100) : 0),
-      onComplete: () => setStatus("Ready to explore"),
-      onError: (error) =>
+      onComplete: () => {
+        setIngesting(false);
+        setStatus("Ready to explore");
+        if (options.sample) setSampleLoads((current) => current + 1);
+        else trackReview({ type: "parse-success", bytes: file.size });
+      },
+      onError: (error) => {
+        setIngesting(false);
         setStatus(
           `${error.name}: ${error.message}${
             error.offset === undefined ? "" : ` at byte ${error.offset}`
           }`,
-        ),
+        );
+      },
     });
+  }
+
+  function loadSampleData() {
+    const sample = createSampleWorkspace();
+    updatePipeline(sample.pipeline);
+    setSqlQuery(sample.sqlQuery);
+    setSqlResult(undefined);
+    setSqlError(undefined);
+    setDiffText(sample.diffText);
+    setDiffResult(undefined);
+    onFile(
+      new File([sample.text], sample.fileName, { type: "application/json" }),
+      { sample: true },
+    );
   }
 
   function loadPastedText() {
@@ -531,6 +608,8 @@ function App() {
   function cancelWork() {
     taskRef.current?.cancel();
     pipelineWorkerRef.current?.terminate();
+    setIngesting(false);
+    setPipelineRunning(false);
     setStatus("Cancelled");
   }
 
@@ -693,6 +772,7 @@ function App() {
     setPipelineStats([]);
     setMemoryBytes(0);
     setStatus("Running preview…");
+    setPipelineRunning(true);
     try {
       const result = await new Promise<JsonValue>((resolve, reject) => {
         const worker = new Worker(
@@ -760,11 +840,23 @@ function App() {
       });
       setPipelineResult(result);
       setStatus("Preview ready");
+      trackReview({ type: "pipeline-success" });
     } catch (error) {
       setPipelineError(error instanceof Error ? error.message : String(error));
       setStatus("Preview failed");
+    } finally {
+      setPipelineRunning(false);
     }
   }
+
+  // After the sample finishes loading, run the example pipeline so the
+  // table, pipeline result and diff are populated without extra clicks.
+  useEffect(() => {
+    if (!sampleLoads || !sampleRef.current) return;
+    void runPreview();
+    runDiff();
+    setStatus("Sample loaded · example pipeline, SQL and diff ready");
+  }, [sampleLoads]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1021,11 +1113,58 @@ function App() {
                 >
                   Format current tab now
                 </button>
+                <div className="card-label">ABOUT</div>
+                <p className="muted settings-note" data-testid="compat-note">
+                  Works in Chrome and Edge 120+. Your data stays on this device.
+                </p>
+                <p className="muted settings-note" data-testid="echokit-promo">
+                  Debugging APIs too?{" "}
+                  <a
+                    href={ECHOKIT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Try EchoKit — record real traffic and mock it
+                  </a>
+                </p>
               </div>
             )}
           </div>
         </div>
       </header>
+      {reviewVisible && (
+        <div
+          className="review-banner"
+          role="region"
+          aria-label="Review request"
+          data-testid="review-banner"
+        >
+          <span>
+            Enjoying JSON Workbench? A quick review helps other developers find
+            it.
+          </span>
+          <div className="inline-actions">
+            <button
+              type="button"
+              onClick={() => {
+                window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
+                setReviewVisible(false);
+              }}
+              data-testid="review-rate"
+            >
+              Rate it
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => setReviewVisible(false)}
+              data-testid="review-dismiss"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
       <section className="workspace">
         <div className="source-bar">
           <div className="source-file">
@@ -1085,9 +1224,23 @@ function App() {
               validate, and export it. Parsing stays on-device and off the UI
               thread.
             </p>
-            <button type="button" onClick={() => inputRef.current?.click()}>
-              Choose file
-            </button>
+            <div className="inline-actions empty-actions">
+              <button type="button" onClick={() => inputRef.current?.click()}>
+                Choose file
+              </button>
+              <button
+                className="secondary"
+                type="button"
+                onClick={loadSampleData}
+                data-testid="sample-data-button"
+              >
+                Try with sample data
+              </button>
+            </div>
+            <p className="muted sample-hint">
+              New here? The sample loads a synthetic orders API response with an
+              example filter + JSONata pipeline, a DuckDB SQL query and a diff.
+            </p>
             <div className="paste-box">
               <textarea
                 value={pasteText}
