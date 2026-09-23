@@ -20,19 +20,19 @@ npm run build         # builds the extension, content script, and packages dist/
 npm run package:check # validates the MV3 package (permissions + required files)
 ```
 
-The uploadable folder is `apps/extension/dist/`. To create the ZIP the store
-wants:
-
-```bash
-cd apps/extension/dist && zip -r ../../../json-workbench.zip . && cd -
-```
+The uploadable folder is `apps/extension/dist/`. `release-platform@v2` builds
+this package itself and produces `dist/*.zip` — there is no manual `zip -r`
+step; do not hand-build the archive.
 
 Confirm the ZIP contains: `manifest.json`, `index.html`, `background.js`,
 `json-render.js`, `icons/`, `assets/`, `jq.wasm`, `duckdb-*.wasm`.
 
 ## 2. Bump the version
 
-Edit `apps/extension/manifest.json` → `"version"`. The store rejects re-uploads
+The version baseline release-platform@v2 reads from is `package.json` at the
+repo root. Edit `package.json` → `"version"`, then keep
+`apps/extension/package.json` and `apps/extension/manifest.json` in step with
+it — all three must agree before a release run. The store rejects re-uploads
 that reuse a version. Use semver (e.g. `0.1.0` → `0.1.1` for fixes, `0.2.0` for
 features). Rebuild after changing it.
 
