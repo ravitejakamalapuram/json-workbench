@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ravitejakamalapuram/release-platform/main/schema/release.schema.json
+# Release contract for ravitejakamalapuram/release-platform@v2 (keyless Chrome Web Store publishing).
+app: json-workbench
+test: npm ci && npm run typecheck && npm run format:check && npm run lint && npm test
+targets:
+  - type: chrome
+    item_id: higmlhleblpmdogjccpmjlnilpmhohal
+    build: npm ci && npm run build
+    path: apps/extension/dist # contains manifest.json after the build
+    node: "22"
