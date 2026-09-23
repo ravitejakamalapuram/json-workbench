@@ -1,0 +1,36 @@
+{
+  "appName": "JSON Workbench",
+  "appType": "chrome-extension",
+  "repoName": "json-workbench",
+  "description": "Local-first developer workbench for exploring and transforming large JSON data, shipped as a Chrome extension (plus CLI and VS Code packages).",
+  "modules": [
+    {
+      "name": "JSON Workbench",
+      "type": "chrome-extension",
+      "path": "apps/extension/dist",
+      "status": "draft",
+      "storeId": "higmlhleblpmdogjccpmjlnilpmhohal",
+      "storeUrl": "https://chromewebstore.google.com/detail/higmlhleblpmdogjccpmjlnilpmhohal",
+      "developerConsoleUrl": "https://chrome.google.com/webstore/devconsole/9637cb78-fa33-49dd-a4cb-91066ff182e3/higmlhleblpmdogjccpmjlnilpmhohal",
+      "buildScript": "npm run build",
+      "artifactPath": "apps/extension/dist",
+      "cwsListing": {
+        "shortDescription": "Inspect, transform, validate, diff, and query large JSON locally. Nothing leaves your browser.",
+        "detailedDescription": "JSON Workbench is a local-first developer tool for large JSON, JSONL, and NDJSON files. Open a file, a JSON tab, or a captured response and explore it as a tree or table without losing numeric precision. Profile structure, infer a JSON Schema, build reproducible transform pipelines (native steps, jq, and JSONata), run local DuckDB SQL, diff two payloads as an RFC 6902 JSON Patch (with a side-by-side visual view), and export JSON, JSONL, CSV, or TSV. It can also pretty-print any JSON page in place. Your source data stays in the browser.",
+        "category": "developer-tools",
+        "singlePurpose": "JSON Workbench lets developers inspect, transform, validate, diff and query JSON data locally in the browser.",
+        "privacyPolicyUrl": "https://ravitejakamalapuram.github.io/json-workbench.html",
+        "remoteCodeUsed": false,
+        "remoteCodeJustification": "The extension does not execute remote code. All scripts and WebAssembly runtimes (DuckDB WASM, jq) are bundled into the extension package.",
+        "dataUsageCertified": true,
+        "permissionJustifications": {
+          "activeTab": "Reads JSON from the active tab only when the user explicitly asks to open or format it.",
+          "sidePanel": "Displays the workbench interface in Chrome's side panel.",
+          "storage": "Persists local preferences and transform pipelines on the device.",
+          "scripting": "Injects the in-page JSON formatter into the active tab upon explicit user request.",
+          "debugger": "Optional; requested only if the user opts in to capturing network JSON responses, which stay in local memory."
+        }
+      }
+    }
+  ]
+}
