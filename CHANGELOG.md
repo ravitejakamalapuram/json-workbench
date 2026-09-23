@@ -6,10 +6,12 @@ version is the `version` field in `apps/extension/manifest.json`.
 ## [0.1.1] - 2026-09-23
 
 ### Added
+
 - Chrome Web Store release pipeline (on-demand CD through the shared workflows),
   store listing metadata, promo tiles and real UI screenshots.
 
 ### Changed
+
 - Privacy policy URL points to the GitHub Pages policy.
 
 ## [0.1.0] - 2026-09-13

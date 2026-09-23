@@ -18,9 +18,9 @@ jobs:
     name: Chrome Web Store Release
     uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-cd.yml@v1
     with:
-      extension-dir: 'apps/extension/dist'
-      build-command: 'npm run build'
-      node-version: '22'
+      extension-dir: "apps/extension/dist"
+      build-command: "npm run build"
+      node-version: "22"
     secrets:
       chrome-extension-id: ${{ secrets.CWS_EXTENSION_ID }}
       chrome-client-id: ${{ secrets.CWS_CLIENT_ID }}
