@@ -1,6 +1,6 @@
 # Chrome Web Store Listing & Publishing Record
 
-_Last Updated: 2026-09-20_
+_Last Updated: 2026-09-24_
 
 ---
 
@@ -9,7 +9,7 @@ _Last Updated: 2026-09-20_
 - **Name**: JSON Workbench
 - **Extension ID**: `higmlhleblpmdogjccpmjlnilpmhohal`
 - **Publisher ID**: `9637cb78-fa33-49dd-a4cb-91066ff182e3`
-- **Version**: `0.1.0`
+- **Version**: `0.1.0` published (100%, live), `0.2.0` uploaded and submitted (pending review)
 - **Manifest Version**: `MV3`
 - **Language**: `en`
 - **Category**: `Developer Tools`
@@ -52,22 +52,20 @@ Google review requires specific plain-English justification for each declared pe
   Extension Frontend (Popup / Side Panel / Content Scripts)
   ⬇
   Local Browser Storage (chrome.storage.local / session)
-  ⬇
-  External HTTPS API Endpoints
 
 - **Data Handling Summary**:
   - **User Preference & Session State**: Collected: Yes | Stored: Local | Purpose: Store application configuration, theme preferences, and local document state.
-  - **Web Page Data & Content**: Collected: Yes | Stored: No | Purpose: Parse and visualize JSON or user-requested data directly within the browser context.
+  - **Web Page Data & Content**: Collected: No | Stored: No | Purpose: Parsed and visualized in-memory in the browser only; never stored and never transmitted off-device.
   - **Privacy Policy URL**: https://ravitejakamalapuram.github.io/json-workbench.html
 
 ---
 
 ## 5. Store Assets Checklist
 
-- [x] Extension Icon (128×128 PNG): `icons/icon-128.png`
-- [ ] Primary Screenshot (1280×800 PNG): `chrome-store/assets/screenshots/01-main-screen.png`
-- [ ] Promotional Tile (440×280 PNG): Optional but recommended for featured placement
-- [ ] Marquee Promo (1400×560 PNG): Optional
+- [x] Extension Icon (128×128 PNG): `store/assets/icon-128.png`
+- [x] Screenshots (1280×800 PNG, 4 files): `store/assets/screenshots/`
+- [x] Promotional Tile (440×280 PNG): `chrome-store/assets/promo/small-tile.png`
+- [x] Marquee Promo (1400×560 PNG): `chrome-store/assets/promo/marquee.png`
 
 ---
 
@@ -77,7 +75,7 @@ Google review requires specific plain-English justification for each declared pe
 - [x] No `eval()` or remotely hosted code
 - [x] No secrets, private keys, or API tokens in package
 - [x] Distributable archive contains `manifest.json` at root
-- [ ] Extension registered in Chrome Web Store Developer Dashboard
+- [x] Extension registered in Chrome Web Store Developer Dashboard
 - [ ] CWS API OAuth credentials configured (`.env`)
 - [ ] Final human confirmation obtained before submission
 
@@ -85,6 +83,8 @@ Google review requires specific plain-English justification for each declared pe
 
 ## 7. Release History
 
-| Version | Date       | Status        | Package ZIP                                     | Notes                                 |
-| :------ | :--------- | :------------ | :---------------------------------------------- | :------------------------------------ |
-| `0.1.0` | 2026-09-20 | Draft / Ready | `chrome-store/builds/json-workbench-v0.1.0.zip` | Automated build & verification passed |
+| Version | Date       | Status                                | Package ZIP                                     | Notes                                                      |
+| :------ | :--------- | :------------------------------------ | :---------------------------------------------- | :--------------------------------------------------------- |
+| `0.1.0` | 2026-09-20 | Draft / Ready                         | `chrome-store/builds/json-workbench-v0.1.0.zip` | Automated build & verification passed                      |
+| `0.1.0` | 2026-09-23 | Published (100%)                      | —                                               | Listing went public; release run 35891501484               |
+| `0.2.0` | 2026-09-23 | Uploaded / Submitted (pending review) | —                                               | Uploaded and submitted for review; release run 35891501484 |

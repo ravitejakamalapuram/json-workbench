@@ -2,6 +2,8 @@
 
 A local-first Chrome extension for developers to explore, query, transform, validate, diff, and export JSON/JSONL — including very large files.
 
+**Chrome Web Store**: https://chromewebstore.google.com/detail/json-workbench/higmlhleblpmdogjccpmjlnilpmhohal
+
 ## Product vision
 
 Treat JSON manipulation as a reproducible pipeline rather than a one-off formatting task:
