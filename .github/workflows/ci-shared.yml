@@ -15,14 +15,16 @@ concurrency:
 
 jobs:
   chrome-extension-ci:
-    uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-ci.yml@a71d52b8a7c6f7ee6741603b479770db78dffc6b
+    uses: ravitejakamalapuram/.github-workflows-shared/.github/workflows/chrome-extension-ci.yml@v1
     with:
-      extension-dir: apps/extension
+      # Validate/package the built extension (Vite output), not the source tree.
+      extension-dir: apps/extension/dist
+      build-command: npm run build
       node-version: "22"
       manifest-version: "3"
       strict-mode: "true"
-      release-compliance: false
-      run-lint: true
+      # ESLint ignores **/dist/**; the CI workflow already runs `npm run lint` on the repo.
+      run-lint: false
       run-unit-tests: true
       run-e2e-tests: true
       e2e-test-script: tests/smoke_extension.py
