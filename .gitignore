@@ -11,3 +11,4 @@ test-results/
 chrome-store/builds/
 chrome-store/*.zip
 logs/
+chrome-store/release.json

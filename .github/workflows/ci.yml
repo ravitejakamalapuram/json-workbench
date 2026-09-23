@@ -1,22 +1,32 @@
-name: CI
+name: ci
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
+  push:
+    branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Release-platform PR check: validate release.yaml, run `test`, build + package the
+  # Chrome zip exactly as a release would (no secrets, no id-token).
+  ci:
+    permissions:
+      contents: read
+      actions: read # lets app-ci.yml find which release-platform commit it runs at
+    uses: ravitejakamalapuram/release-platform/.github/workflows/app-ci.yml@v2
+
+  # Repo-specific gate the platform does not cover: dependency audit, CLI and
+  # VS Code builds, and the package check.
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -25,10 +35,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=moderate
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run lint
-      - run: npm run format:check
       - run: npm run build
       - run: npm run build:cli
       - run: npm run test:cli
