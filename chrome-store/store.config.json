@@ -21,5 +21,6 @@
   "promotionalImages": {
     "smallTile": "assets/promo/small-tile.png",
     "marquee": "assets/promo/marquee.png"
-  }
+  },
+  "promoVideo": "https://youtu.be/Jrr2vy4up2c"
 }
