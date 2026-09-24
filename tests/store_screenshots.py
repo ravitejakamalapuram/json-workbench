@@ -1,3 +1,4 @@
+import json
 import struct
 import subprocess
 import time
@@ -11,13 +12,21 @@ OUT.mkdir(parents=True, exist_ok=True)
 STORE_WIDTH = 1280
 STORE_HEIGHT = 800
 
-SAMPLE_JSON = (
-    '[{"id":900719925474099312345,"name":"Ada Lovelace","active":true,'
-    '"roles":["admin","dev"],"meta":{"age":37,"city":"London"}},'
-    '{"id":2,"name":"Grace Hopper","active":false,"roles":["ops"],'
-    '"meta":{"age":45,"city":"NYC"}},{"id":3,"name":"Alan Turing",'
-    '"active":true,"roles":["research"],"meta":{"age":41,"city":"Manchester"}}]'
-)
+SAMPLE_RECORDS = [
+    {"id": 900719925474099312345, "name": "Ada Lovelace", "active": True,
+     "roles": ["admin", "dev"], "meta": {"age": 37, "city": "London"}},
+    {"id": 2, "name": "Grace Hopper", "active": False, "roles": ["ops"],
+     "meta": {"age": 45, "city": "NYC"}},
+    {"id": 3, "name": "Alan Turing", "active": True, "roles": ["research"],
+     "meta": {"age": 41, "city": "Manchester"}},
+]
+
+# Pretty-printed (not minified): the Raw/code view renders the uploaded
+# file's verbatim bytes, while Tree/Table/SQL/diff all work off the parsed
+# structure, so this only changes what 03-raw-monaco.png shows. Minified,
+# these three records word-wrap to ~4 lines and leave the rest of the
+# Monaco pane a dead black rectangle; pretty-printed they fill it.
+SAMPLE_JSON = json.dumps(SAMPLE_RECORDS, indent=2)
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -83,9 +92,13 @@ try:
 
         # SELECT * exposes a pre-existing DuckDB-WASM rendering issue on
         # nested array/object columns (function-source-looking junk), so
-        # scope the demo query to scalar columns for a clean result table.
+        # scope the demo query to scalar columns (dot into the "meta"
+        # struct for "city") for a clean result table. Also skips "id":
+        # DuckDB-WASM coerces that oversized integer to a lossy double,
+        # which would contradict the lossless-number pitch made by
+        # 01-tree-insights.png and 02-table.png.
         pg.get_by_label("SQL query").fill(
-            "SELECT id, name, active FROM read_json_auto('source.json') LIMIT 100"
+            "SELECT name, active, meta.city AS city FROM read_json_auto('source.json') LIMIT 100"
         )
         pg.get_by_role("button", name="Run local SQL").click()
         pg.locator(".sql-result").wait_for(timeout=15000)
