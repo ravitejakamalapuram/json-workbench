@@ -6,13 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (validate and show what would change; no Play commit, no issue)'
+        description: "Dry run (validate and show what would change; no Play commit, no issue)"
         type: boolean
         default: false
       targets:
-        description: 'Only these target types (comma list: chrome,android). Empty = all.'
+        description: "Only these target types (comma list: chrome,android). Empty = all."
         type: string
-        default: ''
+        default: ""
 
 permissions: {}
 
@@ -20,8 +20,8 @@ jobs:
   listing:
     permissions:
       contents: read
-      issues: write     # Chrome: the Developer Dashboard checklist issue
-      id-token: write   # Play: keyless Google auth (OIDC -> Workload Identity Federation)
+      issues: write # Chrome: the Developer Dashboard checklist issue
+      id-token: write # Play: keyless Google auth (OIDC -> Workload Identity Federation)
     uses: ravitejakamalapuram/release-platform/.github/workflows/listing.yml@v2
     with:
       dry_run: ${{ inputs.dry_run || false }}
