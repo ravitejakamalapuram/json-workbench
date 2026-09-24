@@ -21,7 +21,7 @@ well tested. Every release gate documented in `STATUS.md` passes locally.
 | `npm run build:cli` + `npm run test:cli`            | ✅ pass                     |
 | `npm run build:vscode`                              | ✅ pass                     |
 | `npm run package:check`                             | ✅ pass                     |
-| `python3 tests/smoke_extension.py` (Playwright E2E) | ✅ pass (full journey)      |
+| `python3 tests/smoke_extension.py` (Playwright E2E) | ✅ local pass; CI enforced  |
 
 So the honest status is: **the product does what the docs claim it does.** The gap
 to "market leader" is therefore _not_ "make the claims true" — it is **exposure,
@@ -128,7 +128,7 @@ Still built in core but **not yet surfaced** (recommended next):
   operations, pipeline, persistence, embedded, jq/jsonata). Good coverage of edge
   cases (empty, malformed, unicode, big integers, JSONL/NDJSON).
 - The Playwright smoke now also asserts the three newly-wired features, so they are
-  part of the release gate rather than "trust me" features.
+  part of the CI-enforced release gate rather than "trust me" features.
 - Gap: **no performance regression gate wired into CI.** The bench harness exists
   (`npm run bench`) but numbers are recorded manually in `STATUS.md`. To _defend_ a
   large-file claim as a market leader, wire a CI bench with a threshold.
@@ -197,8 +197,9 @@ polished and actually published.**
 - Wired **Structure Insights**, **Schema inference**, and **Diff/JSON Patch** panels
   into the extension (`apps/extension/src/main.tsx`, `app.css`) using already-tested
   core APIs. No core logic was rewritten.
-- Extended `tests/smoke_extension.py` to assert all three so they are release-gated.
-- Re-ran and confirmed every documented gate stays green, including the E2E smoke.
+- Extended `tests/smoke_extension.py` to assert all three, and CI now runs the smoke
+  on every pull request and push to `main`.
+- Re-ran and confirmed every documented gate stays green locally, including the E2E smoke.
 - Updated `STATUS.md` and `FEATURE_CHECKLIST.md` to describe the now-surfaced UI
   (previously these features were tested in core but unreachable by users).
 

@@ -40,3 +40,27 @@ jobs:
       - run: npm run test:cli
       - run: npm run build:vscode
       - run: npm run package:check
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-1.63.0
+      - run: pip install playwright==1.63.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python3 tests/smoke_extension.py
