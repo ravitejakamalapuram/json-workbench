@@ -60,7 +60,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-      - run: pip install playwright
+          key: ${{ runner.os }}-playwright-1.63.0
+      - run: pip install playwright==1.63.0
       - run: python -m playwright install --with-deps chromium
       - run: python3 tests/smoke_extension.py
