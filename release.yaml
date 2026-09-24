@@ -8,3 +8,4 @@ targets:
     build: npm ci && npm run build
     path: apps/extension/dist # contains manifest.json after the build
     node: "22"
+    listing: chrome-store/store.config.json # store listing; checked on PRs, see release-platform "Store listings"
