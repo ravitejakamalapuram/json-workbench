@@ -21,7 +21,7 @@
   "side_panel": {
     "default_path": "index.html"
   },
-  "permissions": ["activeTab", "sidePanel", "storage", "scripting"],
+  "permissions": ["activeTab", "sidePanel", "storage", "scripting", "alarms"],
   "optional_permissions": ["debugger"],
   "optional_host_permissions": ["<all_urls>"],
   "background": {
