@@ -19,7 +19,12 @@ permissions: .appforge/permissions.yaml
 data_collection:
   collected: []
   stored:
-    local: [chrome_storage_local_auto_render_flag, chrome_storage_session_pending_payload, localstorage_pipeline_and_theme]
+    local:
+      [
+        chrome_storage_local_auto_render_flag,
+        chrome_storage_session_pending_payload,
+        localstorage_pipeline_and_theme,
+      ]
     remote: []
   transmitted:
     endpoints: [] # the one fetch() call re-reads the active tab's own URL, not a third-party endpoint
