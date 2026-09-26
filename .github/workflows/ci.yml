@@ -41,6 +41,18 @@ jobs:
       - run: npm run build:vscode
       - run: npm run package:check
 
+  # AppForge AI factory checks: permission-diff PR comment + secret scanning.
+  # TEMP: pointed at appforge-kit's feat/reusable-checks-workflow branch to prove this out
+  # end-to-end before that PR merges — flip to @main once proven (see the linked PRs).
+  appforge-checks:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ravitejakamalapuram/appforge-kit/.github/workflows/checks.yml@feat/reusable-checks-workflow
+    with:
+      manifest-path: apps/extension/dist/manifest.json
+      appforge-kit-ref: feat/reusable-checks-workflow
+
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
