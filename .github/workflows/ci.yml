@@ -49,10 +49,16 @@ jobs:
     uses: ravitejakamalapuram/appforge-kit/.github/workflows/checks.yml@feat/security-checks-osv-csp-bundle
     with:
       manifest-path: apps/extension/dist/manifest.json
-      # TEMPORARY, for this proof PR only: json-workbench bundles Monaco + DuckDB WASM, so its
-      # real dist/ is ~48.8 MB (unrelated to appforge-kit's own default budget, sized against
-      # the tiny chrome-vanilla/chrome-react templates). Isolates "the mechanism works" from
-      # "json-workbench's current build happens to fit a budget it was never sized against".
+      # TEMPORARY, for this proof PR only (both overrides revert to main/default before merge):
+      # - appforge-kit-ref must also point at the feature branch — the `uses:` ref above only
+      #   selects which version of checks.yml's own YAML runs; it does NOT affect which
+      #   appforge-kit commit the "Checkout appforge-kit" step inside that YAML checks out and
+      #   builds the CLI from (that's this separate input, defaulting to main).
+      # - json-workbench bundles Monaco + DuckDB WASM, so its real dist/ is ~48.8 MB (unrelated
+      #   to appforge-kit's own default budget, sized against the tiny chrome-vanilla/chrome-react
+      #   templates). Isolates "the mechanism works" from "json-workbench's current build happens
+      #   to fit a budget it was never sized against".
+      appforge-kit-ref: feat/security-checks-osv-csp-bundle
       max-bundle-size-kb: 60000
 
   smoke:
