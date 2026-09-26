@@ -46,9 +46,17 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: ravitejakamalapuram/appforge-kit/.github/workflows/checks.yml@main
+    uses: ravitejakamalapuram/appforge-kit/.github/workflows/checks.yml@feat/security-checks-osv-csp-bundle
     with:
       manifest-path: apps/extension/dist/manifest.json
+      # TEMPORARY, for this proof PR only (reverts to main before merge). appforge-kit-ref must
+      # also point at the feature branch — the `uses:` ref above only selects which version of
+      # checks.yml's own YAML runs; it does not affect which appforge-kit commit the "Checkout
+      # appforge-kit" step inside that YAML builds the CLI from (a separate input, default main).
+      # Deliberately NOT overriding max-bundle-size-kb this time: the whole point of this second
+      # proof is to confirm the new report-only-by-default (0) behavior means json-workbench's
+      # real ~48.8MB dist/ (Monaco + DuckDB WASM) no longer needs any override to pass.
+      appforge-kit-ref: feat/security-checks-osv-csp-bundle
 
   smoke:
     runs-on: ubuntu-latest
