@@ -1,0 +1,32 @@
+schema: appforge/permissions@1
+permissions:
+  - permission: activeTab
+    required: true
+    reason: "Read/format the JSON content of the tab the user explicitly triggers 'Active JSON tab' on"
+    data_access: [tab_url, tab_content_user_triggered]
+    security_impact: low
+  - permission: sidePanel
+    required: true
+    reason: "Show the workbench UI in Chrome's side panel"
+    data_access: []
+    security_impact: low
+  - permission: storage
+    required: true
+    reason: "Persist the auto-render toggle (chrome.storage.local) and pass a pending JSON payload between a content script and the side panel (chrome.storage.session)"
+    data_access: [user_settings_local]
+    security_impact: low
+  - permission: scripting
+    required: true
+    reason: "Run the opt-in auto-render content script, and inject the JSON pretty-printer into the active tab on explicit request"
+    data_access: [tab_content_user_triggered]
+    security_impact: medium
+  - permission: debugger
+    required: false
+    reason: "Optional 'capture next JSON response' feature reads one network response body via the Chrome DevTools Protocol, only when the user opts in"
+    data_access: [network_response_user_triggered]
+    security_impact: high
+  - permission: "<all_urls>"
+    required: false
+    reason: "Optional host permission for the opt-in 'auto-render JSON pages' content script; checked via chrome.permissions.contains before registering, and only requested if the user turns the feature on"
+    data_access: [any_site_content_opt_in]
+    security_impact: high
