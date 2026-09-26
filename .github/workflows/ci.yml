@@ -41,6 +41,15 @@ jobs:
       - run: npm run build:vscode
       - run: npm run package:check
 
+  # AppForge AI factory checks: permission-diff PR comment + secret scanning.
+  appforge-checks:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ravitejakamalapuram/appforge-kit/.github/workflows/checks.yml@main
+    with:
+      manifest-path: apps/extension/dist/manifest.json
+
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
