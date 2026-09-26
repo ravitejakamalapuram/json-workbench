@@ -46,9 +46,14 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: ravitejakamalapuram/appforge-kit/.github/workflows/checks.yml@main
+    uses: ravitejakamalapuram/appforge-kit/.github/workflows/checks.yml@feat/security-checks-osv-csp-bundle
     with:
       manifest-path: apps/extension/dist/manifest.json
+      # TEMPORARY, for this proof PR only: json-workbench bundles Monaco + DuckDB WASM, so its
+      # real dist/ is ~48.8 MB (unrelated to appforge-kit's own default budget, sized against
+      # the tiny chrome-vanilla/chrome-react templates). Isolates "the mechanism works" from
+      # "json-workbench's current build happens to fit a budget it was never sized against".
+      max-bundle-size-kb: 60000
 
   smoke:
     runs-on: ubuntu-latest
