@@ -6,6 +6,19 @@ description: "Local-first developer workbench for exploring and transforming lar
 platform: [chrome]
 state: PRODUCTION
 portfolio_state: GROWTH
+
+# §22.1 day-30/60/90 clock (APP-41). `first_published` is the
+# clock origin; `store_item_status` ∈ [published, draft, unlisted,
+# internal_track, unpublished] gates whether the clock runs at all.
+# Publicly listed: APP-35 records a cws_public_listing reading on
+# 2026-09-28. (app-metadata.json still says "draft" — stale.)
+store_item_status: published
+# UNRECOVERABLE from repo evidence — backfill from the CWS listing.
+# NOT 2026-09-20: logs/chrome-store/2026-09-20-release.log contains no
+# publish event (it ends `[ERROR] [BLOCKED] Found 3 secret findings`),
+# and CHANGELOG.md dates the CWS release pipeline itself to 0.1.1 on
+# 2026-09-23, with the first tag v0.1.0 also 2026-09-23.
+first_published: null
 repository: ravitejakamalapuram/json-workbench
 owner: founder
 team: []
