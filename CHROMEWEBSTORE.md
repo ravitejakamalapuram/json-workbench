@@ -34,13 +34,13 @@ JSON Workbench is a local-first developer tool for large JSON, JSONL, and NDJSON
 
 Google review requires specific plain-English justification for each declared permission:
 
-| Permission  | Used in Code? | Sample Evidence   | Required? |  Risk  | Plain-English Review Justification                                                                            |
-| :---------- | :-----------: | :---------------- | :-------: | :----: | :------------------------------------------------------------------------------------------------------------ |
-| `activeTab` |      Yes      | background.js:33  |    Yes    |  LOW   | Grants temporary access to the active tab upon explicit user invocation without persistent background access. |
-| `sidePanel` |      Yes      | background.js:102 |    Yes    |  LOW   | Allows the extension interface to be displayed in Chrome side panel.                                          |
-| `storage`   |      Yes      | background.js:19  |    Yes    |  LOW   | Required to locally persist user settings, configurations, and application state across sessions.             |
-| `scripting` |      Yes      | background.js:33  |    Yes    | MEDIUM | Enables programmatic script or stylesheet injection into target pages to render extension functionality.      |
-| `debugger`  |      Yes      | background.js:183 |    No     |  HIGH  | Enables deep DevTools protocol instrumentation upon explicit developer opt-in.                                |
+| Permission  | Used in Code? | Sample Evidence   | Required? |  Risk  | Plain-English Review Justification                                                                                                                                                                                                                                                      |
+| :---------- | :-----------: | :---------------- | :-------: | :----: | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activeTab` |      Yes      | background.js:33  |    Yes    |  LOW   | Grants temporary access to the active tab upon explicit user invocation without persistent background access. "Active JSON tab" uses it to re-request the tab's own address with the user's cookies so that a signed-in API response can be read; the request never leaves that origin. |
+| `sidePanel` |      Yes      | background.js:102 |    Yes    |  LOW   | Allows the extension interface to be displayed in Chrome side panel.                                                                                                                                                                                                                    |
+| `storage`   |      Yes      | background.js:19  |    Yes    |  LOW   | Required to locally persist user settings, configurations, and application state across sessions.                                                                                                                                                                                       |
+| `scripting` |      Yes      | background.js:33  |    Yes    | MEDIUM | Enables programmatic script or stylesheet injection into target pages to render extension functionality.                                                                                                                                                                                |
+| `debugger`  |      Yes      | background.js:183 |    No     |  HIGH  | Enables deep DevTools protocol instrumentation upon explicit developer opt-in.                                                                                                                                                                                                          |
 
 ---
 
@@ -53,9 +53,15 @@ Google review requires specific plain-English justification for each declared pe
   ⬇
   Local Browser Storage (chrome.storage.local / session)
 
+  The extension has no backend and contacts no AppForge or third-party server. It
+  makes exactly one kind of outbound request: when the user presses "Active JSON
+  tab", it re-requests the address of the tab they are viewing, with that site's
+  cookies attached, so an authenticated API response can be read. The destination is
+  always the page's own origin and the response is never forwarded anywhere.
+
 - **Data Handling Summary**:
   - **User Preference & Session State**: Collected: Yes | Stored: Local | Purpose: Store application configuration, theme preferences, and local document state.
-  - **Web Page Data & Content**: Collected: No | Stored: No | Purpose: Parsed and visualized in-memory in the browser only; never stored and never transmitted off-device.
+  - **Web Page Data & Content**: Collected: No | Stored: No | Purpose: Parsed and visualized in-memory in the browser only; never stored and never transmitted off-device. Retrieving it may involve one credentialed request to the viewed page's own origin (see Data Flow above); no other origin is contacted.
   - **Privacy Policy URL**: https://ravitejakamalapuram.github.io/json-workbench.html
 
 ---

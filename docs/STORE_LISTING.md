@@ -21,7 +21,10 @@ Single purpose: help developers read, understand, transform, and compare JSON
 data locally in the browser.
 
 - `activeTab` — read the JSON of the tab you are on when you press "Active JSON
-  tab" or "Format current tab", only after you invoke the extension.
+  tab" or "Format current tab", only after you invoke the extension. "Active JSON
+  tab" re-requests that tab's own address with your cookies for it, so that an API
+  response you are signed in to comes back as JSON rather than as a login page. The
+  request goes to the page's own origin and nowhere else.
 - `sidePanel` — the workbench UI runs in Chrome's side panel.
 - `storage` — persist your pipeline, theme, and the auto-render preference locally.
 - `scripting` — inject the in-page JSON formatter into the current tab on demand

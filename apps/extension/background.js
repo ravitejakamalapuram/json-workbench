@@ -134,8 +134,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           active: true,
           lastFocusedWindow: true,
         });
-        if (!tab?.url || !/^https?:/i.test(tab.url))
+        // `tab.url` is only populated when this extension holds access to the
+        // tab: either the transient `activeTab` grant from clicking the toolbar
+        // icon on that tab, or the optional `<all_urls>` host grant behind the
+        // auto-render toggle. We declare no `tabs` permission, so an absent URL
+        // means "not allowed to look", which is a different failure from "this
+        // is not an HTTP page" and needs its own message.
+        if (!tab) throw new Error("No active tab was found");
+        if (!tab.url)
+          throw new Error(
+            "JSON Workbench cannot see this tab's address. Open the side panel " +
+              "from the toolbar icon while the JSON tab is in front, or turn on " +
+              "auto-render to grant access to all sites.",
+          );
+        if (!/^https?:/i.test(tab.url))
           throw new Error("The active tab is not an HTTP(S) page");
+        // `credentials: "include"` is deliberate and load-bearing: the common
+        // case is a JSON API endpoint the developer is viewing while signed in,
+        // and an uncredentialed re-fetch would return a 401 or a login page
+        // instead of the document on screen. `"same-origin"` is not a middle
+        // option here — the initiator is this extension's own origin, so it
+        // never matches an http(s) tab and behaves exactly like `"omit"`.
+        // Reachability is bounded by the grant check above: the request can
+        // only ever target the tab the user is looking at, on an origin this
+        // extension was already granted, after the user pressed the button.
+        // See appforge-brain engineering/debt.md DEBT-0004 (APP-81).
         const response = await fetch(tab.url, { credentials: "include" });
         if (!response.ok)
           throw new Error(`The active page returned HTTP ${response.status}`);

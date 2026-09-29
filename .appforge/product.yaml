@@ -27,7 +27,14 @@ data_collection:
       ]
     remote: []
   transmitted:
-    endpoints: [] # the one fetch() call re-reads the active tab's own URL, not a third-party endpoint
+    endpoints: []
+    # The one fetch() call re-reads the active tab's own URL, not a third-party
+    # endpoint. It is sent with credentials: "include" so that a JSON API the
+    # developer is signed in to returns the document on screen rather than a login
+    # page; cookies therefore go to that origin, and the request is a second GET of
+    # a URL the user already loaded. Reviewed under APP-81 and kept deliberately —
+    # see appforge-brain engineering/debt.md DEBT-0004. Disclosed in PRIVACY.md
+    # ("How \"Active JSON tab\" reads the page") and in CHROMEWEBSTORE.md.
   sensitive: [] # user JSON content is processed client-side (WASM: DuckDB-WASM, jq-web) and never leaves the browser
   third_party: []
   retention: { local: indefinite_until_user_clears, remote: none }

@@ -24,7 +24,7 @@
         "remoteCodeJustification": "The extension does not execute remote code. All scripts and WebAssembly runtimes (DuckDB WASM, jq) are bundled into the extension package.",
         "dataUsageCertified": true,
         "permissionJustifications": {
-          "activeTab": "Reads JSON from the active tab only when the user explicitly asks to open or format it.",
+          "activeTab": "Reads JSON from the active tab only when the user explicitly asks to open or format it. \"Active JSON tab\" re-requests that tab's own URL with the site's cookies so a signed-in API response can be read; the request targets only the page's own origin and no data is sent to any other server.",
           "sidePanel": "Displays the workbench interface in Chrome's side panel.",
           "storage": "Persists local preferences and transform pipelines on the device.",
           "scripting": "Injects the in-page JSON formatter into the active tab upon explicit user request.",
