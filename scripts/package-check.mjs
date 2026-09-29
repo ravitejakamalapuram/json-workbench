@@ -2,6 +2,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import {
+  findVersionDrift,
+  readVersionMirrors,
+} from "./lib/version-consistency.mjs";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const dist = join(root, "apps/extension/dist");
@@ -39,6 +43,18 @@ if (
   JSON.stringify(["<all_urls>"])
 )
   throw new Error("Auto-render host access must remain an optional permission");
+// The packaged manifest version is the single source of truth; every other file
+// that restates it must agree. See scripts/lib/version-consistency.mjs.
+const versionDrift = findVersionDrift(
+  manifest.version,
+  readVersionMirrors(root),
+);
+if (versionDrift.length)
+  throw new Error(
+    `Version metadata disagrees with apps/extension/manifest.json (${manifest.version}):\n` +
+      versionDrift.map((line) => `  - ${line}`).join("\n") +
+      "\nThe manifest is the single source of truth - update the files above to match it.",
+  );
 const archive = join(tmpdir(), `json-workbench-${process.pid}.zip`);
 try {
   execFileSync("zip", ["-qr", archive, "."], { cwd: dist, stdio: "ignore" });

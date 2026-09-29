@@ -24,4 +24,4 @@ Fixtures should cover empty documents, primitives, nested structures, arrays of 
 
 ## Release gate
 
-All tests and static checks must pass. Performance regressions above the agreed baseline threshold must block release. No known critical/high defect may remain in a release candidate.
+All tests and static checks must pass. `npm run package:check` also enforces that `package.json`, `apps/extension/package.json` and `.appforge/product.yaml` state the same version as the packaged manifest, which is the single source of truth (see [ADR 0002](ADR/0002-manifest-is-the-version-source-of-truth.md)); `npm test` covers that comparison through `scripts/lib/version-consistency.test.mjs`. Performance regressions above the agreed baseline threshold must block release. No known critical/high defect may remain in a release candidate.
