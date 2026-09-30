@@ -73,3 +73,33 @@ jobs:
       - run: pip install playwright==1.63.0
       - run: python -m playwright install --with-deps chromium
       - run: python3 tests/smoke_extension.py
+
+  # Tell the AppForge factory (Paperclip) about the two events an agent should act on:
+  # a PR opened for review, and CI failing on main. Deliberately NOT every push - each
+  # notification wakes an agent and spends budget. Needs the PAPERCLIP_WEBHOOK_URL and
+  # PAPERCLIP_WEBHOOK_SECRET Actions secrets; see appforge-control/infra/cloudflare-tunnel.
+  notify-pr-opened:
+    if: github.event_name == 'pull_request' && github.event.action == 'opened' && !github.event.pull_request.draft
+    needs: [ci, quality, appforge-checks, smoke]
+    uses: ravitejakamalapuram/appforge-kit/.github/workflows/notify-paperclip.yml@main
+    with:
+      event: pr_opened
+      product: json-workbench
+      idempotency-key: json-workbench:pr_opened:${{ github.event.pull_request.number }}
+      details-json: '{"pr": ${{ github.event.pull_request.number }}, "ci": "${{ needs.ci.result }}/${{ needs.quality.result }}/${{ needs.smoke.result }}"}'
+    secrets:
+      paperclip-webhook-url: ${{ secrets.PAPERCLIP_WEBHOOK_URL }}
+      paperclip-webhook-secret: ${{ secrets.PAPERCLIP_WEBHOOK_SECRET }}
+
+  notify-main-failed:
+    if: always() && github.event_name == 'push' && (needs.ci.result == 'failure' || needs.quality.result == 'failure' || needs.smoke.result == 'failure')
+    needs: [ci, quality, appforge-checks, smoke]
+    uses: ravitejakamalapuram/appforge-kit/.github/workflows/notify-paperclip.yml@main
+    with:
+      event: ci_failed
+      product: json-workbench
+      idempotency-key: json-workbench:ci_failed:${{ github.sha }}
+      details-json: '{"ci": "${{ needs.ci.result }}", "quality": "${{ needs.quality.result }}", "smoke": "${{ needs.smoke.result }}"}'
+    secrets:
+      paperclip-webhook-url: ${{ secrets.PAPERCLIP_WEBHOOK_URL }}
+      paperclip-webhook-secret: ${{ secrets.PAPERCLIP_WEBHOOK_SECRET }}
