@@ -15,12 +15,31 @@ JSON Workbench **does not collect, transmit, or sell any personal data, browsing
 
 ## 2. Permissions & Data Usage
 
-- `activeTab`: Used solely to read JSON data from the currently active tab when you explicitly click "Active JSON tab" or "Format current tab".
+- `activeTab`: Used solely to read JSON data from the currently active tab when you explicitly click "Active JSON tab" or "Format current tab". Reading the tab's address requires either this grant (created by opening the side panel from the toolbar icon on that tab) or the optional `<all_urls>` grant below; without one of them the action reports that it cannot see the tab and does nothing.
 - `sidePanel`: Used to display the extension's workbench interface in Chrome's side panel.
 - `storage`: Used to persist local preferences and transform pipelines on your machine.
 - `scripting`: Used to inject the in-page JSON formatter into the active tab upon explicit user request.
 - `debugger` (optional): Requested only if you explicitly choose to capture network JSON responses. Captured responses remain in local memory and are never transmitted.
 - `<all_urls>` (optional): Requested only if you opt in to "Auto-render JSON pages". The default installation requests no host permissions.
+
+### How "Active JSON tab" reads the page
+
+"Active JSON tab" re-requests the address of the tab you are viewing and reads the
+response. Two things about that request are worth stating plainly:
+
+- **It goes only to the page's own address.** The request is sent to the same URL
+  that is already in your address bar, never to an AppForge server or any third
+  party. Nothing about the request or its response is transmitted anywhere else.
+- **It is sent with your cookies for that site** (`credentials: "include"`). This is
+  necessary rather than incidental: developers usually use this action on an API
+  endpoint they are signed in to, and a request without cookies would come back as a
+  sign-in page or an authorization error instead of the JSON on screen. The practical
+  consequence is that this action causes one additional authenticated request to the
+  page you are on, exactly as reloading that tab would. If the endpoint changes state
+  when it is requested, requesting it twice will do so twice.
+
+The action is only available for the tab you are looking at, only on a site this
+extension has been granted access to, and only when you press the button.
 
 ## 3. Third-Party Services & Analytics
 
