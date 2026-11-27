@@ -106,30 +106,18 @@ describe("registry", () => {
   });
 
   it("lists modes, views and details sections in display order", () => {
-    expect(registry.modes.map((m) => m.id)).toEqual([
-      "compare",
-      "transform",
-      "types",
-      "jwt",
-    ]);
-    expect(registry.views.map((v) => v.id)).toEqual(["tree", "raw", "table"]);
-    expect(registry.details.map((d) => d.id)).toEqual([
-      "raw-problem",
-      "insights",
-      "schema",
-    ]);
+    expect(registry.modes.map((m) => m.id)).toEqual(["jwt"]);
+    expect(registry.views.map((v) => v.id)).toEqual(["tree", "raw"]);
+    expect(registry.details.map((d) => d.id)).toEqual(["raw-problem"]);
   });
 
-  it("switches modes with Alt+1 to Alt+5 in rail order", () => {
+  it("switches modes with Alt+1 onwards in rail order", () => {
     const modeKeys = registry.actions
       .filter((a) => a.id.startsWith("app.mode."))
       .map((a) => [a.id, a.shortcut]);
     expect(modeKeys).toEqual([
       ["app.mode.view", "Alt+1"],
-      ["app.mode.compare", "Alt+2"],
-      ["app.mode.transform", "Alt+3"],
-      ["app.mode.types", "Alt+4"],
-      ["app.mode.jwt", "Alt+5"],
+      ["app.mode.jwt", "Alt+2"],
     ]);
   });
 

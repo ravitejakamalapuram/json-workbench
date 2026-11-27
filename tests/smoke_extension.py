@@ -54,7 +54,7 @@ def check_network_blocked(page: Page) -> None:
 def check_modes_and_views(page: Page) -> None:
     modes = page.get_by_role("navigation", name="Modes").get_by_role("button")
     labels = modes.all_inner_texts()
-    assert labels[:1] == ["View"] and len(labels) == 5, labels
+    assert labels == ["View", "JWT"], labels
     for label in labels[1:]:
         modes.filter(has_text=label).click()
         expect(page.locator("main")).not_to_be_empty()
@@ -63,7 +63,7 @@ def check_modes_and_views(page: Page) -> None:
     expect(
         page.get_by_role("button", name="sample-orders.json", exact=True)
     ).to_be_visible()
-    for view in ("Tree", "Raw", "Table"):
+    for view in ("Tree", "Raw"):
         page.get_by_role("tab", name=view).click()
         expect(page.get_by_role("tabpanel")).not_to_be_empty()
 

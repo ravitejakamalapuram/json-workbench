@@ -44,3 +44,16 @@ Lumen v3 (tokens in `docs/design/lumen/tokens.json`, mockups in `docs/design/moc
 - In the side panel (about 400 px) the rail becomes a top mode strip below 640 px and the details panel becomes an overlay.
 
 Approved for build on 2026-10-23.
+
+## First release scope (2026-11-27)
+
+The owner chose a simple first release over parity with the version on the Store, which they found complex and hard to follow. Features are built one at a time, in this order, each shown before the next starts:
+
+1. Shell: open, paste or drop a file, the command palette and shortcuts, settings, export.
+2. Tree view, including "Expand as JSON" for JSON inside strings.
+3. Raw editor.
+4. Large files: the range index, so files up to 1 GB open (the memory index alone refuses files over 2 MB).
+5. JWT decode.
+6. YAML in and out.
+
+Compare, Transform, Types, Table, field insights, schema, the in-page viewer and tab import with the DevTools panel are out of the first release. Their stubs stay in the tree and are not registered, so nothing unfinished shows in the UI. Each one returns only after the owner approves it again. Features that the Store version has and this release lacks are accepted as dropped.

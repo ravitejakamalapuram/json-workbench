@@ -54,7 +54,7 @@ describe("Shell, empty", () => {
       modes()
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["View", "Compare", "Transform", "Types", "JWT"]);
+    ).toEqual(["View", "JWT"]);
     expect(
       modes()
         .getByRole("button", { name: "View" })
@@ -96,12 +96,10 @@ describe("Shell, with a document", () => {
     expect(await screen.findByTestId("stub-raw")).toBeDefined();
     // Raw's details section joins the stack under Selected.
     expect(screen.getByRole("heading", { name: "Problem" })).toBeDefined();
-    await user.click(modes().getByRole("button", { name: "Compare" }));
-    expect(await screen.findByTestId("stub-compare")).toBeDefined();
+    await user.click(modes().getByRole("button", { name: "JWT" }));
+    expect(await screen.findByTestId("stub-jwt")).toBeDefined();
     expect(
-      modes()
-        .getByRole("button", { name: "Compare" })
-        .getAttribute("aria-current"),
+      modes().getByRole("button", { name: "JWT" }).getAttribute("aria-current"),
     ).toBe("page");
   });
 
@@ -170,8 +168,6 @@ describe("Shell details panel", () => {
     expect(details.getByText("$.items[0].price")).toBeDefined();
     expect(details.getAllByRole("heading").map((h) => h.textContent)).toEqual([
       "Selected",
-      "About this field",
-      "Schema",
     ]);
     await user.click(details.getByRole("button", { name: "Copy path" }));
     expect(await navigator.clipboard.readText()).toBe("$.items[0].price");
