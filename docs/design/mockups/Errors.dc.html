@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Errors</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#ffffff;--surface:#f6f6f7;--raised:#ffffff;--line:#e3e3e6;--ink:#212121;--ink-muted:#6b6b6b;--accent:#c2410c;--on-accent:#ffffff;--selected:#fdebdd;--syn-key:#1d4f91;--syn-string:#2f7a3d;--syn-number:#a05a00;--danger:#c5221f;--danger-bg:#fce8e6}
+body{margin:0}
+.l{display:flex;height:28px;align-items:center;font:13px 'JetBrains Mono',monospace;color:var(--ink);white-space:pre}
+.n{width:56px;text-align:right;padding-right:16px;color:var(--ink-muted);box-sizing:border-box}
+.k{color:var(--syn-key)}.s{color:var(--syn-string)}.v{color:var(--syn-number)}
+.nav{padding:7px 12px;border-radius:6px;font-size:13px;color:var(--ink-muted)}
+.nav.on{background:var(--selected);color:var(--accent);font-weight:600}
+.tab{padding:0 16px;height:40px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);background:var(--bg);box-shadow:inset 0 2px 0 var(--accent);border-right:1px solid var(--line)}
+</style>
+</helmet>
+<div style="width:1280px;height:800px;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;display:flex;box-sizing:border-box">
+  <div style="width:208px;background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;box-sizing:border-box;display:flex;flex-direction:column;gap:4px">
+    <div style="font-weight:600;font-size:14px;padding:4px 12px 16px"><span style="color:var(--accent)">{ }</span> JSON Workbench</div>
+    <div class="nav on">View</div><div class="nav">Compare</div><div class="nav">Transform</div><div class="nav">Types</div><div class="nav">JWT</div>
+  </div>
+  <div style="flex-grow:1;display:flex;flex-direction:column;min-width:0">
+    <div style="display:flex;background:var(--surface);border-bottom:1px solid var(--line)"><div class="tab">pasted.json <span style="color:var(--danger)">●</span></div></div>
+    <div style="height:48px;display:flex;align-items:center;gap:16px;padding:0 24px;font-size:13px;border-bottom:1px solid var(--line)">
+      <span style="color:var(--danger);font-weight:500">● Invalid · 1 error</span>
+      <div style="flex-grow:1"></div>
+      <span style="color:var(--ink-muted)">Tree</span><span style="box-shadow:inset 0 -2px 0 var(--accent);padding:14px 2px;font-weight:500">Raw</span><span style="color:var(--ink-muted)">Table</span>
+    </div>
+    <div style="display:flex;flex-grow:1;min-height:0">
+      <div style="flex-grow:1;padding-top:12px">
+        <div class="l"><span class="n">1</span>{</div>
+        <div class="l"><span class="n">2</span>  <span class="k">"id"</span>: <span class="v">48213</span>,</div>
+        <div class="l"><span class="n">3</span>  <span class="k">"status"</span>: <span class="s">"paid"</span>,</div>
+        <div class="l"><span class="n">4</span>  <span class="k">"customer"</span>: {</div>
+        <div class="l"><span class="n">5</span>    <span class="k">"name"</span>: <span class="s">"Ada Lovelace"</span>,</div>
+        <div class="l"><span class="n">6</span>    <span class="k">"email"</span>: <span class="s">"ada@example.com"</span></div>
+        <div class="l" style="background:var(--danger-bg)"><span class="n" style="color:var(--danger)">7</span>    <span class="k">"tier"</span>: <span class="s">"gold"</span> <span style="text-decoration:underline wavy var(--danger);text-underline-offset:4px">"vip"</span>: true</div>
+        <div class="l"><span class="n">8</span>  },</div>
+        <div class="l"><span class="n">9</span>  <span class="k">"items"</span>: [ ]</div>
+        <div class="l"><span class="n">10</span>}</div>
+      </div>
+      <div style="width:288px;border-left:1px solid var(--line);background:var(--surface);padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;font-size:13px">
+        <div style="font:500 11px 'Inter',sans-serif;color:var(--ink-muted)">PROBLEM</div>
+        <div style="color:var(--danger);font-weight:600">Line 7, column 24</div>
+        <div style="line-height:1.5">Expected ',' or '}' after property value, found '"vip"'.</div>
+        <div style="color:var(--ink-muted);line-height:1.5">Line 6 also needs a comma after "email".</div>
+        <div style="display:flex;align-items:center;gap:16px;margin-top:8px"><span style="background:var(--accent);color:var(--on-accent);border-radius:6px;padding:6px 14px;font-weight:600">Add commas</span><span style="color:var(--accent);font-weight:500">Go to error</span></div>
+      </div>
+    </div>
+    <div style="height:32px;border-top:1px solid var(--line);background:var(--surface);display:flex;align-items:center;padding:0 24px;font:12px 'JetBrains Mono',monospace;color:var(--ink-muted)">Ln 7, Col 24</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
