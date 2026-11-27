@@ -227,6 +227,16 @@ export class MemoryIndex implements DocumentIndex {
     });
   }
 
+  async lineAt(byteOffset: number): Promise<number> {
+    const end = Math.min(Math.max(0, byteOffset), this.bytes.length);
+    let line = 1;
+    for (let at = this.bytes.indexOf(0x0a); at !== -1 && at < end;) {
+      line++;
+      at = this.bytes.indexOf(0x0a, at + 1);
+    }
+    return line;
+  }
+
   /** Nothing to end: the tree is garbage once the worker drops the index. */
   dispose(): void {}
 }

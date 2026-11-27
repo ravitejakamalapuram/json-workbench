@@ -186,6 +186,7 @@ export type DocOps = {
   records: Op<Page, RecordsPage>;
   slice: Op<ByteRange, string>;
   offsets: Op<{ pointers: readonly Pointer[] }, readonly (ByteRange | null)[]>;
+  lineAt: Op<{ byteOffset: number }, number>;
 };
 
 /** search.worker.ts, disposable and terminable: searches the indexed text in chunks. */

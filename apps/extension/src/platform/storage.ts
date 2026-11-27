@@ -1,4 +1,6 @@
-// The only module that touches chrome.storage (TARGET.md section 3.2).
+// The only module of the extension pages and the content script that touches
+// chrome.storage (TARGET.md section 3.2); the service worker writes the
+// handoff slot itself.
 // Everything persisted is listed in StoredValues; outside the extension (Vite
 // dev, tests without the fake chrome) values live in memory for the session.
 import { HANDOFF_KEY, type Handoff } from "./contract";

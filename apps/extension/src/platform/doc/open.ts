@@ -76,6 +76,7 @@ function indexProxy(
     },
     slice: (byteStart, byteEnd) => client.call("slice", { byteStart, byteEnd }),
     offsets: (pointers) => client.call("offsets", { pointers }),
+    lineAt: (byteOffset) => client.call("lineAt", { byteOffset }),
     dispose: () => client.terminate(),
   };
 }

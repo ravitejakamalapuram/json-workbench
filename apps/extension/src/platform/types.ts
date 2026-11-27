@@ -147,7 +147,7 @@ export interface DocumentIndex {
   ): Promise<ChildrenPage>;
   /** The child position at each level from the root down to `pointer` ([] for the root), so a reveal never pages. Null when absent. */
   locate(pointer: Pointer): Promise<readonly number[] | null>;
-  /** The deepest node whose value contains the byte offset. */
+  /** The deepest node whose value contains the byte offset. An object member's key token counts as part of that member, so a key search hit resolves to the member. */
   pointerAt(byteOffset: number): Promise<Pointer>;
   /** Elements of the array at `pointer` (the virtual root for JSONL) as table rows. */
   records(
@@ -165,6 +165,8 @@ export interface DocumentIndex {
   slice(byteStart: number, byteEnd: number): Promise<string>;
   /** Byte ranges of values, for drawing markers in Raw; null where a pointer does not exist. */
   offsets(pointers: readonly Pointer[]): Promise<readonly (ByteRange | null)[]>;
+  /** The line (from 1, counting "\n") that holds the byte offset; the Raw pager numbers each window from it. */
+  lineAt(byteOffset: number): Promise<number>;
   /** Terminates the worker. Closing a document must call it. */
   dispose(): void;
 }
@@ -250,6 +252,12 @@ export type Selection = {
   readonly docId: DocId;
   readonly pointer: Pointer;
   readonly via?: readonly Pointer[];
+  /**
+   * With `via`: the index of the innermost expanded string, which `pointer`
+   * belongs to; readers use it instead of the document's index. The tree sets
+   * it, and clears the selection before it disposes that index.
+   */
+  readonly index?: DocumentIndex;
 };
 
 // ------------------------------------------------------------------- store
@@ -356,6 +364,8 @@ export interface ViewPlugin {
   readonly Component: ComponentType<ViewProps>;
   /** View controls on the right of the toolbar row; must fit the 400 px side panel. */
   readonly Toolbar?: ComponentType<ViewProps>;
+  /** The 32 px bar under the view and the details panel: the tree's breadcrumbs, Raw's cursor position. */
+  readonly StatusBar?: ComponentType<ViewProps>;
   readonly actions?: readonly Action[];
 }
 

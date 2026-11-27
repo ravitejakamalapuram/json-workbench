@@ -1,3 +1,5 @@
+import { readStored, writeStored } from "../platform/storage";
+
 /**
  * One-time, non-modal "please review" nudge. The prompt becomes eligible
  * after a few successful pipeline runs or one clean parse of a large
@@ -7,7 +9,7 @@
 
 export const REVIEW_URL =
   "https://chromewebstore.google.com/detail/higmlhleblpmdogjccpmjlnilpmhohal/reviews";
-export const REVIEW_STORAGE_KEY = "json-workbench:review-prompt";
+export const REVIEW_STORAGE_KEY = "json-workbench:review-prompt" as const;
 export const REVIEW_RUN_THRESHOLD = 3;
 export const REVIEW_LARGE_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
@@ -91,42 +93,19 @@ export function normalizeReviewState(value: unknown): ReviewPromptState {
   };
 }
 
-/** Minimal promise-based subset of chrome.storage.local. */
-export interface ReviewStorageArea {
-  get(key: string): Promise<Record<string, unknown>>;
-  set(items: Record<string, unknown>): Promise<void>;
-}
-
-export async function loadReviewState(
-  storage: ReviewStorageArea | undefined,
-): Promise<ReviewPromptState> {
-  if (!storage) return initialReviewState;
+// Storage is best-effort: the prompt is a nicety, never a blocker.
+export async function loadReviewState(): Promise<ReviewPromptState> {
   try {
-    const items = await storage.get(REVIEW_STORAGE_KEY);
-    return normalizeReviewState(items[REVIEW_STORAGE_KEY]);
+    return normalizeReviewState(await readStored(REVIEW_STORAGE_KEY));
   } catch {
     return initialReviewState;
   }
 }
 
-export async function saveReviewState(
-  storage: ReviewStorageArea | undefined,
-  state: ReviewPromptState,
-): Promise<void> {
-  if (!storage) return;
+export async function saveReviewState(state: ReviewPromptState): Promise<void> {
   try {
-    await storage.set({ [REVIEW_STORAGE_KEY]: { ...state } });
+    await writeStored(REVIEW_STORAGE_KEY, { ...state });
   } catch {
-    // Storage is best-effort; the prompt is a nicety, never a blocker.
+    // Nothing to do: the nudge shows again at worst.
   }
-}
-
-/** Returns chrome.storage.local when running inside the extension. */
-export function chromeLocalStorageArea(): ReviewStorageArea | undefined {
-  const chrome = (
-    globalThis as typeof globalThis & {
-      chrome?: { storage?: { local?: ReviewStorageArea } };
-    }
-  ).chrome;
-  return chrome?.storage?.local;
 }

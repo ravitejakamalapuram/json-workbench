@@ -45,6 +45,7 @@ export function fakeIndex(overrides: Partial<DocumentIndex> = {}): FakeIndex {
     search: async () => ({ hits: 0, capped: false }),
     slice: async () => "",
     offsets: async (pointers) => pointers.map(() => null),
+    lineAt: async () => 1,
     ...overrides,
     dispose: vi.fn(),
   };

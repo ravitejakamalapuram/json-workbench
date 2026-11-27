@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { installFakeChrome } from "../testing/fake-chrome";
 import {
   REVIEW_LARGE_DOCUMENT_BYTES,
   REVIEW_STORAGE_KEY,
@@ -13,7 +14,6 @@ import {
   saveReviewState,
   shouldShowReviewPrompt,
   type ReviewPromptState,
-  type ReviewStorageArea,
 } from "./review-prompt";
 
 const run = (state: ReviewPromptState, times: number) => {
@@ -22,17 +22,6 @@ const run = (state: ReviewPromptState, times: number) => {
     next = recordReviewEvent(next, { type: "pipeline-success" });
   return next;
 };
-
-function memoryStorage(initial: Record<string, unknown> = {}) {
-  const data: Record<string, unknown> = { ...initial };
-  const area: ReviewStorageArea = {
-    get: async (key) => (key in data ? { [key]: data[key] } : {}),
-    set: async (items) => {
-      Object.assign(data, items);
-    },
-  };
-  return { area, data };
-}
 
 describe("review prompt trigger", () => {
   it("points at the Chrome Web Store reviews page", () => {
@@ -108,23 +97,21 @@ describe("review prompt trigger", () => {
 });
 
 describe("review prompt persistence", () => {
-  it("round-trips state through chrome.storage.local-style storage", async () => {
-    const { area, data } = memoryStorage();
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("round-trips state through chrome.storage.local", async () => {
+    const chrome = installFakeChrome();
     const state = markReviewPrompted(run(initialReviewState, 3));
-    await saveReviewState(area, state);
-    expect(data[REVIEW_STORAGE_KEY]).toEqual(state);
-    expect(await loadReviewState(area)).toEqual(state);
+    await saveReviewState(state);
+    expect(chrome.storage.local.data.get(REVIEW_STORAGE_KEY)).toEqual(state);
+    expect(await loadReviewState()).toEqual(state);
   });
 
-  it("falls back to the initial state without storage or on errors", async () => {
-    expect(await loadReviewState(undefined)).toEqual(initialReviewState);
-    const failing: ReviewStorageArea = {
-      get: () => Promise.reject(new Error("unavailable")),
-      set: () => Promise.reject(new Error("unavailable")),
-    };
-    expect(await loadReviewState(failing)).toEqual(initialReviewState);
-    await expect(
-      saveReviewState(failing, initialReviewState),
-    ).resolves.toBeUndefined();
+  it("falls back to the initial state when storage fails", async () => {
+    const chrome = installFakeChrome();
+    chrome.storage.local.get.mockRejectedValueOnce(new Error("unavailable"));
+    chrome.storage.local.set.mockRejectedValueOnce(new Error("unavailable"));
+    expect(await loadReviewState()).toEqual(initialReviewState);
+    await expect(saveReviewState(initialReviewState)).resolves.toBeUndefined();
   });
 });

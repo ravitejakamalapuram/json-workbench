@@ -1,5 +1,5 @@
 // A typed in-memory fake of the chrome APIs the extension uses, for unit tests
-// of platform/, background/ and anything else that touches `chrome`. Calls are
+// of platform/, background/, devtools/ and anything else that touches `chrome`. Calls are
 // vi.fn spies, so a test can assert on them or replace one result. Values are
 // structured-cloned on the way in and out, as chrome.storage serializes them.
 import { vi } from "vitest";
@@ -68,7 +68,13 @@ function fakeArea(quotaBytes = Infinity) {
 
 export type FakeArea = ReturnType<typeof fakeArea>;
 
+export type FakePanel = {
+  readonly onShown: FakeEvent<[window: Window]>;
+  readonly onHidden: FakeEvent<[]>;
+};
+
 function createFakeChrome() {
+  const created: FakePanel[] = [];
   const local = fakeArea();
   const session = fakeArea(SESSION_QUOTA_BYTES);
   const granted = new Set<string>();
@@ -144,6 +150,31 @@ function createFakeChrome() {
       setPanelBehavior: vi.fn(
         async (_behavior: chrome.sidePanel.PanelBehavior) => {},
       ),
+    },
+    devtools: {
+      panels: {
+        /** Every panel created, so a test can dispatch its onShown. */
+        created,
+        create: vi.fn(
+          (
+            _title: string,
+            _iconPath: string,
+            _pagePath: string,
+            callback?: (panel: FakePanel) => void,
+          ) => {
+            const panel: FakePanel = {
+              onShown: fakeEvent<[window: Window]>(),
+              onHidden: fakeEvent<[]>(),
+            };
+            created.push(panel);
+            callback?.(panel);
+          },
+        ),
+      },
+      network: {
+        onRequestFinished:
+          fakeEvent<[request: chrome.devtools.network.Request]>(),
+      },
     },
   };
 }

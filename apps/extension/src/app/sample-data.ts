@@ -16,15 +16,6 @@ import {
 export const SAMPLE_FILE_NAME = "sample-orders.json";
 export const SAMPLE_ORDER_COUNT = 80;
 
-export const SAMPLE_SQL_QUERY = [
-  "SELECT status,",
-  "  COUNT(*) AS orders,",
-  "  ROUND(SUM(total), 2) AS revenue",
-  "FROM read_json_auto('source.json')",
-  "GROUP BY status",
-  "ORDER BY revenue DESC",
-].join("\n");
-
 const FIRST_NAMES = [
   "Ada",
   "Bruno",
@@ -181,18 +172,16 @@ export interface SampleWorkspace {
   readonly fileName: string;
   readonly text: string;
   readonly pipeline: PipelineDefinition;
-  readonly sqlQuery: string;
   readonly diffText: string;
 }
 
-/** Everything the side panel needs to populate Tree/Table/SQL/Diff. */
+/** The sample document, plus a pipeline and an edited copy for Transform and Compare. */
 export function createSampleWorkspace(): SampleWorkspace {
   const orders = createSampleOrders();
   return {
     fileName: SAMPLE_FILE_NAME,
     text: stringifyJsonValue(orders as JsonValue, true),
     pipeline: createSamplePipeline(),
-    sqlQuery: SAMPLE_SQL_QUERY,
     diffText: stringifyJsonValue(
       createSampleDiffTarget(orders) as JsonValue,
       true,

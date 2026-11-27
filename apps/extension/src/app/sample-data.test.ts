@@ -70,12 +70,6 @@ describe("sample workspace", () => {
     ]);
   });
 
-  it("suggests a DuckDB SQL query over the loaded source", () => {
-    expect(createSampleWorkspace().sqlQuery).toContain(
-      "read_json_auto('source.json')",
-    );
-  });
-
   it("prefills a diff target with a few visible changes", () => {
     const workspace = createSampleWorkspace();
     const changes = diffJson(

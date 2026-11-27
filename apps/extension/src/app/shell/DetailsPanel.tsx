@@ -1,6 +1,7 @@
 import { Suspense, useState } from "react";
 import {
   LIMITS,
+  type DocumentIndex,
   type DocumentModel,
   type Pointer,
   type ViewId,
@@ -19,7 +20,14 @@ type DetailsProps = { readonly doc: DocumentModel; readonly view: ViewId };
  */
 export function DetailsPanel({ doc, view }: DetailsProps) {
   const selection = useAppStore((state) => state.selection);
-  const pointer = selection?.docId === doc.id ? selection.pointer : null;
+  const selected = selection?.docId === doc.id ? selection : null;
+  const { status } = doc;
+  // Embedded JSON is read from its own index, which the selection carries.
+  const index =
+    selected?.index ??
+    (status.kind === "ready" || status.kind === "indexing"
+      ? status.index
+      : undefined);
   const sections = registry.details.filter(
     (section) => section.views?.includes(view) ?? true,
   );
@@ -30,10 +38,14 @@ export function DetailsPanel({ doc, view }: DetailsProps) {
         <h2 id="details-selected" className="caption">
           Selected
         </h2>
-        {pointer === null ? (
+        {selected === null ? (
           <p className="muted">Select a node to see its path.</p>
         ) : (
-          <Selected key={pointer} doc={doc} pointer={pointer} />
+          <Selected
+            key={selected.pointer}
+            index={index}
+            pointer={selected.pointer}
+          />
         )}
       </section>
       {sections.map((section) => (
@@ -57,13 +69,12 @@ export function DetailsPanel({ doc, view }: DetailsProps) {
 }
 
 async function valueText(
-  doc: DocumentModel,
+  index: DocumentIndex | undefined,
   pointer: Pointer,
 ): Promise<string> {
-  const { status } = doc;
-  if (status.kind !== "ready" && status.kind !== "indexing")
+  if (!index)
     throw new Error("The document has no index to read the value from.");
-  const node = await status.index.node(pointer);
+  const node = await index.node(pointer);
   if (!node) throw new Error("The selected value no longer exists.");
   // A primitive's text is its decoded value, which is what a user pastes;
   // containers and cut-off strings copy as their source text.
@@ -72,15 +83,15 @@ async function valueText(
     throw new Error("This value is still being indexed. Try again shortly.");
   if (node.byteEnd - node.byteStart > LIMITS.rawEditChars)
     throw new Error("This value is too large to copy. Export it instead.");
-  return status.index.slice(node.byteStart, node.byteEnd);
+  return index.slice(node.byteStart, node.byteEnd);
 }
 
 type SelectedProps = {
-  readonly doc: DocumentModel;
+  readonly index: DocumentIndex | undefined;
   readonly pointer: Pointer;
 };
 
-function Selected({ doc, pointer }: SelectedProps) {
+function Selected({ index, pointer }: SelectedProps) {
   const [notice, setNotice] = useState("");
   const path = pathLabel(pointer);
 
@@ -102,7 +113,7 @@ function Selected({ doc, pointer }: SelectedProps) {
         </Button>
         <Button
           onClick={() =>
-            void copy(() => valueText(doc, pointer), "Value copied.")
+            void copy(() => valueText(index, pointer), "Value copied.")
           }
         >
           Copy value

@@ -69,5 +69,6 @@ export function createDocHandlers(): Handlers<DocOps> {
     slice: async ({ byteStart, byteEnd }) =>
       (await ready()).slice(byteStart, byteEnd),
     offsets: async ({ pointers }) => (await ready()).offsets(pointers),
+    lineAt: async ({ byteOffset }) => (await ready()).lineAt(byteOffset),
   };
 }

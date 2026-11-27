@@ -120,6 +120,21 @@ export function documentIndexContract(makeIndex: MakeIndex): void {
     expect(await index.slice(inner, (z?.byteEnd ?? 0) - 1)).toBe("\uFEFFx");
   });
 
+  it("numbers lines from 1 at any byte offset, a newline ending its own line", async () => {
+    const index = await open(
+      bytesOf([0xef, 0xbb, 0xbf], '[\n"\u00e9",\r\n2\n]'),
+      "json",
+    );
+    // BOM (3) "[" "\n" | "\"é\"," (5) "\r" "\n" | "2" "\n" | "]"
+    expect(await index.lineAt(0)).toBe(1);
+    expect(await index.lineAt(4)).toBe(1);
+    expect(await index.lineAt(5)).toBe(2);
+    expect(await index.lineAt(11)).toBe(2);
+    expect(await index.lineAt(12)).toBe(3);
+    expect(await index.lineAt(14)).toBe(4);
+    expect(await index.lineAt(1_000)).toBe(4);
+  });
+
   it("answers null or empty for pointers that do not exist", async () => {
     const index = await open(bytesOf('{"a":[1],"b":"x"}'), "json");
     expect(await index.node("/c")).toBeNull();

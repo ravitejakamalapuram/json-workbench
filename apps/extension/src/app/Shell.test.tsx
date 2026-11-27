@@ -181,6 +181,38 @@ describe("Shell details panel", () => {
   });
 });
 
+describe("Shell details panel, embedded JSON", () => {
+  it("copies a value from the index the selection carries", async () => {
+    const { openReady, store, user } = setup();
+    await openReady();
+    const embedded = fakeIndex({
+      node: async (pointer) => ({
+        pointer,
+        key: "event",
+        kind: "string",
+        byteStart: 9,
+        byteEnd: 24,
+        text: "order.created",
+      }),
+    });
+    const docId = store.getState().activeDocId ?? "";
+    act(() =>
+      store.getState().select({
+        docId,
+        pointer: "/event",
+        via: ["/payload"],
+        index: embedded,
+      }),
+    );
+    const details = within(
+      screen.getByRole("complementary", { name: "Details" }),
+    );
+    await user.click(details.getByRole("button", { name: "Copy value" }));
+    expect(await details.findByText("Value copied.")).toBeDefined();
+    expect(await navigator.clipboard.readText()).toBe("order.created");
+  });
+});
+
 describe("Shell with the real doc engine", () => {
   it("indexes an opened file in the doc worker and says whether it is valid", async () => {
     const user = userEvent.setup();

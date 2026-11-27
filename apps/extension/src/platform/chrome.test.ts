@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installFakeChrome } from "../testing/fake-chrome";
 import {
+  activeTabHost,
   hasHostAccess,
   inExtension,
   openFullTab,
@@ -19,12 +20,12 @@ describe("inExtension", () => {
 });
 
 describe("host access", () => {
-  it("asks for one site as an https origin pattern", async () => {
+  it("asks for one site over http and https", async () => {
     const chrome = installFakeChrome();
     expect(await hasHostAccess({ host: "api.example.com" })).toBe(false);
     expect(await requestHostAccess({ host: "api.example.com" })).toBe(true);
     expect(chrome.permissions.request).toHaveBeenCalledWith({
-      origins: ["https://api.example.com/*"],
+      origins: ["*://api.example.com/*"],
     });
     expect(await hasHostAccess({ host: "api.example.com" })).toBe(true);
   });
@@ -36,6 +37,27 @@ describe("host access", () => {
     expect(chrome.permissions.request).toHaveBeenCalledWith({
       origins: ["<all_urls>"],
     });
+  });
+});
+
+describe("activeTabHost", () => {
+  it("names the host of the tab in front when its URL is visible", async () => {
+    const chrome = installFakeChrome();
+    const tab = (url?: string) => [{ url } as chrome.tabs.Tab];
+    chrome.tabs.query.mockResolvedValueOnce(
+      tab("http://localhost:3000/api/orders?token=x"),
+    );
+    expect(await activeTabHost()).toBe("localhost");
+    expect(chrome.tabs.query).toHaveBeenCalledWith({
+      active: true,
+      lastFocusedWindow: true,
+    });
+    // Without an icon click on that page Chrome hides the URL.
+    chrome.tabs.query.mockResolvedValueOnce(tab(undefined));
+    expect(await activeTabHost()).toBeNull();
+    chrome.tabs.query.mockResolvedValueOnce(tab("chrome://extensions/"));
+    expect(await activeTabHost()).toBeNull();
+    expect(await activeTabHost()).toBeNull();
   });
 });
 

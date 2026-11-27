@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DocStatus, Registry } from "../platform/types";
-import { documentFixture } from "../testing/fixtures";
+import { documentFixture, fakeIndex } from "../testing/fixtures";
 import { registry } from "./registry";
 
 /**
@@ -133,16 +133,29 @@ describe("registry", () => {
     ]);
   });
 
+  const statuses: DocStatus[] = [
+    { kind: "loading" },
+    {
+      kind: "indexing",
+      index: fakeIndex(),
+      progress: { indexedBytes: 0, totalBytes: 2, records: 0 },
+    },
+    { kind: "ready", index: fakeIndex(), summary: { records: 1, nodes: 1 } },
+    { kind: "invalid", issues: [] },
+    { kind: "failed", message: "File changed on disk. Reopen it." },
+  ];
+
   it("answers supports() for a document in every status without throwing", () => {
-    const statuses: DocStatus[] = [
-      { kind: "loading" },
-      { kind: "invalid", issues: [] },
-      { kind: "failed", message: "File changed on disk. Reopen it." },
-    ];
     for (const status of statuses)
       for (const view of registry.views) {
         const answer = view.supports(documentFixture({ status }));
         expect(answer === true || typeof answer === "string").toBe(true);
       }
+  });
+
+  it("has a view for every status, so the shell can always show one", () => {
+    const raw = registry.views.find((view) => view.id === "raw");
+    for (const status of statuses)
+      expect(raw?.supports(documentFixture({ status }))).toBe(true);
   });
 });
