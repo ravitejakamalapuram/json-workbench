@@ -1,0 +1,356 @@
+/* Layout of the minimal shell, after docs/design/mockups/Main and Empty. */
+
+.shell {
+  display: flex;
+  height: 100%;
+}
+
+.shell-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loading {
+  padding: var(--space-4);
+}
+
+/* --------------------------------------------------------------- Rail */
+
+.rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 208px;
+  padding: var(--space-4) var(--space-3);
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.brand {
+  padding: var(--space-1) var(--space-3) var(--space-4);
+  font: var(--type-body);
+  font-weight: 600;
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rail-item,
+.rail-recent {
+  display: block;
+  width: 100%;
+  padding: 7px var(--space-3);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink-muted);
+  font-size: 13px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-item {
+  cursor: pointer;
+}
+
+.rail-item[aria-current="page"] {
+  background: var(--selected);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rail-recents .caption {
+  padding: var(--space-6) var(--space-3) var(--space-2);
+}
+
+/* ---------------------------------------------------------- Tab strip */
+
+.tab-strip {
+  flex: none;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.tab-strip-list {
+  display: flex;
+}
+
+.doc-tab {
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--line);
+}
+
+.doc-tab[data-active] {
+  background: var(--bg);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.doc-tab-name,
+.doc-tab-close,
+.doc-tab-new {
+  height: 40px;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.doc-tab-name {
+  padding: 0 var(--space-2) 0 var(--space-4);
+}
+
+.doc-tab[data-active] .doc-tab-name {
+  color: var(--ink);
+}
+
+.doc-tab-close {
+  padding: 0 var(--space-3) 0 var(--space-1);
+}
+
+.doc-tab-new {
+  padding: 0 var(--space-4);
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------ Toolbar */
+
+.document {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-4);
+  height: 48px;
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.doc-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.doc-status p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-status progress {
+  width: 80px;
+  accent-color: var(--accent);
+}
+
+.status-ok {
+  color: var(--ok);
+}
+
+.status-danger {
+  color: var(--danger);
+}
+
+.status-muted {
+  color: var(--ink-muted);
+}
+
+.toolbar-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* ------------------------------------------------------- View, details */
+
+.document-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.view-panel {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.details {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 288px;
+  padding: var(--space-6);
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.details-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* A section whose component rendered nothing has nothing to say. */
+.details-section:has(> .details-body:empty) {
+  display: none;
+}
+
+.details-path {
+  overflow-wrap: anywhere;
+}
+
+.details-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: calc(-1 * var(--space-3));
+}
+
+.details-notice:empty {
+  display: none;
+}
+
+/* ---------------------------------------------------------- Empty state */
+
+.empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.empty-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 560px;
+}
+
+.empty-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.empty-title {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 36px;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 168px;
+  padding: var(--space-4);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.empty-recent {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 6px 0;
+}
+
+/* --------------------------------------------------------- Status bar */
+
+.status-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--space-6);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: var(--type-code-small);
+}
+
+/* ----------------------------------------------------------- Narrow */
+
+/* The side panel is about 400 px wide. Until item "shell" adds its narrow
+   layout (a top mode strip and a details overlay), the rail turns into a
+   scrolling row and the details panel steps aside, so nothing overflows. */
+@media (max-width: 639px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .rail {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    padding: var(--space-2);
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand,
+  .rail-recents {
+    display: none;
+  }
+
+  .rail-list {
+    flex-direction: row;
+  }
+
+  .shell-main {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .toolbar,
+  .status-bar {
+    padding: 0 var(--space-3);
+  }
+
+  .details {
+    display: none;
+  }
+}
