@@ -34,9 +34,12 @@ export function unescapeString(
 ): { readonly text: string; readonly more: boolean } {
   let text = "";
   let at = from;
+  // A view that ends at `to`, so a search for the next escape never runs on
+  // into the rest of a chunk that holds none.
+  const within = bytes.subarray(0, to);
   while (at < to && text.length < maxUnits) {
-    const slash = bytes.indexOf(BACKSLASH, at);
-    const runEnd = slash === -1 || slash >= to ? to : slash;
+    const slash = within.indexOf(BACKSLASH, at);
+    const runEnd = slash === -1 ? to : slash;
     if (runEnd > at) text += decoder.decode(bytes.subarray(at, runEnd));
     at = runEnd;
     if (at >= to) break;

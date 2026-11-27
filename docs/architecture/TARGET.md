@@ -371,6 +371,26 @@ Non-goals (this rebuild):
 
 Empty means not measured. F2 owns this section and replaces review numbers with its own; every other number in this file that is not listed here is a target.
 
+The 1 GB engine, F2, 2026-11-27: Intel Xeon @ 2.10 GHz, 4 vCPUs shared with other jobs, 16 GiB, Linux 6.18, Node 22.23.5. `range-index.bench.ts` writes each file under `os.tmpdir()` with streams (records of about 200 bytes: 5,152,572 in 1 GiB), opens it with `fs.openAsBlob` and runs the engine on the main thread of the Node process, one run per file, no warm-up, and deletes the file. These are not Chrome numbers: a picked `File` is read through the browser, and the real-extension acceptance run of the screens item measures that.
+
+| Measured on 1 GiB                                            | JSONL             | `{"data":[...]}`  | Target (section 5) |
+| ------------------------------------------------------------ | ----------------- | ----------------- | ------------------ |
+| first 50 rows readable                                       | 36 ms             | 45 ms             | under 1.5 s        |
+| full index, one pass                                         | 8.1 s (126 MiB/s) | 8.0 s (127 MiB/s) | under 30 s         |
+| slowest event-loop gap during the pass                       | 22 ms             | 29 ms             | under 50 ms        |
+| peak JS heap, peak RSS, whole run (index, search)            | 107 MiB, 187 MiB  | 104 MiB, 205 MiB  | under 400 MB       |
+| last 50 rows and the line number of the last byte            | 7 ms              | 3 ms              |                    |
+| search, no match, plain text, case-insensitive               | 9.3 s (110 MiB/s) | 10.9 s (94 MiB/s) | not promised       |
+| search, a value 10 records from the end                      | 10.8 s            | 11.1 s            |                    |
+| search, regular expression (first 128 MiB)                   | 46 MiB/s          | 45 MiB/s          |                    |
+| slowest event-loop gap during the search                     | 72 ms             | 17 ms             |                    |
+| `loadValue` of `/5` (JSONL) and of `/meta` (after the array) | 0.01 s            | 7.8 s             |                    |
+
+- The index is about 15x faster than core's `scanJson` on JSONL measured in the architecture review (120-139 s/GiB in a sandbox 3x slower), and slower than that review's depth-scan prototype (168-179 MB/s in the same sandbox), which validated nothing. It meets its targets with a wide margin, so it was not tuned further.
+- Search reads and tokenizes every byte once. A plain-text query compares bytes and decodes only tokens that hold an escape; a regular expression or a case-insensitive non-ASCII query decodes every token, which is why the regular expression rows are about 2.4x slower. A first version bounded nothing in the escape search of `unescapeString` and ran at 2 MiB/s for a regular expression: it scanned to the end of the chunk for every token.
+- `loadValue` of a value at the materialize limits, each in a fresh process (`JWB_BENCH_LOADS`, `NODE_OPTIONS=--expose-gc`): a 62 MiB value (limit 64 MiB) took 3.0 s, peaked at 728 MiB RSS (133 MiB before) and kept 454 MiB of heap after a collection; a 126 MiB value (limit 128 MiB) took 5.5 s, peaked at 1,392 MiB and kept 911 MiB. That is about 7.3x the source bytes retained and about 10x at the peak, not the 6x and "about 400 MB at the default" that section 5 assumed. The cost is the lossless parse in core (one `LosslessNumber` object per number), not the byte scan.
+- A 1 GiB file with one line: the line number of its last byte costs one 8 MiB read (3 ms), because the line index also keeps a checkpoint every 8 MiB.
+
 The F1a build, 2026-11-27 (this repository's container, shared with another job):
 
 - `entry-index-*.js` 4,433 B raw, 1.9 kB gzip; `shared-*.js` (React, ReactDOM) 221,809 B raw, 69.0 kB gzip; `background.js` 64 B; `json-render.js` 25 B.
@@ -388,4 +408,4 @@ Reported by the first build's items, 2026-10-23. Not re-run here:
 
 - tabimport: `chrome.storage.session` accepted 10 MiB of UTF-8 text, and JSON escaping did not inflate quote-heavy text. The `runtime.sendMessage` reply ceiling is 64 MiB encoded.
 - raw: CodeMirror's Lezer idle parse caused main-thread tasks of up to about 71 ms at 2 MiB (busy machine).
-- `executeScript` result ceiling, `getContent` ceiling, Raw typing latency on a quiet machine, the range index on 1 GiB, search throughput, worker heap at 128 MB: not measured.
+- `executeScript` result ceiling, `getContent` ceiling, Raw typing latency on a quiet machine: not measured. The engine in Chrome (a picked `File`, a real worker) is not measured either.
