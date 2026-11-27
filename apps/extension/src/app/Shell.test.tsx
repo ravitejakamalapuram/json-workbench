@@ -110,7 +110,7 @@ describe("Shell, with a document", () => {
     // Raw's details section joins the stack under Selected.
     expect(screen.getByRole("heading", { name: "Problem" })).toBeDefined();
     await user.click(modes().getByRole("button", { name: "JWT" }));
-    expect(await screen.findByTestId("stub-jwt")).toBeDefined();
+    expect(await screen.findByTestId("jwt-input")).toBeDefined();
     expect(
       modes().getByRole("button", { name: "JWT" }).getAttribute("aria-current"),
     ).toBe("page");

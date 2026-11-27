@@ -1,6 +1,9 @@
-// Owned by item "jwt". F1a stub: the exported names are fixed (TARGET.md section 4).
+// Owned by item "jwt": decode a JWT, never verify it (decision 13). The names
+// exported here are the ones app/registry.ts imports.
 import { lazy } from "react";
-import type { Action, ModePlugin } from "../../platform/types";
+import type { ModePlugin } from "../../platform/types";
+
+export { jwtActions, openInJwt } from "./actions";
 
 export const jwtMode: ModePlugin = {
   id: "jwt",
@@ -8,8 +11,3 @@ export const jwtMode: ModePlugin = {
   needsDocument: false,
   Component: lazy(() => import("./JwtMode")),
 };
-
-export const jwtActions: readonly Action[] = [];
-
-/** Opens the JWT mode on a token; the "Decode JWT" row action calls it. */
-export function openInJwt(_token: string): void {}
