@@ -4,7 +4,8 @@
 // decoded text and reported as the token's byte range.
 import { scanJson, type JsonToken } from "@json-workbench/core";
 import type { SearchHit, SearchQuery } from "../types";
-import type { DecodedText } from "./utf8";
+import type { Handlers, SearchOps } from "../workers/protocol";
+import { decodeUtf8, type DecodedText } from "./utf8";
 
 export type SearchResult = {
   readonly hits: readonly SearchHit[];
@@ -65,3 +66,13 @@ export async function searchText(
   if (string && !test(string, "value")) return { hits, capped: true };
   return { hits, capped: false };
 }
+
+/** search.worker.ts: one search per worker, so the next keystroke ends it. */
+export const searchHandlers: Handlers<SearchOps> = {
+  async search({ source, query, maxHits }, { partial, signal }) {
+    const decoded = decodeUtf8(new Uint8Array(await source.arrayBuffer()));
+    const { hits, capped } = await searchText(decoded, query, maxHits, signal);
+    for (const hit of hits) partial(hit);
+    return { hits: hits.length, capped };
+  },
+};
