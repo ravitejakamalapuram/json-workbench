@@ -110,14 +110,16 @@ export function createDocumentSlice({
     }
 
     async function detectAndIndex(id: DocId, source: Blob, name: string) {
+      // Closed or already re-opened by an edit while the head was read.
+      const stillLoading = () => find(id)?.status.kind === "loading";
       try {
         const head = await source.slice(0, SNIFF_BYTES).text();
-        if (!find(id)) return;
+        if (!stillLoading()) return;
         const format = detectFormat(name, head);
         update(id, { format });
         startIndexing(id, source, format);
       } catch (error) {
-        if (find(id))
+        if (stillLoading())
           update(id, { status: { kind: "failed", message: messageOf(error) } });
       }
     }

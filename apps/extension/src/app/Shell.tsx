@@ -17,7 +17,6 @@ import { ActionsContext } from "./ui/actions-context";
 
 export function Shell({ extraSources }: ShellProps) {
   const store = useAppStoreApi();
-  const surface = useAppStore((state) => state.surface);
   const theme = useAppStore((state) => state.theme);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -39,7 +38,7 @@ export function Shell({ extraSources }: ShellProps) {
 
   return (
     <ActionsContext.Provider value={registry.actions}>
-      <div className="shell" data-surface={surface}>
+      <div className="shell">
         <Rail modes={registry.modes} />
         <div className="shell-main">
           <main className="workspace">

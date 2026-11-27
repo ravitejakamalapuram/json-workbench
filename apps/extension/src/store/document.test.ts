@@ -123,13 +123,11 @@ describe("openDocument", () => {
   it("adds a recent for files only, with name and size but no content", async () => {
     const { store, open } = setup();
     await open("orders.json", "[1]");
-    store
-      .getState()
-      .openDocument({
-        name: "clip",
-        origin: "paste",
-        source: new Blob(["{}"]),
-      });
+    store.getState().openDocument({
+      name: "clip",
+      origin: "paste",
+      source: new Blob(["{}"]),
+    });
     expect(store.getState().recents).toEqual([
       { name: "orders.json", bytes: 3, openedAt: expect.any(Number) },
     ]);
@@ -189,6 +187,17 @@ describe("editDocument", () => {
       kind: "indexing",
       index: engine.opens[1]?.index,
     });
+  });
+
+  it("is not overtaken by the format detection of the open it replaced", async () => {
+    const { store, engine, doc } = setup();
+    const id = store
+      .getState()
+      .openDocument({ name: "a", origin: "paste", source: new Blob(["{}"]) });
+    store.getState().editDocument(id, '{"b":2}');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(engine.opens).toHaveLength(1);
+    expect(doc(id)?.status).toMatchObject({ index: engine.opens[0]?.index });
   });
 
   it("refuses text above LIMITS.rawEditChars", async () => {

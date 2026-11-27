@@ -75,7 +75,12 @@ async function valueText(
   return status.index.slice(node.byteStart, node.byteEnd);
 }
 
-function Selected({ doc, pointer }: { doc: DocumentModel; pointer: Pointer }) {
+type SelectedProps = {
+  readonly doc: DocumentModel;
+  readonly pointer: Pointer;
+};
+
+function Selected({ doc, pointer }: SelectedProps) {
   const [notice, setNotice] = useState("");
   const path = pathLabel(pointer);
 
