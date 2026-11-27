@@ -1,23 +1,39 @@
 // The one way a worker materializes a value (TARGET.md section 5): Compare,
 // Types, Schema, Table sort, Insights, Transform and Export call it and return
-// plain results, so a value never crosses a worker boundary. This version
-// parses the whole text and so refuses anything above rawEditChars; F2
-// replaces it with a byte scan to the pointer that decodes only that slice.
+// plain results, so a value never crosses a worker boundary. The byte scanner
+// walks the pointer straight from the Blob, only the bytes of the value it
+// finds are decoded and parsed, and maxBytes bounds those bytes, not the file
+// they sit in: a member of a 1 GB wrapper loads without the rest.
 import {
   fromJsonPointer,
   parseJsonLines,
   parseJsonValue,
-  type JsonObject,
   type JsonValue,
 } from "@json-workbench/core";
-import {
-  LIMITS,
-  TooLargeError,
-  type LoadValueOptions,
-  type Pointer,
-} from "../types";
+import { TooLargeError, type LoadValueOptions, type Pointer } from "../types";
+import { listItems, type Item, type ListEnv } from "./range-list";
+import { readBytes } from "./read";
+import { sizeText } from "./size-text";
 
 const MB = 1024 * 1024;
+const BOM = [0xef, 0xbb, 0xbf];
+const OPEN_ARRAY = 0x5b;
+const OPEN_OBJECT = 0x7b;
+const isSpace = (byte: number) =>
+  byte === 0x20 || byte === 0x0a || byte === 0x0d || byte === 0x09;
+
+/** The bytes of one value in the source; `end` is exclusive. */
+type Range = { readonly start: number; readonly end: number };
+
+/** A container to look inside: "records" is the JSONL virtual root. */
+type Parent = {
+  readonly kind: "array" | "object" | "records";
+  readonly start: number;
+  readonly depth: number;
+};
+
+const missing = (pointer: Pointer) =>
+  new Error(`Nothing at ${pointer} in this document.`);
 
 async function* once(text: string) {
   yield text;
@@ -36,30 +52,133 @@ async function records(
   return values;
 }
 
-/** A parsed object; a LosslessNumber is an object too, but has no members. */
-const isObject = (value: JsonValue): value is JsonObject =>
-  value !== null &&
-  typeof value === "object" &&
-  Object.getPrototypeOf(value) === Object.prototype;
-
-/** The value at `pointer`; containers are plain arrays and objects, numbers LosslessNumber. */
-function valueAt(root: JsonValue, pointer: Pointer): JsonValue {
-  const missing = () => new Error(`Nothing at ${pointer} in this document.`);
-  if (pointer !== "" && !pointer.startsWith("/")) throw missing();
-  let value = root;
-  for (const segment of fromJsonPointer(pointer)) {
-    if (Array.isArray(value)) {
-      const item = /^(0|[1-9]\d*)$/.test(segment)
-        ? value[Number(segment)]
-        : undefined;
-      if (item === undefined) throw missing();
-      value = item;
-    } else if (isObject(value) && Object.hasOwn(value, segment)) {
-      // Own members of parsed JSON are never undefined; "??" only satisfies the index type.
-      value = value[segment] ?? null;
-    } else throw missing();
+/** Where the first value begins: after a BOM and whitespace; the size of the source if there is none. */
+async function firstValue(source: Blob, from: number): Promise<number> {
+  for (let at = from; at < source.size; at += 64 * 1024) {
+    const bytes = await readBytes(source, at, at + 64 * 1024);
+    const found = bytes.findIndex((byte) => !isSpace(byte));
+    if (found >= 0) return at + found;
   }
-  return value;
+  return source.size;
+}
+
+/**
+ * The child of `parent` at this pointer segment: the element at that position,
+ * or the member with that key (the last one, as parsing keeps it). An array
+ * stops at the batch that holds its element; an object is read to its end.
+ */
+async function child(
+  env: ListEnv,
+  parent: Parent,
+  segment: string,
+  limit: number,
+): Promise<Item | undefined> {
+  const positional = parent.kind !== "object";
+  let wanted = 0;
+  if (positional) {
+    if (!/^(0|[1-9]\d*)$/.test(segment)) return undefined;
+    wanted = Number(segment);
+    if (wanted >= limit) return undefined;
+  }
+  const listing = listItems(env, {
+    ...parent,
+    seek: { index: 0, offset: -1 },
+    levels: 1,
+    wantFrom: wanted,
+  });
+  let found: Item | undefined;
+  try {
+    for (
+      let batch = await listing.next();
+      !batch.done;
+      batch = await listing.next()
+    ) {
+      for (const item of batch.value)
+        if (positional ? item.index === wanted : item.key === segment)
+          found = item;
+      if (positional && found) break;
+    }
+  } finally {
+    await listing.return({ count: 0, end: -1 });
+  }
+  return found;
+}
+
+/** Where the first `maxRecords` records of a JSONL source end: with the last of them, or with the source when it has fewer. */
+async function recordsEnd(
+  env: ListEnv,
+  records: Parent,
+  maxRecords: number,
+): Promise<number> {
+  if (maxRecords <= 0) return records.start;
+  const last = await child(env, records, String(maxRecords - 1), Infinity);
+  return last && last.end >= 0 ? last.end : env.source.size;
+}
+
+/** The bytes of the value at `segments`, found by scanning from the start of the source. */
+async function locate(
+  source: Blob,
+  pointer: Pointer,
+  segments: readonly string[],
+  { format, maxRecords }: LoadValueOptions,
+): Promise<Range> {
+  const head = await readBytes(source, 0, BOM.length);
+  const bom = BOM.every((byte, at) => head[at] === byte) ? BOM.length : 0;
+  const env: ListEnv = {
+    source,
+    until: source.size,
+    chunkBytes: MB,
+    known: () => undefined,
+  };
+  const jsonl = format === "jsonl";
+  const recordsOf: Parent = { kind: "records", start: bom, depth: 0 };
+
+  if (segments.length === 0) {
+    if (!jsonl || maxRecords === undefined)
+      return { start: bom, end: source.size };
+    return { start: bom, end: await recordsEnd(env, recordsOf, maxRecords) };
+  }
+
+  let parent: Parent | undefined;
+  if (jsonl) parent = recordsOf;
+  else {
+    const start = await firstValue(source, bom);
+    const first = (await readBytes(source, start, start + 1))[0];
+    if (first === OPEN_ARRAY || first === OPEN_OBJECT)
+      parent = {
+        kind: first === OPEN_ARRAY ? "array" : "object",
+        start,
+        depth: 0,
+      };
+  }
+
+  let range: Range | undefined;
+  for (const [depth, segment] of segments.entries()) {
+    const item: Item | undefined =
+      parent &&
+      (await child(
+        env,
+        parent,
+        segment,
+        jsonl && depth === 0 ? (maxRecords ?? Infinity) : Infinity,
+      ));
+    if (!item) throw missing(pointer);
+    if (item.end < 0)
+      throw new Error(
+        `The text ends before the value at ${pointer} is complete.`,
+      );
+    range = { start: item.start, end: item.end };
+    parent =
+      item.first === OPEN_ARRAY || item.first === OPEN_OBJECT
+        ? {
+            kind: item.first === OPEN_ARRAY ? "array" : "object",
+            start: item.start,
+            depth: depth + 1,
+          }
+        : undefined;
+  }
+  if (!range) throw missing(pointer);
+  return range;
 }
 
 export async function loadValue(
@@ -67,15 +186,15 @@ export async function loadValue(
   pointer: Pointer,
   options: LoadValueOptions,
 ): Promise<JsonValue> {
-  const limit = Math.min(options.maxBytes, LIMITS.rawEditChars);
-  if (source.size > limit)
+  if (pointer !== "" && !pointer.startsWith("/")) throw missing(pointer);
+  const segments = pointer === "" ? [] : fromJsonPointer(pointer);
+  const { start, end } = await locate(source, pointer, segments, options);
+  if (end - start > options.maxBytes)
     throw new TooLargeError(
-      `This document is larger than ${Math.round((limit / MB) * 10) / 10} MB, the most this can load.`,
+      `This ${segments.length === 0 ? "document" : "value"} is larger than ${sizeText(options.maxBytes)}, the most this can load.`,
     );
-  const text = await source.text();
-  const root =
-    options.format === "jsonl"
-      ? await records(text, options.maxRecords)
-      : parseJsonValue(text);
-  return valueAt(root, pointer);
+  const text = new TextDecoder().decode(await readBytes(source, start, end));
+  return options.format === "jsonl" && segments.length === 0
+    ? records(text, options.maxRecords)
+    : parseJsonValue(text);
 }

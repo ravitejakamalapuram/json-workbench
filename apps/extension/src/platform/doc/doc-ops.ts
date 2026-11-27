@@ -21,6 +21,8 @@ import type {
 } from "../workers/protocol";
 import { buildMemoryIndex } from "./memory-index";
 import { RangeIndex } from "./range-index";
+import { friendlyReadError, readBytes } from "./read";
+import { sizeText } from "./size-text";
 
 export type DocOptions = {
   /** Sources larger than this many bytes get the range index; tests lower it. */
@@ -40,11 +42,6 @@ const GB = 1024 * MB;
  */
 const MAX_BYTES = 1.25 * GB;
 
-const sizeText = (bytes: number) =>
-  bytes >= GB
-    ? `${Number((bytes / GB).toFixed(2))} GB`
-    : `${Number((bytes / MB).toFixed(1))} MB`;
-
 /** What a query is answered from, and how the open that builds it ends. */
 type Opening = {
   /** Settles when queries can be answered: at once for the range index; null when the open leaves no index. */
@@ -62,7 +59,7 @@ async function openMemory(
       : undefined;
   const indexed = converted ?? source;
   progress({ indexedBytes: 0, totalBytes: indexed.size, records: 0 });
-  const bytes = new Uint8Array(await indexed.arrayBuffer());
+  const bytes = await readBytes(indexed, 0, indexed.size);
   const built = await buildMemoryIndex(bytes, indexedFormat(format), signal);
   const extra = converted ? { converted } : {};
   if (built.kind === "invalid")
@@ -129,7 +126,10 @@ export function createDocHandlers(options: DocOptions = {}): Handlers<DocOps> {
       current = opening.index;
       // A Raw edit opens again; the pass over the old text has nothing left to serve.
       void previous.then((index) => index?.dispose());
-      return opening.result;
+      // A YAML conversion reads the source outside the engines' own reads.
+      return opening.result.catch((error: unknown) => {
+        throw friendlyReadError(error);
+      });
     },
     node: async ({ pointer }) => (await ready()).node(pointer),
     children: async ({ pointer, offset, limit }) =>

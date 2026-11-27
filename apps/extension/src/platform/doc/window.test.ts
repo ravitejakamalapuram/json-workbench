@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { changedBlob } from "../../testing/blobs";
+import { LIMITS } from "../types";
 import { readWindow } from "./window";
 
 const blob = (...parts: BlobPart[]) => new Blob(parts);
@@ -61,6 +63,34 @@ describe("readWindow", () => {
       byteStart: 5,
       byteEnd: 5,
       text: "",
+    });
+  });
+
+  it("never holds more than the bytes it was asked for", async () => {
+    const source = blob("aaa\nbbb\nccc\n");
+    // A zero-byte window used to borrow the last newline of its lead-in bytes.
+    expect(await readWindow(source, 0, 0)).toEqual({
+      byteStart: 0,
+      byteEnd: 0,
+      text: "",
+    });
+    const big = blob(new Uint8Array(LIMITS.rawPageBytes + 4096).fill(0x61));
+    const window = await readWindow(big, 0, Number.MAX_SAFE_INTEGER);
+    expect(window.byteEnd - window.byteStart).toBe(LIMITS.rawPageBytes);
+  });
+
+  it("treats a start that is not a position as the start of the file", async () => {
+    const source = blob("abc");
+    for (const start of [Number.NaN, -5, Number.NEGATIVE_INFINITY])
+      expect((await readWindow(source, start)).text, String(start)).toBe("abc");
+    expect((await readWindow(source, 1.9)).text).toBe("bc");
+    expect((await readWindow(source, Infinity)).text).toBe("");
+  });
+
+  it("says what to do when the file changed on disk", async () => {
+    await expect(readWindow(changedBlob("abc"), 0)).rejects.toMatchObject({
+      name: "NotReadableError",
+      message: "File changed on disk. Reopen it.",
     });
   });
 });

@@ -4,7 +4,6 @@
 // testing/index-contract.ts requires.
 import { decodeJsonPointerSegment, toJsonPointer } from "@json-workbench/core";
 import {
-  LIMITS,
   type ByteRange,
   type Cell,
   type ChildrenPage,
@@ -21,7 +20,7 @@ import {
 } from "../types";
 import { preview } from "./json-string";
 import { parseTree, type Entry } from "./parse";
-import { searchText } from "./search";
+import { searchInline } from "./search";
 import { decodeUtf8, type DecodedText } from "./utf8";
 
 export type BuildResult =
@@ -189,19 +188,14 @@ export class MemoryIndex implements DocumentIndex {
     return { rows, total: entry.children.length, totalFinal: true };
   }
 
-  async search(
+  search(
     query: SearchQuery,
     onHits: (hits: readonly SearchHit[]) => void,
     signal: AbortSignal,
   ): Promise<SearchSummary> {
-    const { hits, capped } = await searchText(
-      this.decoded,
-      query,
-      LIMITS.searchHits,
-      signal,
-    );
-    if (hits.length > 0) onHits(hits);
-    return { hits: hits.length, capped };
+    // The extension's proxy searches in a worker; this serves direct callers
+    // and the contract suite, on text of at most rawEditChars.
+    return searchInline(new Blob([this.bytes.slice()]), query, signal, onHits);
   }
 
   async slice(byteStart: number, byteEnd: number): Promise<string> {

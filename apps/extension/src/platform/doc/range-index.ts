@@ -5,7 +5,6 @@
 // worker a few megabytes.
 import { decodeJsonPointerSegment, toJsonPointer } from "@json-workbench/core";
 import {
-  LIMITS,
   type ByteRange,
   type Cell,
   type ChildrenPage,
@@ -35,7 +34,8 @@ import {
   type Container,
 } from "./range-build";
 import { listItems, type Item, type ListRequest } from "./range-list";
-import { searchHandlers } from "./search";
+import { readBytes } from "./read";
+import { searchInline } from "./search";
 
 export type RangeOptions = {
   /** Bytes per read of the indexing pass and of a query; tests shrink it to cross every boundary. */
@@ -177,9 +177,8 @@ export class RangeIndex implements DocumentIndex {
     return this.#builder.rootFirst < 0 ? 0 : 1;
   }
 
-  async #read(from: number, to: number): Promise<Uint8Array> {
-    const end = Math.min(to, this.#source.size);
-    return new Uint8Array(await this.#source.slice(from, end).arrayBuffer());
+  #read(from: number, to: number): Promise<Uint8Array> {
+    return readBytes(this.#source, from, Math.min(to, this.#source.size));
   }
 
   /** The error with the line and column an editor shows: from 1, columns in UTF-16 units of the decoded line. */
@@ -501,21 +500,14 @@ export class RangeIndex implements DocumentIndex {
     return { rows, total: parent.count, totalFinal: parent.end >= 0 };
   }
 
-  async search(
+  search(
     query: SearchQuery,
     onHits: (hits: readonly SearchHit[]) => void,
     signal: AbortSignal,
   ): Promise<SearchSummary> {
     // The extension never calls this: its proxy searches the Blob in a
-    // disposable worker. This reads the whole Blob, which is fine for the
-    // documents the contract suite builds.
-    const hits: SearchHit[] = [];
-    const summary = await searchHandlers.search(
-      { source: this.#source, query, maxHits: LIMITS.searchHits },
-      { signal, progress: () => undefined, partial: (hit) => hits.push(hit) },
-    );
-    if (hits.length > 0) onHits(hits);
-    return summary;
+    // disposable worker. It serves the contract suite.
+    return searchInline(this.#source, query, signal, onHits);
   }
 
   async slice(byteStart: number, byteEnd: number): Promise<string> {

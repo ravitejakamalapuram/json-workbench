@@ -2,6 +2,8 @@
 // the byte offset after every 1,024th newline is kept, so any offset costs a
 // binary search plus a read of at most 1,023 lines, and nothing stores 8 bytes
 // per line or scans the whole file.
+import { readBytes } from "./read";
+
 const NEWLINE = 0x0a;
 const READ_BYTES = 1024 * 1024;
 
@@ -53,10 +55,10 @@ export class LineIndex {
       from < target;
       from += READ_BYTES
     ) {
-      const block = new Uint8Array(
-        await this.#source
-          .slice(from, Math.min(target, from + READ_BYTES))
-          .arrayBuffer(),
+      const block = await readBytes(
+        this.#source,
+        from,
+        Math.min(target, from + READ_BYTES),
       );
       for (
         let at = block.indexOf(NEWLINE);

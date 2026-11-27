@@ -5,6 +5,7 @@
 import { ByteScanner, type ScanSink } from "./byte-scan";
 import { primitivePreview, PREVIEW_BYTES, unescapeString } from "./json-string";
 import { isContainerByte, type Container } from "./range-build";
+import { readBytes } from "./read";
 
 /** One child. With two levels, `members` holds its own children. */
 export type Item = {
@@ -55,9 +56,6 @@ export type ListRequest = {
 export type Listed = { readonly count: number; readonly end: number };
 
 const FIRST_READ = 32 * 1024;
-
-const read = async (source: Blob, from: number, to: number) =>
-  new Uint8Array(await source.slice(from, to).arrayBuffer());
 
 class Collector implements ScanSink {
   scanner!: ByteScanner;
@@ -188,7 +186,7 @@ class Collector implements ScanSink {
   async readLate(): Promise<void> {
     for (const item of this.late.splice(0)) {
       if (item.keyEnd >= 0 && typeof item.key !== "string") {
-        const bytes = await read(
+        const bytes = await readBytes(
           this.env.source,
           item.memberStart,
           item.keyEnd,
@@ -196,7 +194,7 @@ class Collector implements ScanSink {
         item.key = unescapeString(bytes, 1, bytes.length - 1).text;
       }
       if (item.end >= 0 && !isContainerByte(item.first)) {
-        const bytes = await read(
+        const bytes = await readBytes(
           this.env.source,
           item.start,
           Math.min(item.end, item.start + PREVIEW_BYTES + 2),
@@ -234,7 +232,11 @@ export async function* listItems(
   let size = Math.min(env.chunkBytes, FIRST_READ);
   let failed = false;
   while (at < env.until && !failed && collector.containerEnd < 0) {
-    const bytes = await read(env.source, at, Math.min(env.until, at + size));
+    const bytes = await readBytes(
+      env.source,
+      at,
+      Math.min(env.until, at + size),
+    );
     collector.bytes = bytes;
     collector.base = at;
     failed = scanner.write(bytes, at) !== undefined;

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ChangingBlob, CountingBlob } from "../../testing/blobs";
 import {
   documentIndexContract,
   invalidDocumentContract,
@@ -20,16 +21,6 @@ async function makeIndex(chunkBytes: number, source: Blob, format: DocFormat) {
   const outcome = await index.build();
   if (outcome.kind !== "ready") throw new Error(outcome.issues[0]?.message);
   return index;
-}
-
-/** Counts the bytes the index reads, to show that a query does not rescan the file. */
-class CountingBlob extends Blob {
-  reads = 0;
-  override slice(start?: number, end?: number): Blob {
-    const part = super.slice(start, end);
-    this.reads += part.size;
-    return part;
-  }
 }
 
 /** Holds every read that starts at or past `limit` until released, to stop the pass between two chunks. */
@@ -109,6 +100,35 @@ describe("range index", () => {
     index.dispose();
     source.release();
     await expect(building).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  describe("when the file changes on disk", () => {
+    const changed = {
+      name: "NotReadableError",
+      message: "File changed on disk. Reopen it.",
+    };
+
+    it("fails the pass that was running with a message that says what to do", async () => {
+      const file = new ChangingBlob([bytesOf(`[${numbers(100)}]`)]);
+      const index = new RangeIndex(file, "json", { chunkBytes: 10 });
+      await expect(
+        index.build({
+          onProgress: ({ indexedBytes }) => {
+            if (indexedBytes >= 20) file.change();
+          },
+        }),
+      ).rejects.toMatchObject(changed);
+    });
+
+    it("fails the reads of a finished index the same way", async () => {
+      const file = new ChangingBlob([bytesOf(`[${numbers(100)}]`)]);
+      const index = await makeIndex(10, file, "json");
+      expect(await index.slice(1, 2)).toBe("0");
+      file.change();
+      await expect(index.slice(1, 2)).rejects.toMatchObject(changed);
+      await expect(index.children("", 0, 5)).rejects.toMatchObject(changed);
+      await expect(index.lineAt(50)).rejects.toMatchObject(changed);
+    });
   });
 
   it("serves rows after the first MiB while the rest is still unread", async () => {

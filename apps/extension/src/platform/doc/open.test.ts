@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { changedBlob } from "../../testing/blobs";
 import { fakeWorker } from "../../testing/fake-worker";
 import {
   documentIndexContract,
@@ -112,6 +113,26 @@ describe("openDocument", () => {
     expect(status).toEqual({
       kind: "failed",
       message: "This file is 2 MB. JSON Workbench opens files up to 1 MB.",
+    });
+  });
+
+  describe("when the file changes on disk", () => {
+    const failed = {
+      kind: "failed",
+      message: "File changed on disk. Reopen it.",
+    };
+    const rows = `[${"1,".repeat(100)}1]`;
+
+    it("fails a memory-indexed document", async () => {
+      const { open } = setup();
+      const { status } = await open(changedBlob(rows)).finished;
+      expect(status).toEqual(failed);
+    });
+
+    it("fails a range-indexed document", async () => {
+      const { open } = setup({ rangeAboveBytes: 0, chunkBytes: 16 });
+      const { status } = await open(changedBlob(rows)).finished;
+      expect(status).toEqual(failed);
     });
   });
 
