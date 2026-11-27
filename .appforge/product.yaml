@@ -2,7 +2,7 @@
 # they depend on infrastructure (appforge-control, appforge-edge, Paperclip) not built yet.
 product_id: json-workbench
 name: JSON Workbench
-description: "Local-first developer workbench for exploring and transforming large JSON data."
+description: "Local-first workbench for exploring large JSON and JSONL files."
 platform: [chrome]
 state: PRODUCTION
 portfolio_state: GROWTH
@@ -32,22 +32,18 @@ permissions: .appforge/permissions.yaml
 data_collection:
   collected: []
   stored:
-    local:
-      [
-        chrome_storage_local_settings_recents_pipeline,
-        chrome_storage_session_handoff_60s,
-      ]
+    local: [chrome_storage_local_settings_recents]
     remote: []
   transmitted:
     endpoints: []
     # No network request carries user data: the extension-pages CSP sets
-    # connect-src 'self', and the service worker and content script make no
-    # network calls. Tab import reads the
-    # rendered page text; the old credentialed re-fetch is removed (ADR 0005).
-  sensitive: [] # user JSON content is processed client-side (workers, jq-web WASM) and never leaves the browser
+    # connect-src 'self', and the service worker only opens the side panel. The
+    # extension reads no web page and no tab (the first release has no tab
+    # import and no in-page viewer).
+  sensitive: [] # user JSON content is processed client-side (in workers) and never leaves the browser
   third_party: []
   retention: { local: indefinite_until_user_clears, remote: none }
-  deletion: "'Clear local data' in Settings removes every stored key; uninstall clears all local and session storage for the extension"
+  deletion: "'Clear local data' in Settings removes every stored key; uninstall clears all local storage for the extension"
 security_classification: low
 release_channel: default
 current_version: "0.2.1"

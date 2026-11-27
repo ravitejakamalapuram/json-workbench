@@ -16,33 +16,35 @@ This is the exact, ordered path from this repo to a published extension. Copy in
 ```bash
 npm install
 npm run typecheck && npm run lint && npm run format:check && npm test
-npm run build         # builds the extension, content script, and packages dist/
-npm run package:check # validates the MV3 package (permissions + required files)
+npm run build         # builds the extension page and service worker, and packages dist/
+npm run package:check # validates the MV3 package (permissions, required and forbidden files)
 ```
 
 The uploadable folder is `apps/extension/dist/`. `release-platform@v2` builds
 this package itself and produces `dist/*.zip` — there is no manual `zip -r`
 step; do not hand-build the archive.
 
-Confirm the ZIP contains: `manifest.json`, `index.html`, `background.js`,
-`json-render.js`, `icons/`, `assets/`, `jq.wasm`, `duckdb-*.wasm`.
+Confirm the ZIP contains: `manifest.json`, `index.html`, `background.js`, `icons/`,
+`assets/` and the built `*.js` chunks and workers. It must hold no `json-render.js`,
+no DevTools page and no `jq.wasm`: `package:check` fails if one appears.
 
 ## 2. Bump the version
 
-The version baseline release-platform@v2 reads from is `package.json` at the
-repo root. Edit `package.json` → `"version"`, then keep
-`apps/extension/package.json` and `apps/extension/manifest.json` in step with
-it — all three must agree before a release run. The store rejects re-uploads
-that reuse a version. Use semver (e.g. `0.1.0` → `0.1.1` for fixes, `0.2.0` for
-features). Rebuild after changing it.
+`apps/extension/manifest.json` is the version source of truth
+([ADR 0002](ADR/0002-manifest-is-the-version-source-of-truth.md)). Keep the root
+`package.json`, `apps/extension/package.json` and `.appforge/product.yaml`
+(`current_version`) equal to it; `npm run package:check` fails on any drift. The
+version that is published is computed by release-platform from the `v*` tags and
+conventional commit messages. The store rejects re-uploads that reuse a version.
+Rebuild after changing it.
 
 ## 3. Prepare listing assets
 
 - **Icon**: `store/assets/icon-128.png` (already generated).
 - **Screenshots** (1280×800 PNG/JPEG, at least one, up to five). Capture them
   with the same harness style used in tests — load a synthetic fixture, then
-  screenshot each view (Tree, Raw/code, Table, Insights+Pipeline, Local SQL,
-  Diff side-by-side). Never use real/customer data.
+  screenshot each view (Tree, Raw with a syntax error and its fix, JWT, YAML).
+  Never use real/customer data.
 - **Short description** and **detailed description**: copy from
   `docs/STORE_LISTING.md`.
 - (Optional) **Small promo tile** 440×280.
@@ -56,8 +58,8 @@ features). Rebuild after changing it.
 4. **Privacy practices** tab (this is where most reviews stall — be precise):
    - Single purpose: paste the single-purpose line from `STORE_LISTING.md`.
    - Permission justifications: paste the per-permission reasons from
-     `STORE_LISTING.md` for `activeTab`, `scripting`, `storage`, `sidePanel`,
-     and the optional `debugger` and `<all_urls>` host access.
+     `STORE_LISTING.md` for `sidePanel` and `storage`, the only permissions the
+     manifest declares.
    - Data usage: check **does not collect** user data; certify the disclosures.
    - Provide a privacy policy URL if the form requires one (a short page stating
      "all processing is local; no data is collected or transmitted" is enough).
@@ -67,10 +69,11 @@ features). Rebuild after changing it.
 
 - Click **Submit for review**. First reviews typically take a few days.
 - Common rejection causes for this extension and how we pre-empt them:
-  - _Broad host permission_ → we keep `<all_urls>` **optional** (runtime-granted),
-    so the default install has no host permissions. Explain the auto-render toggle.
-  - _`debugger` permission_ → justified as opt-in one-shot response capture.
+  - _Broad host permission_ → there is none: the manifest has no host permissions,
+    no optional permissions and no content script.
   - _Unused permissions_ → the manifest is minimal; `package:check` guards it.
+  - _Remote code_ → none; every script is bundled, and the extension pages' CSP
+    blocks any connection to another address.
 
 ## 6. After approval
 
@@ -81,6 +84,7 @@ features). Rebuild after changing it.
 ## 7. Optional pre-submission self-check
 
 Load `apps/extension/dist/` as an unpacked extension to smoke-test the real
-Chrome APIs (side panel open, "Format current tab", auto-render toggle):
-`chrome://extensions` → enable **Developer mode** → **Load unpacked** → select
-`apps/extension/dist`.
+Chrome APIs: `chrome://extensions` → enable **Developer mode** → **Load unpacked** →
+select `apps/extension/dist`. Then click the toolbar icon (the side panel opens),
+open a file, and run "Open in full tab" from the command palette (`Ctrl/Cmd+K`).
+`tests/smoke_extension.py` automates the manifest, CSP and page checks in Chromium.

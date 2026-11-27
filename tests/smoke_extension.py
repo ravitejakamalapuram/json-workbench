@@ -15,17 +15,23 @@ from playwright.sync_api import Page, expect, sync_playwright
 
 from e2e_support import ConsoleErrors, Steps, assert_fits, build, extension
 
-PERMISSIONS = ["activeTab", "scripting", "sidePanel", "storage"]
+PERMISSIONS = ["sidePanel", "storage"]
+ABSENT = (
+    "host_permissions",
+    "optional_host_permissions",
+    "optional_permissions",
+    "content_scripts",
+    "devtools_page",
+    "web_accessible_resources",
+)
 EMPTY_WASM = "[0, 97, 115, 109, 1, 0, 0, 0]"  # "\0asm" and version 1
 
 
 def check_manifest(page: Page) -> None:
     manifest = page.evaluate("() => chrome.runtime.getManifest()")
     assert sorted(manifest["permissions"]) == PERMISSIONS, manifest["permissions"]
-    assert manifest["optional_host_permissions"] == ["<all_urls>"]
-    for absent in ("host_permissions", "optional_permissions"):
+    for absent in ABSENT:
         assert absent not in manifest, f"{absent}: {manifest[absent]}"
-    assert manifest["devtools_page"] == "devtools.html"
 
 
 def check_wasm(page: Page) -> None:

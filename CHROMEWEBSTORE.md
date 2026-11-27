@@ -1,6 +1,6 @@
 # Chrome Web Store Listing & Publishing Record
 
-_Last Updated: 2026-09-24_
+_Last Updated: 2026-11-27_
 
 ---
 
@@ -20,27 +20,33 @@ _Last Updated: 2026-09-24_
 
 ### Short Description (max 132 characters)
 
-> Inspect, transform, validate, diff, and query large JSON locally. Nothing leaves your browser.
+> Open large JSON and JSONL as a tree or raw text, fix common syntax errors, decode JWTs, convert YAML. Nothing leaves your browser.
 
 ### Detailed Description
 
-```markdown
-JSON Workbench is a local-first developer tool for large JSON, JSONL, and NDJSON files. Open a file, a JSON tab, or a captured response and explore it as a tree or table without losing numeric precision. Profile structure, infer a JSON Schema, build reproducible transform pipelines (native steps, jq, and JSONata), run local DuckDB SQL, diff two payloads as an RFC 6902 JSON Patch (with a side-by-side visual view), and export JSON, JSONL, CSV, or TSV. It can also pretty-print any JSON page in place. Your source data stays in the browser. Works in Chrome and Edge 120+.
+```text
+JSON Workbench is a local-first tool for reading and fixing JSON. Open a file, paste text or drop a file into Chrome's side panel or a full tab. Your data is processed on your device and never uploaded.
+
+- Tree: browse any document as a tree, search keys and values, copy a value's path, and expand JSON hidden inside a string (a double-encoded API response) into a tree of its own. Numbers keep every digit, including integers too large for a JavaScript number.
+- Raw: edit the text in a code editor. A syntax error shows its line and column with a one-click fix for common mistakes: trailing or missing commas, single quotes, unquoted keys, comments. Format and minify.
+- Large files: a large file is indexed in chunks in a background worker, so the first rows appear while the rest is still being read. Files above 2 MB open in a paged, read-only raw view.
+- JWT: paste a token to read its header and payload.
+- YAML: open YAML as JSON and save JSON as YAML.
+- Export: save as JSON, JSONL, NDJSON, CSV or TSV, or save the file as it is.
+
+No account, no analytics, no network access: the extension's pages are not allowed to connect to any server. Works in Chrome and Edge 120+.
 ```
 
 ---
 
 ## 3. Permissions Justifications (Required for Review)
 
-Google review requires specific plain-English justification for each declared permission:
+Google review requires specific plain-English justification for each declared permission. The manifest declares these two and nothing else: no host permissions, no content scripts, no optional permissions, no DevTools page.
 
-| Permission  | Used in Code? | Sample Evidence   | Required? |  Risk  | Plain-English Review Justification                                                                                                                                                                                                                                                      |
-| :---------- | :-----------: | :---------------- | :-------: | :----: | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `activeTab` |      Yes      | background.js:33  |    Yes    |  LOW   | Grants temporary access to the active tab upon explicit user invocation without persistent background access. "Active JSON tab" uses it to re-request the tab's own address with the user's cookies so that a signed-in API response can be read; the request never leaves that origin. |
-| `sidePanel` |      Yes      | background.js:102 |    Yes    |  LOW   | Allows the extension interface to be displayed in Chrome side panel.                                                                                                                                                                                                                    |
-| `storage`   |      Yes      | background.js:19  |    Yes    |  LOW   | Required to locally persist user settings, configurations, and application state across sessions.                                                                                                                                                                                       |
-| `scripting` |      Yes      | background.js:33  |    Yes    | MEDIUM | Enables programmatic script or stylesheet injection into target pages to render extension functionality.                                                                                                                                                                                |
-| `debugger`  |      Yes      | background.js:183 |    No     |  HIGH  | Enables deep DevTools protocol instrumentation upon explicit developer opt-in.                                                                                                                                                                                                          |
+| Permission  | Used in Code? | Evidence                                                                       | Required? | Risk | Plain-English Review Justification                                                                                                                                                  |
+| :---------- | :-----------: | :----------------------------------------------------------------------------- | :-------: | :--: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sidePanel` |      Yes      | `apps/extension/src/background/index.ts` (`chrome.sidePanel.setPanelBehavior`) |    Yes    | LOW  | Displays the extension interface in Chrome's side panel; the toolbar button opens it.                                                                                               |
+| `storage`   |      Yes      | `apps/extension/src/platform/storage.ts` (`chrome.storage.local`)              |    Yes    | LOW  | Keeps the theme, the memory limit, the names of the last 10 files opened and the one-time review-note flags on the device. Nothing stored leaves it; "Clear local data" removes it. |
 
 ---
 
@@ -49,19 +55,15 @@ Google review requires specific plain-English justification for each declared pe
 - **Data Flow**:
   User Interaction
   ⬇
-  Extension Frontend (Popup / Side Panel / Content Scripts)
+  Extension Frontend (Side Panel / full tab, with background workers)
   ⬇
-  Local Browser Storage (chrome.storage.local / session)
+  Local Browser Storage (chrome.storage.local)
 
-  The extension has no backend and contacts no AppForge or third-party server. It
-  makes exactly one kind of outbound request: when the user presses "Active JSON
-  tab", it re-requests the address of the tab they are viewing, with that site's
-  cookies attached, so an authenticated API response can be read. The destination is
-  always the page's own origin and the response is never forwarded anywhere.
+  The extension has no backend and makes no network request: its pages run under a content security policy with `connect-src 'self'`, so Chrome refuses a connection to any other address. It reads no web page and no tab.
 
 - **Data Handling Summary**:
-  - **User Preference & Session State**: Collected: Yes | Stored: Local | Purpose: Store application configuration, theme preferences, and local document state.
-  - **Web Page Data & Content**: Collected: No | Stored: No | Purpose: Parsed and visualized in-memory in the browser only; never stored and never transmitted off-device. Retrieving it may involve one credentialed request to the viewed page's own origin (see Data Flow above); no other origin is contacted.
+  - **User Preference & Session State**: Collected: Yes | Stored: Local | Purpose: Store the theme, the memory limit and the names of recently opened files.
+  - **Web Page Data & Content**: Collected: No | Stored: No | Purpose: The extension does not read web pages. The files and text you open are parsed in memory in the browser only; never stored (only the file name, size and time of the last 10 files) and never transmitted off-device.
   - **Privacy Policy URL**: https://ravitejakamalapuram.github.io/json-workbench.html
 
 ---
@@ -69,9 +71,9 @@ Google review requires specific plain-English justification for each declared pe
 ## 5. Store Assets Checklist
 
 - [x] Extension Icon (128×128 PNG): `store/assets/icon-128.png`
-- [x] Screenshots (1280×800 PNG, 4 files): `store/assets/screenshots/`
-- [x] Promotional Tile (440×280 PNG): `chrome-store/assets/promo/small-tile.png`
-- [x] Marquee Promo (1400×560 PNG): `chrome-store/assets/promo/marquee.png`
+- [ ] Screenshots (1280×800 PNG): `store/assets/screenshots/` still shows the previous version of the app; retake from the first-release build
+- [ ] Promotional Tile (440×280 PNG; text predates the first release): `chrome-store/assets/promo/small-tile.png`
+- [ ] Marquee Promo (1400×560 PNG; text predates the first release): `chrome-store/assets/promo/marquee.png`
 
 ---
 

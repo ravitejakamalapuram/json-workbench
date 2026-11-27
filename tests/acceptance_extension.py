@@ -1,22 +1,21 @@
-"""The full user journey of TARGET.md section 6, against the built extension.
+"""The first release's user journey, against the built extension: open a file,
+browse the tree, fix a broken file in Raw, export, and fit the narrow side panel.
 
 Each step prints PASS or FAIL and the run continues, so one broken item does
 not hide the others; the exit code is non-zero if any step failed. Steps use
-the data-testid hooks listed per item in TARGET.md section 4. Red while items
-are stubs; each item makes its own steps pass.
+the data-testid hooks listed per item in TARGET.md section 4. Not a CI gate
+(the smoke test is); JWT and YAML steps are added by the items that build them.
 
     npm run build && CHROMIUM_PATH=/path/to/chrome JWB_SKIP_BUILD=1 python3 tests/acceptance_extension.py
 """
 
 from __future__ import annotations
 
-import base64
-import json
 import re
 import tempfile
 from pathlib import Path
 
-from playwright.sync_api import Page, expect, sync_playwright
+from playwright.sync_api import Download, Page, expect, sync_playwright
 
 from e2e_support import ConsoleErrors, Steps, assert_fits, build, extension
 
@@ -29,17 +28,6 @@ FILES = {
     "people.json": '[{"id":1,"name":"Ada"},{"id":2,"name":"Bruno"},{"id":3,"name":"Chen"}]',
 }
 DARK_BACKGROUND = "rgb(28, 29, 33)"  # Lumen dark --bg, #1c1d21
-
-
-def base64url(value: dict[str, object]) -> str:
-    return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
-
-
-def sample_jwt() -> str:
-    # Built at run time from its parts: a literal token trips the secret scan.
-    header = base64url({"alg": "HS256", "typ": "JWT"})
-    payload = base64url({"sub": "42", "name": "Ada", "iat": 1_700_000_000})
-    return ".".join([header, payload, "c2lnbmF0dXJl"])
 
 
 def open_file(page: Page, path: Path) -> None:
@@ -98,32 +86,35 @@ def journey(page: Page, files: dict[str, Path], steps: Steps) -> None:
         page.get_by_test_id("raw-apply-fix").click()
         expect(status).to_contain_text("Valid")
 
-    def table() -> None:
+    def export(name: str, to: str) -> Download:
+        show_document(page, name)
+        page.get_by_role("button", name="Export", exact=True).click()
+        dialog = page.get_by_role("dialog", name="Export")
+        try:
+            # A format's label also holds its hint ("JSON Indented"); "JSONL" must not match "JSON".
+            dialog.get_by_role("radio", name=re.compile(rf"^{to}(?!\w)")).check()
+            with page.expect_download() as download:
+                dialog.get_by_role("button", name="Export", exact=True).click()
+            expect(dialog).to_have_count(0)
+            return download.value
+        finally:
+            # A failed step must not leave the dialog open over the steps after it.
+            if dialog.count():
+                page.keyboard.press("Escape")
+
+    def export_json() -> None:
+        download = export("numbers.json", "JSON")
+        assert download.suggested_filename == "numbers.json", download.suggested_filename
+        assert BIG in Path(download.path()).read_text(encoding="utf-8")
+
+    def export_csv() -> None:
         open_file(page, files["people.json"])
         expect(status).to_contain_text("Valid")
-        page.get_by_role("tab", name="Table").click()
-        expect(page.get_by_test_id("table-row")).to_have_count(3)
-
-    def compare() -> None:
-        go_to_mode(page, "Compare")
-        page.get_by_test_id("compare-left").fill('{"a":1,"b":2}')
-        page.get_by_test_id("compare-right").fill('{"a":1,"b":3}')
-        page.get_by_test_id("compare-run").click()
-        expect(page.get_by_test_id("compare-summary")).to_contain_text(
-            re.compile("1 changed", re.IGNORECASE)
-        )
-
-    def transform() -> None:
-        show_document(page, "people.json")
-        go_to_mode(page, "Transform")
-        page.get_by_test_id("transform-expression").fill("map(.name)")
-        page.get_by_test_id("transform-run").click()
-        expect(page.get_by_test_id("transform-result")).to_contain_text("Chen")
-
-    def jwt() -> None:
-        go_to_mode(page, "JWT")
-        page.get_by_test_id("jwt-input").fill(sample_jwt())
-        expect(page.get_by_test_id("jwt-payload")).to_contain_text("Ada")
+        download = export("people.json", "CSV")
+        assert download.suggested_filename == "people.csv", download.suggested_filename
+        lines = Path(download.path()).read_text(encoding="utf-8").splitlines()
+        assert lines[0] == "id,name", lines
+        assert lines[1:] == ["1,Ada", "2,Bruno", "3,Chen"], lines
 
     def side_panel_width() -> None:
         show_document(page, "numbers.json")
@@ -150,10 +141,8 @@ def journey(page: Page, files: dict[str, Path], steps: Steps) -> None:
     steps.run("the tree expands a node", expand)
     steps.run("tree search reveals a match", search)
     steps.run('a malformed file says "Line N, column M" and Apply fix repairs it', fix_malformed)
-    steps.run("Table shows one row per record", table)
-    steps.run("Compare finds the changed value", compare)
-    steps.run("a jq transform runs on the document", transform)
-    steps.run("JWT decodes a token", jwt)
+    steps.run("Export saves JSON with every digit", export_json)
+    steps.run("Export converts a list of records to CSV", export_csv)
     steps.run("the layout fits the 400 px side panel", side_panel_width)
     steps.run("the dark theme renders", dark_theme)
 

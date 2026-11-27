@@ -6,6 +6,10 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 
 `Source → Analyze → Transform → Validate → Preview → Export`
 
+## First release (2026-11-27)
+
+The owner chose a small first release (`docs/design/DECISIONS.md`, "First release scope"): shell, tree with embedded JSON, raw editor, large files, JWT decode and YAML in and out. The pipeline workflow above and the milestones below are the long-term plan for the core engine, the CLI and the VS Code package. In the extension, compare, transform, types, table, field insights, schema, the in-page viewer and tab import with the DevTools panel are not in the first release (M2 insights and schema, M4, M5, M7 diff and validation, M8, M10), and SQL (M9) is out of the Store build (ADR 0006); each returns only after the owner approves it again. Nothing below is a claim that the extension has the feature today; `docs/STATUS.md` says what is verified.
+
 ## Milestones
 
 ### M0 — Foundation
@@ -40,8 +44,8 @@ Build a local-first Chrome developer workbench for understanding and manipulatin
 ### M3 — Viewer
 
 - Virtualized tree
-- Virtualized table for tabular arrays
-- Raw Monaco editor
+- Virtualized table for tabular arrays (not in the first release)
+- Raw editor (CodeMirror 6 replaced Monaco, ADR 0004)
 - Search and path navigation
 - Copy value/path/JSONPath/JSON Pointer
 - Dark/light themes

@@ -46,9 +46,10 @@ export default defineConfig({
     modulePreload: { polyfill: false },
     rollupOptions: {
       input: {
+        // One page: the side panel, and the full tab with ?surface=tab. The
+        // DevTools pages (devtools.html, devtools-panel.html) belong to tab
+        // import, which is not in the first release, so they are not built.
         index: at("index.html"),
-        devtools: at("devtools.html"),
-        "devtools-panel": at("devtools-panel.html"),
       },
       output: {
         entryFileNames: "entry-[name]-[hash].js",

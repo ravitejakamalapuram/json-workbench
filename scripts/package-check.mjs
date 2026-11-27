@@ -3,6 +3,7 @@ import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { manifestProblems } from "./lib/manifest-policy.mjs";
+import { REQUIRED_FILES, contentProblems } from "./lib/package-contents.mjs";
 import {
   findVersionDrift,
   readVersionMirrors,
@@ -10,19 +11,11 @@ import {
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const dist = join(root, "apps/extension/dist");
-const required = [
-  "manifest.json",
-  "index.html",
-  "devtools.html",
-  "devtools-panel.html",
-  "background.js",
-  "json-render.js",
-  "icons/icon-128.png",
-  "jq.wasm",
-];
-for (const file of required)
-  if (!existsSync(join(dist, file)))
-    throw new Error(`Missing packaged extension file: ${file}`);
+const contents = contentProblems((file) => existsSync(join(dist, file)));
+if (contents.length)
+  throw new Error(
+    `Packaged extension has the wrong files:\n${contents.map((p) => `  - ${p}`).join("\n")}`,
+  );
 const manifest = JSON.parse(readFileSync(join(dist, "manifest.json"), "utf8"));
 const problems = manifestProblems(manifest);
 if (problems.length)
@@ -45,7 +38,7 @@ const archive = join(tmpdir(), `json-workbench-${process.pid}.zip`);
 try {
   execFileSync("zip", ["-qr", archive, "."], { cwd: dist, stdio: "ignore" });
   const listing = execFileSync("unzip", ["-l", archive], { encoding: "utf8" });
-  for (const file of required)
+  for (const file of REQUIRED_FILES)
     if (!listing.includes(file)) throw new Error(`Archive omitted ${file}`);
   console.log(`Chrome package validation passed (${archive})`);
 } finally {

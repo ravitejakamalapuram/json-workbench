@@ -29,39 +29,55 @@ describe("manifest policy", () => {
     ]);
   });
 
-  it("rejects the debugger permission, required or optional", () => {
+  it("allows exactly the side panel and storage permissions", () => {
+    expect(source.permissions).toEqual(["sidePanel", "storage"]);
+    for (const extra of ["activeTab", "scripting", "debugger"]) {
+      expect(
+        manifestProblems({
+          ...source,
+          permissions: [...source.permissions, extra],
+        }),
+      ).toEqual(["permissions must be sidePanel, storage"]);
+    }
+  });
+
+  it("rejects optional permissions, install-time and optional host permissions", () => {
     expect(
       manifestProblems({ ...source, optional_permissions: ["debugger"] }),
     ).toEqual(["optional_permissions must be absent"]);
     expect(
       manifestProblems({
         ...source,
-        permissions: [...source.permissions, "debugger"],
-      }),
-    ).toEqual(["permissions must be activeTab, sidePanel, storage, scripting"]);
-  });
-
-  it("rejects install-time host permissions and a changed optional host list", () => {
-    expect(
-      manifestProblems({
-        ...source,
         host_permissions: ["<all_urls>"],
-        optional_host_permissions: ["https://*/*"],
+        optional_host_permissions: ["<all_urls>"],
       }),
     ).toEqual([
       "host_permissions must be absent",
-      "optional_host_permissions must be <all_urls>",
+      "optional_host_permissions must be absent",
     ]);
   });
 
-  it("requires the pages and the service worker the build emits", () => {
-    const withoutDevtools = structuredClone(source);
-    delete withoutDevtools.devtools_page;
+  it("rejects the in-page viewer, the DevTools page and exposed resources", () => {
     expect(
-      manifestProblems({ ...withoutDevtools, manifest_version: 2 }),
+      manifestProblems({
+        ...source,
+        content_scripts: [{ matches: ["<all_urls>"], js: ["json-render.js"] }],
+        devtools_page: "devtools.html",
+        web_accessible_resources: [{ resources: ["a.js"], matches: [] }],
+      }),
     ).toEqual([
+      "content_scripts must be absent",
+      "devtools_page must be absent",
+      "web_accessible_resources must be absent",
+    ]);
+  });
+
+  it("requires the page and the service worker the build emits", () => {
+    const withoutPanel = structuredClone(source);
+    delete withoutPanel.side_panel;
+    expect(manifestProblems({ ...withoutPanel, manifest_version: 2 })).toEqual([
       "manifest_version must be 3",
-      "devtools_page must be devtools.html",
+      "side_panel.default_path must be index.html",
     ]);
   });
 });

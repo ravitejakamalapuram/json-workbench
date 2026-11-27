@@ -2,7 +2,7 @@
   "appName": "JSON Workbench",
   "appType": "chrome-extension",
   "repoName": "json-workbench",
-  "description": "Local-first developer workbench for exploring and transforming large JSON data, shipped as a Chrome extension (plus CLI and VS Code packages).",
+  "description": "Local-first workbench for exploring large JSON data, shipped as a Chrome extension (plus CLI and VS Code packages).",
   "modules": [
     {
       "name": "JSON Workbench",
@@ -15,20 +15,17 @@
       "buildScript": "npm run build",
       "artifactPath": "apps/extension/dist",
       "cwsListing": {
-        "shortDescription": "Inspect, transform, validate, diff, and query large JSON locally. Nothing leaves your browser.",
-        "detailedDescription": "JSON Workbench is a local-first developer tool for large JSON, JSONL, and NDJSON files. Open a file, a JSON tab, or a captured response and explore it as a tree or table without losing numeric precision. Profile structure, infer a JSON Schema, build reproducible transform pipelines (native steps, jq, and JSONata), run local DuckDB SQL, diff two payloads as an RFC 6902 JSON Patch (with a side-by-side visual view), and export JSON, JSONL, CSV, or TSV. It can also pretty-print any JSON page in place. Your source data stays in the browser. Works in Chrome and Edge 120+.",
+        "shortDescription": "Open large JSON and JSONL as a tree or raw text, fix common syntax errors, decode JWTs, convert YAML. Nothing leaves your browser.",
+        "detailedDescription": "JSON Workbench is a local-first tool for reading and fixing JSON. Open a file, paste text or drop a file into Chrome's side panel or a full tab. Your data is processed on your device and never uploaded.\n\n- Tree: browse any document as a tree, search keys and values, copy a value's path, and expand JSON hidden inside a string (a double-encoded API response) into a tree of its own. Numbers keep every digit, including integers too large for a JavaScript number.\n- Raw: edit the text in a code editor. A syntax error shows its line and column with a one-click fix for common mistakes: trailing or missing commas, single quotes, unquoted keys, comments. Format and minify.\n- Large files: a large file is indexed in chunks in a background worker, so the first rows appear while the rest is still being read. Files above 2 MB open in a paged, read-only raw view.\n- JWT: paste a token to read its header and payload.\n- YAML: open YAML as JSON and save JSON as YAML.\n- Export: save as JSON, JSONL, NDJSON, CSV or TSV, or save the file as it is.\n\nNo account, no analytics, no network access: the extension's pages are not allowed to connect to any server. Works in Chrome and Edge 120+.",
         "category": "developer-tools",
-        "singlePurpose": "JSON Workbench lets developers inspect, transform, validate, diff and query JSON data locally in the browser.",
+        "singlePurpose": "JSON Workbench lets developers open, read, fix and convert JSON, JSONL and YAML data locally in the browser.",
         "privacyPolicyUrl": "https://ravitejakamalapuram.github.io/json-workbench.html",
         "remoteCodeUsed": false,
-        "remoteCodeJustification": "The extension does not execute remote code. All scripts and WebAssembly runtimes (DuckDB WASM, jq) are bundled into the extension package.",
+        "remoteCodeJustification": "The extension does not execute remote code. All scripts are bundled into the extension package.",
         "dataUsageCertified": true,
         "permissionJustifications": {
-          "activeTab": "Reads JSON from the active tab only when the user explicitly asks to open or format it. \"Active JSON tab\" re-requests that tab's own URL with the site's cookies so a signed-in API response can be read; the request targets only the page's own origin and no data is sent to any other server.",
-          "sidePanel": "Displays the workbench interface in Chrome's side panel.",
-          "storage": "Persists local preferences and transform pipelines on the device.",
-          "scripting": "Injects the in-page JSON formatter into the active tab upon explicit user request.",
-          "debugger": "Optional; requested only if the user opts in to capturing network JSON responses, which stay in local memory."
+          "sidePanel": "Displays the workbench interface in Chrome's side panel; the toolbar button opens it.",
+          "storage": "Keeps the theme, the memory limit, the names of the last 10 files opened and the one-time review-note flags on the device."
         }
       }
     }

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && esbuild src/background/index.ts --bundle --minify --format=esm --outfile=dist/background.js && esbuild src/content/index.ts --bundle --minify --format=iife --outfile=dist/json-render.js && node ../../scripts/prepare-extension-package.mjs"
+    "build": "vite build && esbuild src/background/index.ts --bundle --minify --format=esm --outfile=dist/background.js && node ../../scripts/prepare-extension-package.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

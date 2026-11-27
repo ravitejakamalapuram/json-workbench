@@ -1,52 +1,59 @@
 # Chrome Web Store release copy
 
+This is the listing of the first release (`docs/design/DECISIONS.md`, "First release
+scope"): shell, tree, raw editor, large files, JWT decode and YAML in and out. The
+same copy is in `chrome-store/store.config.json`, `app-metadata.json` and
+`CHROMEWEBSTORE.md`; `scripts/lib/store-docs.test.mjs` fails if they drift apart or
+if a document names a permission the manifest does not declare.
+
 ## Listing
 
-- Name: JSON Workbench
-- Short description (132 char max): Inspect, transform, validate, diff, and query large JSON locally. Nothing leaves your browser.
+- Name: JSON Workbench - Large JSON & JSONL Viewer
+- Short description (132 char max): Open large JSON and JSONL as a tree or raw text, fix common syntax errors, decode JWTs, convert YAML. Nothing leaves your browser.
 - Category: Developer Tools
 - Language: English
 
-JSON Workbench is a local-first developer tool for large JSON, JSONL, and NDJSON
-files. Open a file, a JSON tab, or a captured response and explore it as a tree
-or table without losing numeric precision. Profile structure, infer a JSON
-Schema, build reproducible transform pipelines (native steps, jq, and JSONata),
-run local DuckDB SQL, diff two payloads as an RFC 6902 JSON Patch (with a
-side-by-side visual view), and export JSON, JSONL, CSV, or TSV. It can also
-pretty-print any JSON page in place. Your source data stays in the browser.
+Detailed description:
+
+```text
+JSON Workbench is a local-first tool for reading and fixing JSON. Open a file, paste text or drop a file into Chrome's side panel or a full tab. Your data is processed on your device and never uploaded.
+
+- Tree: browse any document as a tree, search keys and values, copy a value's path, and expand JSON hidden inside a string (a double-encoded API response) into a tree of its own. Numbers keep every digit, including integers too large for a JavaScript number.
+- Raw: edit the text in a code editor. A syntax error shows its line and column with a one-click fix for common mistakes: trailing or missing commas, single quotes, unquoted keys, comments. Format and minify.
+- Large files: a large file is indexed in chunks in a background worker, so the first rows appear while the rest is still being read. Files above 2 MB open in a paged, read-only raw view.
+- JWT: paste a token to read its header and payload.
+- YAML: open YAML as JSON and save JSON as YAML.
+- Export: save as JSON, JSONL, NDJSON, CSV or TSV, or save the file as it is.
+
+No account, no analytics, no network access: the extension's pages are not allowed to connect to any server. Works in Chrome and Edge 120+.
+```
 
 ## Privacy and permissions (single purpose + justifications)
 
-Single purpose: help developers read, understand, transform, and compare JSON
-data locally in the browser.
+Single purpose: JSON Workbench lets developers open, read, fix and convert JSON,
+JSONL and YAML data locally in the browser.
 
-- `activeTab` — read the JSON of the tab you are on when you press "Active JSON
-  tab" or "Format current tab", only after you invoke the extension. "Active JSON
-  tab" re-requests that tab's own address with your cookies for it, so that an API
-  response you are signed in to comes back as JSON rather than as a login page. The
-  request goes to the page's own origin and nowhere else.
-- `sidePanel` — the workbench UI runs in Chrome's side panel.
-- `storage` — persist your pipeline, theme, and the auto-render preference locally.
-- `scripting` — inject the in-page JSON formatter into the current tab on demand
-  ("Format current tab"), and register the auto-render content script when you
-  turn that setting on.
-- `debugger` (optional) — requested only when you press "Capture next JSON
-  response"; used to read one network response body. Captured data is held in
-  memory and never uploaded.
-- `<all_urls>` host access (optional) — requested only when you enable
-  "Auto-render JSON pages" in settings, so the formatter can run on JSON pages
-  automatically. It is removed when you turn the setting off. The default install
-  requests no host permissions.
+- `sidePanel` — the workbench UI runs in Chrome's side panel, and the toolbar
+  button opens it. "Open in full tab" opens the same page in a tab and needs no
+  permission.
+- `storage` — keeps the theme, the memory limit, the names of the last 10 files you
+  opened and the one-time review-note flags on your device. Nothing stored leaves
+  it, and Settings → "Clear local data" removes it.
+
+The extension requests no host permissions, runs no content script on any page and
+reads no tab. It loads no remote code.
 
 Data usage disclosure (for the store form): this item does NOT collect or
-transmit user data. All processing is local; no analytics, no remote calls with
-user content.
+transmit user data. All processing is local; no analytics, no remote calls.
 
 ## Asset checklist
 
 - Store icon: `store/assets/icon-128.png` (128×128). Master art:
   `store/assets/icon-source.jpeg` / `store/assets/icon.svg`.
-- Screenshots at 1280×800: Tree, Raw / code (Monaco), Table, Insights + Pipeline,
-  Local SQL, Diff (side-by-side). Use synthetic fixtures only — no real customer
-  data. See `docs/STORE_LAUNCH.md` for how to capture them.
-- Optional promo tile 440×280.
+- Screenshots at 1280×800: Tree, Raw with a syntax error and its fix, JWT, YAML.
+  Use synthetic fixtures only — no real customer data. See `docs/STORE_LAUNCH.md`
+  for how to capture them.
+- **The images in `store/assets/screenshots/` and `chrome-store/assets/` still show
+  the previous version of the app** and must be retaken from the first-release build
+  before the listing is uploaded.
+- Optional promo tile 440×280 and marquee 1400×560 (same caveat).

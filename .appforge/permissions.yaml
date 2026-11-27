@@ -1,30 +1,17 @@
 schema: appforge/permissions@1
-# Changed in the UI rebuild (ADR 0005): the optional debugger permission and the
-# credentialed re-fetch of the tab URL are gone; tab import reads the rendered page
-# text through scripting, and network bodies come from a DevTools panel instead.
+# First release (docs/design/DECISIONS.md, "First release scope"): the extension reads
+# no web page and no tab, so it declares no host access, no content script and no
+# DevTools page. The side panel and local storage are all it needs. The activeTab,
+# scripting, optional all-sites and debugger entries of earlier versions are gone with
+# the features that used them (tab import, the in-page viewer, network capture).
 permissions:
-  - permission: activeTab
-    required: true
-    reason: "Read the text of the tab in front when the user presses 'Import active tab' (granted by clicking the toolbar icon on that tab). The text is read from the page through scripting; the URL is never requested again."
-    data_access: [tab_url, tab_content_user_triggered]
-    security_impact: low
   - permission: sidePanel
     required: true
-    reason: "Show the workbench UI in Chrome's side panel"
+    reason: "Show the workbench UI in Chrome's side panel; the toolbar icon opens it (the service worker sets openPanelOnActionClick). 'Open in full tab' opens the same page in a tab through chrome.tabs.create, which needs no permission."
     data_access: []
     security_impact: low
   - permission: storage
     required: true
-    reason: "chrome.storage.local keeps the settings, recent file names and the working transform pipeline (keys listed in PRIVACY.md, removed by 'Clear local data'); chrome.storage.session holds one 'Open in Workbench' handoff from the in-page viewer for at most 60 s. Both areas are restricted to trusted extension contexts."
-    data_access: [user_settings_local, handoff_session]
+    reason: "chrome.storage.local keeps the theme, the memory limit, the names, sizes and times of the last 10 files opened (never their content) and the one-time review-note flags (keys listed in PRIVACY.md, removed by 'Clear local data'). The area is restricted to trusted extension contexts."
+    data_access: [user_settings_local]
     security_impact: low
-  - permission: scripting
-    required: true
-    reason: "Read the rendered JSON text of the active tab on explicit import, and register the opt-in in-page viewer only for the origins the user granted"
-    data_access: [tab_content_user_triggered]
-    security_impact: medium
-  - permission: "<all_urls>"
-    required: false
-    reason: "Optional host permission, requested from a click: 'Allow on this site' asks for that one origin (https://<host>/*), 'Auto-render on all pages' asks for <all_urls>. The in-page viewer is registered only for granted origins and turns off when the grant is revoked."
-    data_access: [any_site_content_opt_in]
-    security_impact: high

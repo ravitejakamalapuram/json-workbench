@@ -1,15 +1,9 @@
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-// The last build step: Vite has emitted the pages and esbuild the service worker
-// and content script; this adds the manifest and jq's WebAssembly. Nothing else
-// is copied, so no file outside the build can ship under a built file's name.
+// The last build step: Vite has emitted the page and esbuild the service worker;
+// this adds the manifest. Nothing else is copied, so no file outside the build
+// can ship under a built file's name.
 const root = resolve(new URL("..", import.meta.url).pathname);
 const extension = resolve(root, "apps/extension");
 const dist = resolve(extension, "dist");
@@ -23,8 +17,6 @@ writeFileSync(
   resolve(dist, "manifest.json"),
   `${JSON.stringify(manifest, null, 2)}\n`,
 );
-const jqWasm = resolve(root, "node_modules/jq-web/jq.wasm");
-if (existsSync(jqWasm)) copyFileSync(jqWasm, resolve(dist, "jq.wasm"));
 console.log(
   `Prepared Chrome package in ${dirname(resolve(dist, "manifest.json"))}`,
 );
