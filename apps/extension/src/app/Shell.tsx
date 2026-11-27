@@ -1,5 +1,5 @@
 // The minimal shell (F1a step 3): rail, document tabs, toolbar, details and
-// status bar over the registry. Item "shell" replaces it with the full one
+// the view's status bar over the registry. Item "shell" replaces it with the full one
 // (palette, shortcuts, drop zone, settings, export, narrow layout).
 import { Suspense, useEffect, useRef, type ChangeEvent } from "react";
 import { OPEN_ACCEPT } from "../platform/formats";
@@ -44,7 +44,6 @@ export function Shell({ extraSources }: ShellProps) {
           <main className="workspace">
             <Workspace openFile={openFile} extraSources={extraSources} />
           </main>
-          <footer className="status-bar">Local only</footer>
         </div>
         <input
           ref={fileInput}

@@ -12,7 +12,7 @@ import { Loading } from "./Loading";
 
 const PANEL_ID = "view-panel";
 
-/** The active document: toolbar (view tabs, status, view controls), the view and its details. */
+/** The active document: toolbar (view tabs, status, view controls), the view, its details and the view's status bar. */
 export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
   const view = useAppStore((state) => state.view);
   const setView = useAppStore((state) => state.setView);
@@ -67,6 +67,14 @@ export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
           )}
         </div>
         {detailsOpen && shown && <DetailsPanel doc={doc} view={shown.id} />}
+      </div>
+      {/* Always present in view mode, so the layout does not jump when a view has nothing to say. */}
+      <div className="status-bar" data-testid="view-status-bar">
+        {shown?.StatusBar && (
+          <Suspense fallback={null}>
+            <shown.StatusBar key={doc.id} doc={doc} />
+          </Suspense>
+        )}
       </div>
     </div>
   );

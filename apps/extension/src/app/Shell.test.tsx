@@ -60,7 +60,7 @@ describe("Shell, empty", () => {
         .getByRole("button", { name: "View" })
         .getAttribute("aria-current"),
     ).toBe("page");
-    expect(screen.getByText("Local only")).toBeDefined();
+    expect(screen.getByText("Local only · nothing uploaded")).toBeDefined();
   });
 });
 

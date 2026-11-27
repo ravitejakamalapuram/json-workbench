@@ -2,7 +2,7 @@ import type { ModePlugin } from "../../platform/types";
 import { useAppStore } from "../../store";
 import { dayLabel, formatBytes } from "./format";
 
-/** The 208 px left rail: the shell's "View", then the modes, then recent files. */
+/** The 208 px left rail: the shell's "View", then the modes, recent files and the local-only note. */
 export function Rail({ modes }: { readonly modes: readonly ModePlugin[] }) {
   const mode = useAppStore((state) => state.mode);
   const setMode = useAppStore((state) => state.setMode);
@@ -52,6 +52,7 @@ export function Rail({ modes }: { readonly modes: readonly ModePlugin[] }) {
           </ul>
         </section>
       )}
+      <p className="rail-foot">Local only · nothing uploaded</p>
     </div>
   );
 }
