@@ -90,9 +90,12 @@ export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
 }
 
 function DocStatus({ doc }: { readonly doc: DocumentModel }) {
+  const store = useAppStoreApi();
+  const actions = useActionList();
   const cancelIndexing = useAppStore((state) => state.cancelIndexing);
   const { tone, text, detail } = statusLabel(doc);
   const { status } = doc;
+  const open = actions.find((action) => action.id === "app.open");
   return (
     <div className="doc-status">
       <p data-testid="shell-status" role="status" className={`status-${tone}`}>
@@ -109,6 +112,20 @@ function DocStatus({ doc }: { readonly doc: DocumentModel }) {
           />
           <Button onClick={() => cancelIndexing(doc.id)}>Cancel</Button>
         </>
+      )}
+      {/* A browser gives a page no way to read a file again: choosing it again is the only way back. */}
+      {status.kind === "failed" && doc.origin === "file" && open && (
+        <Button
+          onClick={() =>
+            void runAction(open, {
+              state: store.getState(),
+              doc,
+              node: undefined,
+            })
+          }
+        >
+          Reopen file
+        </Button>
       )}
     </div>
   );

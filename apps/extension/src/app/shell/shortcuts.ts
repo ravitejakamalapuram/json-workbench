@@ -1,19 +1,11 @@
 // Page-wide keyboard: registry shortcuts, and Mod+V to open what was copied.
 import { useEffect, useEffectEvent } from "react";
 import type { Action, ActionContext } from "../../platform/types";
-import { actionForKey, IS_MAC, runAction } from "../actions";
+import { actionForKey, IS_MAC, isTextField, runAction } from "../actions";
 
 /** A dialog owns the keyboard while it is open; the page behind it is inert. */
 const dialogOpen = () =>
   document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
-
-function isEditable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-  );
-}
 
 export function useGlobalShortcuts(
   actions: readonly Action[],
@@ -44,7 +36,7 @@ export function usePasteToOpen(onPaste: (data: DataTransfer) => void): void {
     if (
       event.defaultPrevented ||
       !event.clipboardData ||
-      isEditable(event.target) ||
+      isTextField(event.target) ||
       dialogOpen()
     )
       return;

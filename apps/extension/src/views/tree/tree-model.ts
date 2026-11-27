@@ -20,6 +20,7 @@ import {
   indexOf,
   mountedIndexes,
   openNode,
+  ownRows,
   rowAt,
   rowCount,
   withClosed,
@@ -31,7 +32,7 @@ import {
 
 const PAGE = LIMITS.pageSize;
 /** Every expanded string is indexed in a worker of its own, so "Expand all embedded JSON" stops here. */
-const MAX_EXPAND_ALL_MOUNTS = 20;
+export const MAX_EXPAND_ALL_MOUNTS = 20;
 /** Values that start like an object or an array; looksEmbedded has the last word on each hit. */
 const EMBEDDED_QUERY: SearchQuery = {
   text: "^\\s*[[{]",
@@ -51,8 +52,10 @@ export type Row = {
   readonly path: Path;
   /** Undefined while its page is loading, or when it could not be read. */
   readonly node: NodeInfo | undefined;
-  /** Why its page could not be read; the row shows it with Retry. */
+  /** Why its page could not be read; one row of the page shows it with Retry. */
   readonly failure: string | undefined;
+  /** Names that page, so the rows of one failed page are told as one. */
+  readonly failedPage: string | undefined;
   /** The source that lists this row: its parent's, or the document's root. */
   readonly scope: Source;
   /** Set when the row is open. */
@@ -67,6 +70,13 @@ export type EmbeddedState =
       readonly message: string;
       readonly tooLarge: boolean;
     };
+
+/**
+ * How Expand all ended: `capped` opened some rows and then reached
+ * LIMITS.expandAllRows, `blocked` reached it before opening any (the rows
+ * already shown pass it), `complete` opened everything.
+ */
+export type ExpandStop = "complete" | "capped" | "blocked";
 
 export type TreeModel = ReturnType<typeof createTreeModel>;
 
@@ -109,10 +119,14 @@ export function createTreeModel(
     /** Runs before embedded indexes are disposed, so a selection inside them can be cleared first. */
     readonly beforeDispose: (indexes: readonly DocumentIndex[]) => void;
   },
+  /** The open nodes the user left behind; undefined opens the root only. */
+  restored?: { readonly root: OpenNode | null },
 ) {
   const rootSource: Source = { index, via: [], pointer: "" };
   let rootInfo: NodeInfo | null = null;
   let root: OpenNode | null = null;
+  /** The read of the root, shared by load() and whoever needs the root first. */
+  let loading: Promise<void> | undefined;
   let embedded: ReadonlyMap<string, EmbeddedState> = new Map();
   const pages = createPages(changed);
   const searches = new Set<AbortController>();
@@ -169,8 +183,9 @@ export function createTreeModel(
       path.length === 0 ? rootSource : { ...scope, pointer: node.pointer };
     const first = await source.index.children(source.pointer, 0, PAGE);
     pages.keep(source, 0, first.items);
-    // The parent may have closed while the page was read.
+    // The parent may have closed while the page was read, and another call may have opened this one.
     if (path.length > 0 && !openAt(path.slice(0, -1))) return;
+    if (openAt(path)) return;
     setOpen(path, openNode(source, first.total, first.totalFinal));
     changed();
   }
@@ -247,6 +262,8 @@ export function createTreeModel(
 
   /** Opens what lies on the way to `target`, mounting embedded strings; resolves with its path. */
   async function reveal(target: Target): Promise<Path | null> {
+    // A selection kept from before the tree mounted is revealed as it mounts.
+    await ensureLoaded();
     const started = generation;
     const hops = [...target.via, target.pointer];
     let scope = rootSource;
@@ -270,18 +287,22 @@ export function createTreeModel(
   }
 
   /** Breadth first from the root, never past LIMITS.expandAllRows rows; strings stay closed. */
-  async function expandAll() {
+  async function expandAll(): Promise<ExpandStop> {
     const started = generation;
     if (!root) await expand([]);
     const before = root;
-    if (!before) return;
+    if (!before) return "complete";
     let tree = before;
+    let capped = false;
     const queue: (readonly [Path, OpenNode])[] = [[[], tree]];
     for (let next = queue.shift(); next; next = queue.shift()) {
       const [path, node] = next;
       const open = new Map(node.open);
       for (let position = 0; position < node.total; position++) {
-        if (tree.size >= LIMITS.expandAllRows) break;
+        if (tree.size >= LIMITS.expandAllRows) {
+          capped = true;
+          break;
+        }
         const childPath = [...path, position];
         const already = open.get(position);
         if (already) {
@@ -289,10 +310,13 @@ export function createTreeModel(
           continue;
         }
         const child = await pages.load(node.source, position);
-        if (started !== generation) return;
+        if (started !== generation) return "complete";
         const count = child?.childCount;
-        if (!child || !count || tree.size + count > LIMITS.expandAllRows)
+        if (!child || !count) continue;
+        if (tree.size + count > LIMITS.expandAllRows) {
+          capped = true;
           continue;
+        }
         const opened = openNode(
           { ...node.source, pointer: child.pointer },
           count,
@@ -303,9 +327,11 @@ export function createTreeModel(
       }
     }
     // Anything the user opened or closed meanwhile wins over this pass.
-    if (started !== generation || root !== before) return;
+    if (started !== generation || root !== before) return "complete";
     root = tree;
     changed();
+    if (!capped) return "complete";
+    return tree === before ? "blocked" : "capped";
   }
 
   function collapseAll() {
@@ -319,8 +345,12 @@ export function createTreeModel(
     changed();
   }
 
-  /** Finds strings that hold JSON with the search worker, so nothing here reads the whole document. */
-  async function expandAllEmbedded() {
+  /**
+   * Finds strings that hold JSON with the search worker, so nothing here reads
+   * the whole document. Resolves true when MAX_EXPAND_ALL_MOUNTS stopped it
+   * with hits left to look at.
+   */
+  async function expandAllEmbedded(): Promise<boolean> {
     const started = generation;
     const controller = new AbortController();
     searches.add(controller);
@@ -332,13 +362,14 @@ export function createTreeModel(
         controller.signal,
       );
     } catch {
-      return;
+      return false;
     } finally {
       searches.delete(controller);
     }
     let mounted = 0;
     for (const hit of hits) {
-      if (mounted >= MAX_EXPAND_ALL_MOUNTS || started !== generation) return;
+      if (started !== generation) return false;
+      if (mounted >= MAX_EXPAND_ALL_MOUNTS) return true;
       const pointer = await index.pointerAt(hit.byteStart);
       const node = await index.node(pointer);
       if (!node || !looksEmbedded(node)) continue;
@@ -347,6 +378,7 @@ export function createTreeModel(
       await mount(path, node);
       if (openAt(path)) mounted++;
     }
+    return false;
   }
 
   function row(at: number): Row | null {
@@ -354,6 +386,8 @@ export function createTreeModel(
     if (!ref) return null;
     const position = ref.path.at(-1);
     const scope = ref.parent?.source ?? rootSource;
+    const failure =
+      position === undefined ? undefined : pages.failure(scope, position);
     return {
       index: at,
       path: ref.path,
@@ -361,10 +395,8 @@ export function createTreeModel(
         position === undefined
           ? (rootInfo ?? undefined)
           : pages.get(scope, position),
-      failure:
-        position === undefined
-          ? undefined
-          : pages.failure(scope, position)?.message,
+      failure: failure?.error.message,
+      failedPage: failure?.page,
       scope,
       open: ref.node,
       setSize: ref.parent?.total ?? 1,
@@ -413,6 +445,31 @@ export function createTreeModel(
     changed();
   }
 
+  const quietRefresh = quietly(refresh, undefined);
+
+  /** Reads the root and opens it, or puts back what the user left open. */
+  function ensureLoaded(): Promise<void> {
+    loading ??= (async () => {
+      const started = generation;
+      const info = await index.node("");
+      if (started !== generation) return;
+      rootInfo = info;
+      if (info && isContainer(info)) {
+        if (!restored) await expand([]);
+        else {
+          root = restored.root;
+          // Counts that were still growing when the user left have settled by now.
+          void quietRefresh();
+        }
+      }
+      changed();
+    })().catch((error: unknown) => {
+      loading = undefined;
+      throw error;
+    });
+    return loading;
+  }
+
   return {
     subscribe(listener: () => void) {
       listeners.add(listener);
@@ -424,6 +481,24 @@ export function createTreeModel(
     count: () => (rootInfo ? rowCount(root) : 0),
 
     row,
+
+    /**
+     * For each failed page among the rows [start, end), the one row that tells
+     * why: the active row when it is on that page (focus lands on the
+     * explanation), else the page's first row in view.
+     */
+    failureRows(start: number, end: number, active: number | null) {
+      const rows = new Set<number>();
+      if (!pages.anyFailed()) return rows;
+      const byPage = new Map<string, number>();
+      for (let at = start; at < end; at++) {
+        const page = row(at)?.failedPage;
+        if (page !== undefined && (!byPage.has(page) || at === active))
+          byPage.set(page, at);
+      }
+      for (const at of byPage.values()) rows.add(at);
+      return rows;
+    },
 
     /** The flat index of a visible row, or null when an ancestor is closed. */
     indexOf(path: Path): number | null {
@@ -457,24 +532,22 @@ export function createTreeModel(
       }
     },
 
-    load: quietly(async () => {
-      const started = generation;
-      const info = await index.node("");
-      if (started !== generation) return;
-      rootInfo = info;
-      // The root opens before the first paint, so the tree never shows it closed first.
-      if (info && isContainer(info)) await expand([]);
-      changed();
-    }, undefined),
+    load: quietly(ensureLoaded, undefined),
+
+    /** What is open, for the way back; undefined before the root is read. */
+    snapshot(): { readonly root: OpenNode | null } | undefined {
+      if (!rootInfo) return undefined;
+      return { root: root && ownRows(root, index) };
+    },
 
     expand: quietly(expand, undefined),
     collapse,
     mount: quietly(mount, undefined),
     reveal: quietly(reveal, null),
-    expandAll: quietly(expandAll, undefined),
+    expandAll: quietly(expandAll, "complete"),
     collapseAll,
-    expandAllEmbedded: quietly(expandAllEmbedded, undefined),
-    refresh: quietly(refresh, undefined),
+    expandAllEmbedded: quietly(expandAllEmbedded, false),
+    refresh: quietRefresh,
 
     /** Disposes every embedded index; the model can load again (React may remount it). */
     dispose() {
@@ -483,6 +556,7 @@ export function createTreeModel(
       if (root) release(mountedIndexes(root, index));
       root = null;
       rootInfo = null;
+      loading = undefined;
       embedded = new Map();
       pages.clear();
     },

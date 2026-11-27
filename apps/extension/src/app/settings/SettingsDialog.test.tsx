@@ -4,11 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStored, readStored, writeStored } from "../../platform/storage";
 import { createTestStore, renderWithStore } from "../../testing/render";
+import { installFakeChrome } from "../../testing/fake-chrome";
 import { REVIEW_STORAGE_KEY } from "../review-prompt";
 import { SettingsDialog } from "./SettingsDialog";
 
 beforeEach(() => clearStored());
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const recent = { name: "orders.json", bytes: 2048, openedAt: Date.now() };
 
@@ -39,6 +43,23 @@ describe("SettingsDialog", () => {
     expect((limit as HTMLSelectElement).value).toBe("64");
     await user.selectOptions(limit, "128 MB");
     expect(store.getState().materializeLimitMb).toBe(128);
+  });
+
+  it("says what the memory limit costs, and warns at the largest", async () => {
+    const { user, dialog } = setup();
+    const limit = dialog.getByRole("combobox", { name: "Memory limit" });
+    const hint = () =>
+      document.getElementById(limit.getAttribute("aria-describedby") ?? "")
+        ?.textContent ?? "";
+    expect(hint()).toContain("about 10 times its size");
+    expect(hint()).toContain("At 64 MB that is up to about 640 MB.");
+    expect(hint()).not.toMatch(/slow|fail/);
+    await user.selectOptions(limit, "32 MB");
+    expect(hint()).toContain("At 32 MB that is up to about 320 MB.");
+    await user.selectOptions(limit, "128 MB");
+    // Measured: a 128 MB value peaks near 1.4 GB.
+    expect(hint()).toContain("At 128 MB that is up to about 1.4 GB");
+    expect(hint()).toContain("slow or fail on a small machine");
   });
 
   it("lists recent files and clears them", async () => {
@@ -74,6 +95,17 @@ describe("SettingsDialog", () => {
     expect(
       dialog.getByRole("radio", { name: "Light", checked: true }),
     ).toBeDefined();
+  });
+
+  it("says so when the browser refuses to clear its storage", async () => {
+    const { local } = installFakeChrome().storage;
+    local.clear.mockRejectedValueOnce(new Error("Storage is unavailable."));
+    const { user, dialog } = setup();
+    await user.click(dialog.getByRole("button", { name: "Clear local data" }));
+    expect((await dialog.findByRole("status")).textContent).toBe(
+      "Could not clear local data: Storage is unavailable.",
+    );
+    expect(dialog.queryByText("Local data cleared.")).toBeNull();
   });
 
   it("closes with Close", async () => {

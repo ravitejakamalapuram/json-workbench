@@ -30,6 +30,10 @@ export const ViewportHeightContext = createContext<number | null>(null);
 export type VirtualListHandle = {
   /** Scrolls the least needed to show the row. */
   scrollToIndex(index: number): void;
+  /** The first row in view, fractional; what scrollToTop takes. */
+  top(): number;
+  /** Puts `top` (a row, fractional) at the top, as far as the rows allow. */
+  scrollToTop(top: number): void;
 };
 
 type VirtualListProps = {
@@ -101,6 +105,8 @@ export function VirtualList({
       if (index < top) moveTo(index);
       else if (index + 1 > top + viewportRows) moveTo(index + 1 - viewportRows);
     },
+    top: () => Math.min(position.top, maxTop),
+    scrollToTop: moveTo,
   }));
 
   useLayoutEffect(() => {

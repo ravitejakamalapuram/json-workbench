@@ -8,7 +8,8 @@ import { openDialog } from "./session";
 /**
  * The 208 px left rail: the shell's "View", the modes, recent files, Settings
  * and the local-only note. Below 640 px shell.css lays it out as a top mode
- * strip and hides the brand, recents and note (the empty state lists recents).
+ * strip with the note on a line of its own, and hides the brand and recents
+ * (the empty state lists recents).
  */
 export function Rail({ modes }: { readonly modes: readonly ModePlugin[] }) {
   const store = useAppStoreApi();
@@ -86,8 +87,8 @@ export function Rail({ modes }: { readonly modes: readonly ModePlugin[] }) {
             </button>
           </li>
         </ul>
-        <p className="rail-note">Local only · nothing uploaded</p>
       </div>
+      <p className="rail-note">Local only · nothing uploaded</p>
     </div>
   );
 }

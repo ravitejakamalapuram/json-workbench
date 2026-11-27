@@ -215,6 +215,48 @@ describe("editDocument", () => {
       store.getState().editDocument(id, " ".repeat(LIMITS.rawEditChars + 1)),
     ).toThrow(TooLargeError);
   });
+
+  it("counts the limit in UTF-8 bytes, as the engine and Raw do", async () => {
+    const { store, open, doc } = setup();
+    const { id } = await open();
+    // Half the limit in characters, but 2 MiB + 2 bytes: over.
+    const over = "é".repeat(LIMITS.rawEditChars / 2 + 1);
+    expect(() => store.getState().editDocument(id, over)).toThrow(
+      TooLargeError,
+    );
+    // A refused edit leaves the document as it was.
+    expect(doc(id)?.edited).toBe(false);
+    // Exactly the limit in bytes is accepted.
+    store.getState().editDocument(id, "é".repeat(LIMITS.rawEditChars / 2));
+    expect(doc(id)).toMatchObject({
+      bytes: LIMITS.rawEditChars,
+      edited: true,
+    });
+  });
+});
+
+describe("failDocument", () => {
+  it("ends a document that can no longer be read, and disposes its index", async () => {
+    const { store, open, status, doc } = setup();
+    const { id, pending } = await open();
+    pending.settle({ kind: "ready", summary: { records: 1, nodes: 1 } });
+    await vi.waitFor(() => expect(status(id)).toBe("ready"));
+    store.getState().failDocument(id, "File changed on disk. Reopen it.");
+    expect(doc(id)?.status).toEqual({
+      kind: "failed",
+      message: "File changed on disk. Reopen it.",
+    });
+    expect(pending.index.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the first reason, and ignores a document that is gone", async () => {
+    const { store, open, doc } = setup();
+    const { id } = await open();
+    store.getState().failDocument(id, "first");
+    store.getState().failDocument(id, "second");
+    expect(doc(id)?.status).toEqual({ kind: "failed", message: "first" });
+    expect(() => store.getState().failDocument("doc-99", "x")).not.toThrow();
+  });
 });
 
 describe("setMarkers", () => {

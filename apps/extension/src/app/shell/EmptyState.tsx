@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { ShellProps } from "../../platform/types";
 import { useAppStore, useAppStoreApi } from "../../store";
+import { useActionList } from "../ui/actions-context";
 import { Button } from "../ui/Button";
 import { Kbd } from "../ui/Kbd";
 import { dayLabel, formatBytes } from "./format";
@@ -86,6 +87,7 @@ export function EmptyState({ openFile, extraSources }: EmptyStateProps) {
 
 function PasteBox({ onCancel }: { readonly onCancel: () => void }) {
   const store = useAppStoreApi();
+  const actions = useActionList();
   const [text, setText] = useState("");
   const id = useId();
   return (
@@ -93,7 +95,7 @@ function PasteBox({ onCancel }: { readonly onCancel: () => void }) {
       className="paste-box"
       onSubmit={(event) => {
         event.preventDefault();
-        openPasted(store.getState(), text);
+        openPasted(store.getState(), text, actions);
       }}
     >
       <label htmlFor={id} className="caption">

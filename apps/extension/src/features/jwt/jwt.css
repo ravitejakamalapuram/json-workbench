@@ -72,6 +72,12 @@
   color: var(--danger);
 }
 
+/* Always in the page, so a screen reader hears what lands in it; empty, it is
+   taken out of the flow and leaves no gap in the column. */
+.jwt-status:empty {
+  position: absolute;
+}
+
 /* Regions are separated by a hairline, not boxed. */
 .jwt-block {
   display: flex;

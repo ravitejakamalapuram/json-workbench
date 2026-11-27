@@ -12,7 +12,11 @@ const MiB = 1024 * 1024;
 
 /** Every size bound in one place. "Chars" are UTF-16 code units; "Bytes" are UTF-8 bytes. */
 export const LIMITS = {
-  /** Largest text the main thread holds and Raw edits; above it Raw is a read-only pager and the doc worker uses the byte-range index. */
+  /**
+   * Largest text the main thread holds and Raw edits; above it Raw is a
+   * read-only pager and the doc worker uses the byte-range index. Despite the
+   * name it is compared with a Blob's size, in UTF-8 bytes, everywhere.
+   */
   rawEditChars: 2 * MiB,
   /** One window of the Raw pager. */
   rawPageBytes: 1 * MiB,
@@ -299,6 +303,8 @@ export interface DocumentSlice {
   editDocument(id: DocId, text: string): void;
   /** Stops indexing; the document becomes failed with "Indexing cancelled." */
   cancelIndexing(id: DocId): void;
+  /** A view found the document unreadable (its file changed on disk): disposes the index and shows `message`. The first failure stands. */
+  failDocument(id: DocId, message: string): void;
   setMarkers(id: DocId, source: MarkerSource, markers: readonly Marker[]): void;
 }
 

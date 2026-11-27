@@ -69,10 +69,17 @@ export function statusLabel(doc: DocumentModel): StatusLabel {
       return { tone: "muted", text: "Indexing" };
     case "ready": {
       const { nodes, records } = status.summary;
+      // Without a node count (the range index) a JSON document with one
+      // record is a wrapper like {"data":[...]}: one value, whose array is a
+      // row below it in the tree. "1 record" read as if that were the data.
       const size =
-        doc.format === "jsonl" || nodes === null
+        doc.format === "jsonl"
           ? count(records, "record")
-          : count(nodes, "node");
+          : nodes !== null
+            ? count(nodes, "node")
+            : records === 1
+              ? count(records, "value")
+              : count(records, "record");
       return {
         tone: "ok",
         text: "Valid",

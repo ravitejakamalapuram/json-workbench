@@ -9,17 +9,23 @@ import type { DocId, ParseIssue } from "../../platform/types";
 import type { Fix } from "./fixes";
 
 export type RawState = {
-  /** What the problem block and the actions can ask the mounted view to do; the pager can only go to the error. */
+  /** What the problem block and the actions can ask the mounted view to do; the pager can only go to the error and to a line. */
   readonly controls: {
     goToError(issue: ParseIssue): void;
+    goToLine?(): void;
     applyFix?(fix: Fix): void;
     format?(): Promise<void>;
     minify?(): Promise<void>;
   } | null;
-  /** Line and column from 1, columns in UTF-16 units, as the engine counts them; no column for a row that continues a long line. */
+  /**
+   * Line and column from 1, columns in UTF-16 units, as the engine counts
+   * them. The pager has no caret, so it sets no column, and `continued` for a
+   * row that carries on a long line.
+   */
   readonly cursor: {
     readonly line: number;
-    readonly column: number | null;
+    readonly column?: number;
+    readonly continued?: boolean;
   } | null;
   readonly readOnly: boolean;
   /** The read-only pager shows the document, not the editor. */

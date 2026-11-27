@@ -18,7 +18,7 @@ export const LIMITS = {
   chunks: {
     app: 2,
     "app-export": 2,
-    "app-settings": 1,
+    "app-settings": 2,
     background: 1,
     "features-jwt": 4,
     "features-yaml": 2,

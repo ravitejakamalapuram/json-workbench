@@ -259,6 +259,54 @@ describe("JSON inside strings", () => {
     });
   });
 
+  it("says when it stops at the mount limit", async () => {
+    const records = Array.from({ length: 22 }, (_, id) => ({
+      body: JSON.stringify({ id }),
+    }));
+    const shown = await showTree(JSON.stringify(records));
+    const StatusBar = treeView.StatusBar!;
+    renderWithStore(<StatusBar doc={shown.store.getState().docs[0]!} />, {
+      store: shown.store,
+    });
+    await act(() =>
+      runAction(
+        embeddedActions.find((a) => a.id === EXPAND_ALL_JSON)!,
+        {
+          state: {} as never,
+          doc: undefined,
+          node: undefined,
+        },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toBe(
+        "Expanded the first 20 JSON strings; there may be more.",
+      ),
+    );
+    // The root, 22 records, and for each of 20 records its `body` row and the `id` row under that.
+    const body = document.querySelector<HTMLElement>(".vlist-body");
+    expect(parseInt(body!.style.height) / 28).toBe(1 + 22 + 20 * 2);
+  });
+
+  it("does not bring back mounted JSON after a visit to another mode", async () => {
+    const user = userEvent.setup();
+    const { store, unmount } = await showTree(ORDER);
+    await user.click(button("Expand JSON"));
+    await findRows("/event");
+    unmount();
+    renderWithStore(
+      <ActionsContext.Provider value={embeddedActions}>
+        <FrontTree />
+      </ActionsContext.Provider>,
+      { store },
+    );
+    // The mount's index went with the tree, so the string is closed again.
+    const [payload] = await findRows("/payload");
+    expect(payload?.getAttribute("aria-expanded")).toBe("false");
+    expect(payload?.textContent).toContain("Expand JSON");
+    expect(rows().some((r) => r.dataset.pointer === "/event")).toBe(false);
+  });
+
   it("expands every string that holds JSON", async () => {
     const records = [1, 2, 3].map((id) => ({ body: JSON.stringify({ id }) }));
     await showTree(JSON.stringify(records));

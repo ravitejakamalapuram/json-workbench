@@ -136,3 +136,17 @@ export function mountedIndexes(
     ...node.open.flatMap(([, child]) => mountedIndexes(child, own)),
   ];
 }
+
+/**
+ * `node` as the document's own rows only, or null when it lists a mounted
+ * string. Mounted indexes are disposed with the tree, so what is open under
+ * them cannot come back.
+ */
+export function ownRows(node: OpenNode, index: DocumentIndex): OpenNode | null {
+  if (node.source.index !== index) return null;
+  const open = node.open.flatMap(([position, child]) => {
+    const own = ownRows(child, index);
+    return own ? [[position, own] as const] : [];
+  });
+  return openNode(node.source, node.total, node.final, open);
+}

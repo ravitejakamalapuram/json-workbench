@@ -85,9 +85,17 @@ export function createPages(loaded: () => void) {
         position % PAGE
       ],
 
-    /** Why the page holding `position` could not be read, if that is so. */
-    failure: (source: Source, position: number): Error | undefined =>
-      failed.get(pageKey(source, Math.floor(position / PAGE))),
+    /** Why the page holding `position` could not be read, if that is so, and which page it is, so its rows can be told as one. */
+    failure(
+      source: Source,
+      position: number,
+    ): { readonly error: Error; readonly page: string } | undefined {
+      const page = pageKey(source, Math.floor(position / PAGE));
+      const error = failed.get(page);
+      return error && { error, page };
+    },
+
+    anyFailed: () => failed.size > 0,
 
     /** The node at `position`, reading its page when it is not cached; undefined when the page cannot be read. */
     async load(source: Source, position: number) {

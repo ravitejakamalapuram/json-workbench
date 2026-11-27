@@ -54,7 +54,7 @@ export function actionsFor(
   );
 }
 
-function isTextField(target: EventTarget | null): boolean {
+export function isTextField(target: EventTarget | null): boolean {
   const element = target as Partial<HTMLElement> | null;
   return (
     element?.isContentEditable === true ||

@@ -85,12 +85,14 @@ export const jwtActions: readonly Action[] = [
       try {
         openInJwt(await wholeToken(ctx, node), state);
       } catch (error) {
+        const why =
+          error instanceof Error
+            ? error.message
+            : "This token could not be read.";
+        // A token already decoded stays: one that cannot be read is no reason to lose it.
+        const kept = jwtState.getState().token !== "";
         jwtState.setState({
-          token: "",
-          notice:
-            error instanceof Error
-              ? error.message
-              : "This token could not be read.",
+          notice: kept ? `${why} The token shown is the one from before.` : why,
         });
         state.setMode("jwt");
       }

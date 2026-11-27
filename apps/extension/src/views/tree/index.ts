@@ -1,7 +1,7 @@
 // Owned by item "tree". The exported name is fixed (TARGET.md section 4).
 import type { DocumentModel, ViewPlugin } from "../../platform/types";
 import { treeActions } from "./actions";
-import { Breadcrumbs } from "./Breadcrumbs";
+import { TreeStatus } from "./TreeStatus";
 import { TreeToolbar } from "./TreeToolbar";
 import TreeView from "./TreeView";
 
@@ -20,6 +20,6 @@ export const treeView: ViewPlugin = {
   supports,
   Component: TreeView,
   Toolbar: TreeToolbar,
-  StatusBar: Breadcrumbs,
+  StatusBar: TreeStatus,
   actions: treeActions,
 };

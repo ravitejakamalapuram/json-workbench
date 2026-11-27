@@ -8,6 +8,8 @@ type TreeRowProps = {
   /** The one row in the tab order (roving focus); its badges are reachable with Tab. */
   readonly tabStop: boolean;
   readonly focusRef: Ref<HTMLDivElement> | undefined;
+  /** On a row of an unreadable page: this one says why, with Retry; the others stay quiet. */
+  readonly explains: boolean;
   readonly markers: readonly Marker[] | undefined;
   readonly actions: readonly Action[];
   readonly embedded: EmbeddedState | undefined;
@@ -47,6 +49,7 @@ export function TreeRow({
   selected,
   tabStop,
   focusRef,
+  explains,
   markers,
   actions,
   embedded,
@@ -67,6 +70,14 @@ export function TreeRow({
     className: "tree-row",
     style: { "--level": level - 1 } as CSSProperties,
   } as const;
+  // The page's other rows are not loading, so no aria-busy; the tab stop may
+  // land on one, so it takes focus like any row.
+  if (!node && row.failure && !explains)
+    return (
+      <div {...common} ref={focusRef} tabIndex={tabStop ? 0 : -1}>
+        <span className="tree-null">…</span>
+      </div>
+    );
   if (!node && row.failure)
     return (
       <div {...common} ref={focusRef} tabIndex={-1}>

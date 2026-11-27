@@ -163,12 +163,15 @@ export function createDocumentSlice({
       editDocument: (id, text) => {
         const doc = find(id);
         if (!doc) return;
-        if (text.length > LIMITS.rawEditChars)
+        const source = new Blob([text], { type: "application/json" });
+        // Bytes, as the engine and Raw count: a UTF-16 length would let
+        // multi-byte text past the limit, and the toolbar would drop Format
+        // and Minify for a document the editor still holds.
+        if (source.size > LIMITS.rawEditChars)
           throw new TooLargeError(
             "This document is too large to edit. Raw shows it read-only.",
           );
         indexOf(doc.status)?.dispose();
-        const source = new Blob([text], { type: "application/json" });
         update(id, { source, bytes: source.size, edited: true });
         // A YAML document's source is already its JSON conversion.
         startIndexing(id, source, indexedFormat(doc.format));
@@ -179,6 +182,13 @@ export function createDocumentSlice({
         if (status?.kind !== "indexing") return;
         status.index.dispose();
         update(id, { status: { kind: "failed", message: CANCELLED } });
+      },
+
+      failDocument: (id, message) => {
+        const doc = find(id);
+        if (!doc || doc.status.kind === "failed") return;
+        indexOf(doc.status)?.dispose();
+        update(id, { status: { kind: "failed", message } });
       },
 
       setMarkers: (id, source, markers) => {

@@ -260,6 +260,34 @@ describe("saving edits", () => {
   });
 });
 
+describe("the size limit", () => {
+  // The engine and RawView count UTF-8 bytes, so the editor does too: text that
+  // the document would refuse must not be accepted here and then go unsaved.
+  const MiB = 1024 * 1024;
+
+  it("counts bytes, so multi-byte text stops sooner than ASCII", async () => {
+    const { view } = await showRaw("[1]");
+    // 1 Mi characters of "é" are 2 MiB of UTF-8: under the limit in characters, over it in bytes.
+    view.dispatch({ changes: { from: 1, insert: "é".repeat(MiB) } });
+    expect(text(view)).toBe("[1]");
+    expect((await screen.findByRole("status")).textContent).toBe(
+      "Raw edits stop at 2 MB. That change was not applied.",
+    );
+  });
+
+  it("accepts text up to the limit in bytes, and takes room back when text is deleted", async () => {
+    const { view } = await showRaw("[1]");
+    // 3 + 2 * (1 Mi - 2) = 2 MiB - 1 bytes.
+    view.dispatch({ changes: { from: 1, insert: "é".repeat(MiB - 2) } });
+    expect(text(view)).toHaveLength(MiB + 1);
+    view.dispatch({ changes: { from: 1, insert: "éé" } });
+    expect(text(view)).toHaveLength(MiB + 1);
+    view.dispatch({ changes: { from: 1, to: 5 } });
+    view.dispatch({ changes: { from: 1, insert: "éé" } });
+    expect(text(view)).toHaveLength(MiB - 1);
+  });
+});
+
 describe("the error", () => {
   it("is underlined and described: where, why, and the repair", async () => {
     const { view } = await showRaw(BROKEN);

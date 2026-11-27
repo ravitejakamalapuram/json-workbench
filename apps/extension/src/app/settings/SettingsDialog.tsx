@@ -1,5 +1,9 @@
 import { useId, useState } from "react";
-import { MATERIALIZE_LIMITS_MB, type Theme } from "../../platform/types";
+import {
+  MATERIALIZE_LIMITS_MB,
+  type MaterializeLimitMb,
+  type Theme,
+} from "../../platform/types";
 import { useAppStore } from "../../store";
 import { dayLabel, formatBytes } from "../shell/format";
 import { Button } from "../ui/Button";
@@ -10,6 +14,13 @@ const THEMES: readonly { readonly id: Theme; readonly label: string }[] = [
   { id: "light", label: "Light" },
   { id: "dark", label: "Dark" },
 ];
+
+/** About 10 times the limit; 128 MB was measured at a peak of 1.4 GB. */
+const PEAK: Record<MaterializeLimitMb, string> = {
+  32: "320 MB",
+  64: "640 MB",
+  128: "1.4 GB",
+};
 
 /** Settings: theme, the memory limit, recent files and Clear local data. Nothing here asks for a permission. */
 export function SettingsDialog({ onClose }: { readonly onClose: () => void }) {
@@ -66,8 +77,12 @@ export function SettingsDialog({ onClose }: { readonly onClose: () => void }) {
             ))}
           </select>
           <p id={`${id}-limit-hint`} className="muted">
-            Export converts documents up to this size. A higher limit uses more
-            memory.
+            Export loads a document in full up to this size, which takes about
+            10 times its size in memory. At {limit} MB that is up to about{" "}
+            {PEAK[limit]}
+            {limit === MATERIALIZE_LIMITS_MB.at(-1)
+              ? ", which can make the tab slow or fail on a small machine."
+              : "."}
           </p>
         </div>
 
@@ -104,8 +119,14 @@ export function SettingsDialog({ onClose }: { readonly onClose: () => void }) {
           </p>
           <Button
             onClick={async () => {
-              await clearLocalData();
-              setNotice("Local data cleared.");
+              try {
+                await clearLocalData();
+                setNotice("Local data cleared.");
+              } catch (error) {
+                // The live settings are already reset; the stored ones are not.
+                const why = error instanceof Error ? error.message : error;
+                setNotice(`Could not clear local data: ${String(why)}`);
+              }
             }}
           >
             Clear local data

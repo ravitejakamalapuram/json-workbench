@@ -96,6 +96,36 @@ describe("statusLabel", () => {
     ).toEqual({ tone: "ok", text: "Valid", detail: "2 KB · 12,000 records" });
   });
 
+  it("does not call the one value of a large JSON document a record", () => {
+    // The range index leaves nodes null; a wrapper like {"data":[...]} is one value,
+    // and its array, a row below it in the tree, is the thing with a count.
+    const status = (records: number) =>
+      ({
+        kind: "ready",
+        index,
+        summary: { records, nodes: null },
+      }) as const;
+    expect(
+      statusLabel(documentFixture({ bytes: 3 * 1024 ** 2, status: status(1) }))
+        .detail,
+    ).toBe("3 MB · 1 value");
+    // A top-level array counts its elements; JSONL its lines.
+    expect(
+      statusLabel(
+        documentFixture({ bytes: 3 * 1024 ** 2, status: status(5000) }),
+      ).detail,
+    ).toBe("3 MB · 5,000 records");
+    expect(
+      statusLabel(
+        documentFixture({
+          format: "jsonl",
+          bytes: 3 * 1024 ** 2,
+          status: status(1),
+        }),
+      ).detail,
+    ).toBe("3 MB · 1 record");
+  });
+
   it("counts errors and shows a failure's message as it is", () => {
     const issue = { message: "x", byteOffset: 0, line: 1, column: 1 };
     expect(

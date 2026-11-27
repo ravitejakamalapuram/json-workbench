@@ -4,10 +4,12 @@ import {
   cleanup,
   fireEvent,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeToken } from "../features/jwt/fixtures";
 import { installFakeChrome } from "../testing/fake-chrome";
 import { fakeIndex, fakeOpenIndex, type FakeIndex } from "../testing/fixtures";
 import { createTestStore, renderWithStore } from "../testing/render";
@@ -21,10 +23,12 @@ function setWidth(width: number) {
   act(() => happyDOM.setViewport({ width }));
 }
 
+// Wide, where details open beside the view; narrower layouts set their own width.
+beforeEach(() => setWidth(1280));
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  setWidth(1024);
 });
 
 /** The shell over a fake engine, so a test sees each document while it indexes and settles it by hand. */
@@ -266,6 +270,65 @@ describe("Shell, opening", () => {
     expect(store.getState().docs[0]?.origin).toBe("paste");
   });
 
+  it("numbers pasted documents, so two tabs are never named alike", async () => {
+    const { store } = setup();
+    const paste = () =>
+      fireEvent.paste(document.body, {
+        clipboardData: { getData: () => "[1]", files: [] },
+      });
+    paste();
+    paste();
+    paste();
+    expect(store.getState().docs.map((doc) => doc.name)).toEqual([
+      "Pasted text",
+      "Pasted text 2",
+      "Pasted text 3",
+    ]);
+    // A closed tab's number is free again.
+    act(() => store.getState().closeDocument("doc-2"));
+    paste();
+    expect(store.getState().docs.map((doc) => doc.name)).toEqual([
+      "Pasted text",
+      "Pasted text 3",
+      "Pasted text 2",
+    ]);
+  });
+
+  describe("a pasted token", () => {
+    // Built at run time: a literal token in a file trips the secret scan.
+    const token = makeToken({ alg: "HS256" }, { sub: "42" });
+    const tokenBox = async () =>
+      (await screen.findByLabelText("Paste a token")) as HTMLTextAreaElement;
+
+    it("goes to the JWT page, not into a broken tab", async () => {
+      const { store } = setup();
+      fireEvent.paste(document.body, {
+        clipboardData: { getData: () => `${token}\n`, files: [] },
+      });
+      expect(store.getState().docs).toEqual([]);
+      await waitFor(() => expect(store.getState().mode).toBe("jwt"));
+      expect((await tokenBox()).value).toBe(token);
+    });
+
+    it("goes there from the empty state's paste box too", async () => {
+      const { user, store } = setup();
+      await user.click(screen.getByRole("button", { name: "Paste" }));
+      await user.click(screen.getByRole("textbox", { name: "Paste JSON" }));
+      await user.paste(token);
+      await user.click(screen.getByRole("button", { name: "Open" }));
+      expect(store.getState().docs).toEqual([]);
+      expect((await tokenBox()).value).toBe(token);
+    });
+
+    it("is only taken for a token: other text still opens", () => {
+      const { store } = setup();
+      fireEvent.paste(document.body, {
+        clipboardData: { getData: () => '"eyJ not a token"', files: [] },
+      });
+      expect(store.getState().docs).toHaveLength(1);
+    });
+  });
+
   it("leaves a paste into a text field alone", async () => {
     const { user, store } = setup();
     await user.click(screen.getByRole("button", { name: "Paste" }));
@@ -432,6 +495,52 @@ describe("Shell details, embedded JSON hop", () => {
   });
 });
 
+describe("Shell, a file that changed on disk", () => {
+  const CHANGED = "File changed on disk. Reopen it.";
+
+  it("offers Reopen file next to the failure, which picks the file again", async () => {
+    const { openReady, user, store } = setup();
+    await openReady("orders.json");
+    const id = store.getState().activeDocId ?? "";
+    act(() => store.getState().failDocument(id, CHANGED));
+    expect(status().textContent).toContain(CHANGED);
+    const input =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    let clicked = 0;
+    input?.addEventListener("click", () => clicked++);
+    await user.click(screen.getByRole("button", { name: "Reopen file" }));
+    expect(clicked).toBe(1);
+  });
+
+  it("replaces the failed tab when the file is chosen again", async () => {
+    const { openReady, openFile, store } = setup();
+    await openReady("orders.json");
+    const failed = store.getState().activeDocId ?? "";
+    act(() => store.getState().failDocument(failed, CHANGED));
+    await openFile("orders.json", '{"a":2}');
+    const names = store.getState().docs.map((doc) => doc.name);
+    expect(names).toEqual(["orders.json"]);
+    expect(store.getState().docs[0]?.id).not.toBe(failed);
+  });
+
+  it("keeps a tab that opened fine when a file of that name is opened again", async () => {
+    const { openReady, openFile, store } = setup();
+    await openReady("orders.json");
+    await openFile("orders.json", '{"a":2}');
+    expect(store.getState().docs).toHaveLength(2);
+  });
+
+  it("offers it for files only: a pasted text has nothing to pick again", async () => {
+    const { store } = setup();
+    fireEvent.paste(document.body, {
+      clipboardData: { getData: () => "[1]", files: [] },
+    });
+    const id = store.getState().activeDocId ?? "";
+    act(() => store.getState().failDocument(id, "Indexing cancelled."));
+    expect(screen.queryByRole("button", { name: "Reopen file" })).toBeNull();
+  });
+});
+
 describe("Shell layout", () => {
   const more = () => screen.queryByRole("button", { name: "More" });
 
@@ -449,12 +558,11 @@ describe("Shell layout", () => {
 
   it("collapses secondary toolbar controls into More between 641 and 1100 px", async () => {
     setWidth(800);
-    const { openReady, user, store } = setup();
+    const { openReady, user } = setup();
     await openReady();
     expect(document.querySelector(".shell")?.getAttribute("data-width")).toBe(
       "medium",
     );
-    expect(store.getState().detailsOpen).toBe(true);
     expect(screen.queryByRole("button", { name: "Hide details" })).toBeNull();
     await user.click(more() ?? document.body);
     const menu = screen.getByRole("menu");
@@ -464,6 +572,20 @@ describe("Shell layout", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(more());
+  });
+
+  it("starts with details closed between 641 and 1100 px, where they would squeeze the view", async () => {
+    setWidth(800);
+    const { openReady, user, store } = setup();
+    await openReady();
+    expect(store.getState().detailsOpen).toBe(false);
+    expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
+    await user.click(more() ?? document.body);
+    await user.click(screen.getByRole("menuitem", { name: "Show details" }));
+    expect(
+      screen.getByRole("complementary", { name: "Details" }),
+    ).toBeDefined();
+    expect(store.getState().detailsOpen).toBe(true);
   });
 
   it("turns details into an overlay below 640 px", async () => {

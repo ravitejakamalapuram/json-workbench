@@ -2,6 +2,7 @@
 // registry's modes and views, every way to open a document, the command
 // palette, page-wide shortcuts and the shell's dialogs.
 import {
+  memo,
   Suspense,
   useCallback,
   useEffect,
@@ -33,6 +34,10 @@ import { ActionsContext } from "./ui/actions-context";
 
 const showHelp = () => openDialog({ kind: "help" });
 
+// The shell renders on every selection change (the palette and shortcuts need
+// the selected node), but neither of these shows the selection.
+const MemoRail = memo(Rail);
+
 export function Shell({ extraSources }: ShellProps) {
   const store = useAppStoreApi();
   const theme = useAppStore((state) => state.theme);
@@ -40,16 +45,17 @@ export function Shell({ extraSources }: ShellProps) {
   const width = useWidth();
   const node = useSelectedNode();
   const fileInput = useRef<HTMLInputElement>(null);
-  const narrow = width === "narrow";
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  // Below 640 px details cover the view, so they start closed there.
+  // Details open beside the view only where it keeps room (over 1100 px; at
+  // 641 px it shrinks to 145). Below 640 px they cover it. Elsewhere they open
+  // from the toolbar.
   useEffect(() => {
-    store.getState().setDetailsOpen(!narrow);
-  }, [store, narrow]);
+    store.getState().setDetailsOpen(width === "wide");
+  }, [store, width]);
 
   useEffect(() => endSession, []);
 
@@ -68,7 +74,9 @@ export function Shell({ extraSources }: ShellProps) {
     return { state, doc, node };
   };
   useGlobalShortcuts(registry.actions, context);
-  usePasteToOpen((data) => openClipboard(store.getState(), data));
+  usePasteToOpen((data) =>
+    openClipboard(store.getState(), data, registry.actions),
+  );
 
   function onFileChosen(event: ChangeEvent<HTMLInputElement>) {
     const files = [...(event.target.files ?? [])];
@@ -81,7 +89,7 @@ export function Shell({ extraSources }: ShellProps) {
     <ActionsContext.Provider value={registry.actions}>
       <DropZone onFiles={(files) => openFiles(store.getState(), files)}>
         <div className="shell" data-width={width}>
-          <Rail modes={registry.modes} />
+          <MemoRail modes={registry.modes} />
           <div className="shell-main">
             <ReviewNudge />
             <main className="workspace">
@@ -106,7 +114,10 @@ export function Shell({ extraSources }: ShellProps) {
 
 type WorkspaceProps = ShellProps & { readonly openFile: () => void };
 
-function Workspace({ openFile, extraSources }: WorkspaceProps) {
+const Workspace = memo(function Workspace({
+  openFile,
+  extraSources,
+}: WorkspaceProps) {
   const mode = useAppStore((state) => state.mode);
   const doc = useAppStore((state) =>
     state.docs.find((d) => d.id === state.activeDocId),
@@ -129,4 +140,4 @@ function Workspace({ openFile, extraSources }: WorkspaceProps) {
       <DocumentView doc={doc} />
     </>
   );
-}
+});

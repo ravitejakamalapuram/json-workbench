@@ -63,6 +63,27 @@ describe("decodeJwt", () => {
     expect(decoded(prefix + token)).toEqual(decoded(token));
   });
 
+  it.each([
+    ['"', '"'],
+    ["'", "'"],
+  ])("strips one pair of surrounding quotes %s", (quote) => {
+    const token = makeToken(HEADER, PAYLOAD);
+    expect(decoded(`${quote}${token}${quote}`)).toEqual(decoded(token));
+    expect(decoded(` ${quote}${token}${quote}\n`)).toEqual(decoded(token));
+  });
+
+  it("strips the quotes around a whole Authorization value", () => {
+    const token = makeToken(HEADER, PAYLOAD);
+    expect(decoded(`"Bearer ${token}"`)).toEqual(decoded(token));
+  });
+
+  it("leaves a quote without its partner, and a second pair, to the error", () => {
+    const token = makeToken(HEADER, PAYLOAD);
+    expect(failed(`"${token}`).part).toBe("header");
+    expect(failed(`"${token}'`).part).toBe("header");
+    expect(failed(`""${token}""`).part).toBe("header");
+  });
+
   it("accepts padded base64url", () => {
     const header = Buffer.from(JSON.stringify(HEADER)).toString("base64");
     const payload = Buffer.from('{"a":"bc"}').toString("base64");

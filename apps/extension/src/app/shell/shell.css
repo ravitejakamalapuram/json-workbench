@@ -89,15 +89,13 @@
 }
 
 .rail-foot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   margin-top: auto;
   padding-top: var(--space-4);
 }
 
 /* Aligned with the item labels; no right padding, so it stays on one line. */
 .rail-note {
+  margin-top: var(--space-2);
   padding-left: var(--space-3);
   color: var(--ink-muted);
   font-size: 12px;
@@ -485,8 +483,9 @@
   display: flex;
   flex: none;
   align-items: center;
-  height: 32px;
-  padding: 0 var(--space-6);
+  /* Grows when a message has to wrap, as a tree notice does in the side panel. */
+  min-height: 32px;
+  padding: var(--space-1) var(--space-6);
   border-top: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink-muted);
@@ -496,14 +495,15 @@
 /* ----------------------------------------------------------- Narrow */
 
 /* Below 640 px (the side panel is about 400 px): the rail becomes a top mode
-   strip, the details panel covers the view, and the brand, recents and note
-   step aside (the empty state lists recents). */
+   strip with the local-only note on a line below it, the details panel covers
+   the view, and the brand and recents step aside (the empty state lists
+   recents). */
 .shell[data-width="narrow"] {
   flex-direction: column;
 }
 
 .shell[data-width="narrow"] .rail {
-  flex-direction: row;
+  flex-flow: row wrap;
   align-items: center;
   gap: var(--space-2);
   width: auto;
@@ -513,8 +513,13 @@
   border-bottom: 1px solid var(--line);
 }
 
-.shell[data-width="narrow"] :is(.brand, .rail-recents, .rail-note) {
+.shell[data-width="narrow"] :is(.brand, .rail-recents) {
   display: none;
+}
+
+.shell[data-width="narrow"] .rail-note {
+  flex-basis: 100%;
+  margin-top: 0;
 }
 
 .shell[data-width="narrow"] .rail-list {
@@ -535,8 +540,17 @@
   padding: 0 var(--space-3);
 }
 
+.shell[data-width="narrow"] .status-bar {
+  padding-block: var(--space-1);
+}
+
+/* Wraps: while a document indexes, its status needs a progress bar and Cancel,
+   and the controls on the right move to a second line rather than squeeze them
+   to nothing. */
 .shell[data-width="narrow"] .toolbar {
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding-block: var(--space-2);
 }
 
 /* The size and node count wait for a wider window; Valid or Invalid stays. */

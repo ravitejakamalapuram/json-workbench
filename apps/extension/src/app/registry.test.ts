@@ -10,7 +10,7 @@ import { registry } from "./registry";
 const NAMESPACES: Readonly<Record<string, RegExp>> = {
   app: /^(?:Mod\+[KO]|\?|Alt\+[1-5TRB])$/,
   tree: /^(?:Mod\+F|Mod\+Shift\+E|Alt\+Arrow(?:Up|Down|Left|Right))$/,
-  raw: /^(?:Mod\+Shift\+F|Mod\+\.)$/,
+  raw: /^(?:Mod\+Shift\+F|Mod\+\.|Mod\+G)$/,
   table: /^Alt\+C$/,
   compare: /^Mod\+Enter$/,
   transform: /^Mod\+Shift\+Enter$/,

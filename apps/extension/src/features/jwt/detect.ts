@@ -29,6 +29,9 @@ export type JwtError = {
 // A copied Authorization header: the field name and the scheme are not part
 // of the token.
 const PREFIX = /^\s*(?:authorization\s*:\s*)?(?:bearer\s+)?/i;
+// A token copied out of JSON or a shell line comes with its quotes: one pair,
+// around the token or around the whole Authorization value.
+const QUOTED = /^\s*(["'])([\s\S]*)\1\s*$/;
 // Issuers write no padding, but a token re-encoded elsewhere may carry it.
 const BASE64URL = /^[\w-]+={0,2}$/;
 const OBJECT = /^\s*\{/;
@@ -93,7 +96,11 @@ function decodePart(
 export function decodeJwt(token: string): JwtParts | JwtError {
   if (token.length > LIMITS.embeddedChars)
     return { error: "This text is too large to be a token.", part: "token" };
-  const segments = token.replace(PREFIX, "").replace(/\s+/g, "").split(".");
+  const segments = token
+    .replace(QUOTED, "$2")
+    .replace(PREFIX, "")
+    .replace(/\s+/g, "")
+    .split(".");
   if (segments.length !== 3)
     return {
       error: `A token has 3 parts separated by dots; this one has ${segments.length}.`,

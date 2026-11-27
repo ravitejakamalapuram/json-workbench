@@ -29,6 +29,31 @@ import type { Change } from "./fixes";
 
 const readOnlyMode = new Compartment();
 
+const encoder = new TextEncoder();
+const utf8Length = (text: string) => encoder.encode(text).length;
+
+/** What a transaction adds to the text's UTF-8 size, from the changed ranges alone. */
+function byteChange(transaction: Transaction): number {
+  let change = 0;
+  transaction.changes.iterChanges((from, to, _fromB, _toB, inserted) => {
+    change += utf8Length(inserted.toString());
+    change -= utf8Length(transaction.startState.sliceDoc(from, to));
+  });
+  return change;
+}
+
+/**
+ * The text's size in UTF-8 bytes, which is what the document and the doc
+ * engine compare with LIMITS.rawEditChars (it was a character count while the
+ * field of the same name was). Kept by change, so typing never re-reads the
+ * whole text.
+ */
+const textBytes = StateField.define<number>({
+  create: (state) => utf8Length(state.doc.toString()),
+  update: (bytes, transaction) =>
+    transaction.docChanged ? bytes + byteChange(transaction) : bytes,
+});
+
 /** A change that did not come from the user (the document loaded or was converted), so it is not saved back. */
 const external = Annotation.define<boolean>();
 
@@ -154,7 +179,7 @@ export type EditorOptions = {
   /** The editor lost focus. */
   readonly onBlur: () => void;
   readonly onCursor: (line: number, column: number) => void;
-  /** A change was refused because the text would pass LIMITS.rawEditChars. */
+  /** A change was refused because the text would pass LIMITS.rawEditChars bytes. */
   readonly onRefused: () => void;
 };
 
@@ -187,9 +212,15 @@ export function createEditor(
             return false;
           },
         }),
+        textBytes,
         // The doc engine takes no more, so the editor does not either.
         EditorState.changeFilter.of((transaction) => {
-          if (transaction.newDoc.length <= LIMITS.rawEditChars) return true;
+          if (
+            !transaction.docChanged ||
+            transaction.startState.field(textBytes) + byteChange(transaction) <=
+              LIMITS.rawEditChars
+          )
+            return true;
           onRefused();
           return false;
         }),

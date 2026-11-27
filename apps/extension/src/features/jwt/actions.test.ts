@@ -189,6 +189,22 @@ describe("the Decode JWT row action", () => {
       expect(jwtState.getState()).toEqual({ token: SHORT, notice: "" });
     });
 
+    it("keeps the token already shown when another one cannot be read", async () => {
+      jwtState.setState({ token: SHORT, notice: "" });
+      const store = createTestStore();
+      const slice = vi.fn(async () => {
+        throw new Error("File changed on disk. Reopen it.");
+      });
+      await decode().run?.(
+        context(preview(LONG), readyDoc(fakeIndex({ slice })), store),
+      );
+      expect(jwtState.getState()).toEqual({
+        token: SHORT,
+        notice:
+          "File changed on disk. Reopen it. The token shown is the one from before.",
+      });
+    });
+
     it("says so, and reads nothing, when the string is too large", async () => {
       const store = createTestStore();
       const slice = vi.fn(async () => "");

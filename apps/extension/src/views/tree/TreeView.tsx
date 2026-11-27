@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,6 +23,7 @@ import { useAppStoreApi } from "../../store";
 import { SearchBar, useInlineSearch } from "./SearchBar";
 import { useSearch, useSearchRunner } from "./search";
 import { createTreeModel, ignoreAbort, type Row } from "./tree-model";
+import { recall, remember, setNotice } from "./tree-state";
 import { TreeRow } from "./TreeRow";
 import { useActiveRow } from "./use-active-row";
 import { useKeepFocus } from "./use-keep-focus";
@@ -47,20 +49,27 @@ export default function TreeView({ doc }: ViewProps) {
 
 function TreeBody({ doc, index }: ViewProps & { index: DocumentIndex }) {
   const store = useAppStoreApi();
+  // Read once: where the user left this tree when another mode took over.
+  const [kept] = useState(() => recall(doc.id, index));
   const [model] = useState(() =>
-    createTreeModel(index, {
-      beforeDispose(indexes) {
-        const { selection, select } = store.getState();
-        if (selection?.index && indexes.includes(selection.index)) select(null);
+    createTreeModel(
+      index,
+      {
+        beforeDispose(indexes) {
+          const { selection, select } = store.getState();
+          if (selection?.index && indexes.includes(selection.index))
+            select(null);
+        },
       },
-    }),
+      kept,
+    ),
   );
   const version = useSyncExternalStore(model.subscribe, model.version);
   const list = useRef<VirtualListHandle>(null);
   const box = useRef<HTMLDivElement>(null);
   const range = useRef<readonly [number, number]>([0, 0]);
   const [mounted, setMounted] = useState<readonly [number, number]>([0, 0]);
-  const active = useActiveRow(model, doc.id, list);
+  const active = useActiveRow(model, doc.id, list, kept?.selected);
   const { choose, collapse } = active;
   const actionList = useActionList();
   const inline = useInlineSearch();
@@ -68,8 +77,36 @@ function TreeBody({ doc, index }: ViewProps & { index: DocumentIndex }) {
 
   useEffect(() => {
     void model.load();
-    return () => model.dispose();
+    return () => {
+      model.dispose();
+      setNotice("");
+    };
   }, [model]);
+  // Before the list's own cleanup lets go of its handle, which reads the scroll position.
+  useLayoutEffect(
+    () => () => {
+      const open = model.snapshot();
+      if (!open || !list.current) return;
+      const { selection } = store.getState();
+      remember(store, doc.id, {
+        index,
+        ...open,
+        top: list.current.top(),
+        selected:
+          selection?.docId === doc.id
+            ? { via: selection.via ?? [], pointer: selection.pointer }
+            : null,
+      });
+    },
+    [model, store, doc.id, index],
+  );
+  // The rows exist once the tree has loaded; the list scrolls to where it was.
+  const scrollBack = useRef(kept?.top);
+  useLayoutEffect(() => {
+    if (scrollBack.current === undefined || model.count() === 0) return;
+    list.current?.scrollToTop(scrollBack.current);
+    scrollBack.current = undefined;
+  });
   useEffect(() => {
     void model.refresh();
   }, [model, doc.status]);
@@ -132,6 +169,8 @@ function TreeBody({ doc, index }: ViewProps & { index: DocumentIndex }) {
     );
   }
 
+  const failureRows = model.failureRows(first, end, active.activeAt);
+
   function renderRow(at: number) {
     const row = model.row(at);
     if (!row) return null;
@@ -146,6 +185,7 @@ function TreeBody({ doc, index }: ViewProps & { index: DocumentIndex }) {
         selected={active.isSelected(row)}
         tabStop={at === stopAt}
         focusRef={active.activeAt === at ? active.focusRef : undefined}
+        explains={failureRows.has(at)}
         markers={
           node && scope.via.length === 0 ? markers.get(node.pointer) : undefined
         }

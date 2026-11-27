@@ -25,6 +25,9 @@ const rewritable = ({ state, doc }: ActionContext) => {
 
 const controls = () => rawState.getState().controls;
 
+/** The pager is mounted: it registers goToLine in its controls, and the editor does not (it has CodeMirror's own Mod+G, find next). */
+const pagerShows = () => controls()?.goToLine !== undefined;
+
 export const rawActions: readonly Action[] = [
   {
     id: "raw.format",
@@ -40,6 +43,14 @@ export const rawActions: readonly Action[] = [
     placement: ["palette", "toolbar"],
     when: rewritable,
     run: () => controls()?.minify?.(),
+  },
+  {
+    id: "raw.goto-line",
+    label: "Go to line",
+    shortcut: "Mod+G",
+    placement: ["palette"],
+    when: pagerShows,
+    run: () => controls()?.goToLine?.(),
   },
   {
     // The problem block offers the same fix under its own name ("Add commas").

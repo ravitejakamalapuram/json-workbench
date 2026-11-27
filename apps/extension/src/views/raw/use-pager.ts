@@ -16,7 +16,11 @@ const isAbort = (error: unknown) =>
 export function usePager(source: Blob) {
   const [counted, setCounted] = useState({ rows: 0, lines: 0 });
   const [scanning, setScanning] = useState(true);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{
+    readonly message: string;
+    /** The file changed on disk: the document cannot be read again, whatever the view does. */
+    readonly changed: boolean;
+  } | null>(null);
   /** Bumped when rows arrive, so the list draws them. */
   const [version, setVersion] = useState(0);
   const client = useRef<WorkerClient<PagerOps> | null>(null);
@@ -24,8 +28,11 @@ export function usePager(source: Blob) {
   const reading = useRef<AbortController | null>(null);
 
   const fail = useCallback((error: unknown) => {
-    if (!isAbort(error))
-      setFailure(error instanceof Error ? error.message : String(error));
+    if (isAbort(error)) return;
+    setFailure({
+      message: error instanceof Error ? error.message : String(error),
+      changed: error instanceof Error && error.name === "NotReadableError",
+    });
   }, []);
 
   // The list asks for rows before this component's own effects run, so the

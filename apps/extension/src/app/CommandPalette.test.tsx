@@ -92,6 +92,19 @@ describe("CommandPalette", () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it("puts an exact label match first, then the others in registry order", async () => {
+    const store = createTestStore();
+    await openText(store, '{"a":1}');
+    const { user } = setup(store);
+    await user.keyboard("{Control>}k{/Control}");
+    await user.type(within(palette()).getByRole("combobox"), "expand all");
+    // "Expand all embedded JSON" registers before "Expand all", but is a longer label.
+    expect(options()).toEqual([
+      "Expand allCtrl Shift E",
+      "Expand all embedded JSON",
+    ]);
+  });
+
   it("offers document commands once a document is open", async () => {
     const store = createTestStore();
     await openText(store, '{"a":1}');

@@ -197,6 +197,16 @@
   scrollbar-width: none;
 }
 
+/* The notice keeps the end of the bar; the path scrolls under it. It wraps
+   rather than clip when the bar is narrower than the sentence. */
+.tree-notice {
+  flex: none;
+  max-width: 100%;
+  margin-left: auto;
+  padding-left: var(--space-3);
+  text-align: right;
+}
+
 .tree-crumb {
   padding: 0;
   border: 0;

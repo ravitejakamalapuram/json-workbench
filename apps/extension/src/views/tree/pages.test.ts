@@ -106,7 +106,7 @@ describe("the page cache", () => {
       children.mockRejectedValueOnce(changed());
       pages.prefetch(source, 5);
       await vi.waitFor(() => expect(loaded).toHaveBeenCalledOnce());
-      expect(pages.failure(source, 5)?.message).toBe(
+      expect(pages.failure(source, 5)?.error.message).toBe(
         "File changed on disk. Reopen it.",
       );
       // The tree asks for its visible rows after every render.

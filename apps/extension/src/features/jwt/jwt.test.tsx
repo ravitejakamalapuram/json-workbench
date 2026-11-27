@@ -51,7 +51,7 @@ describe("the JWT page", () => {
     expect(screen.getByLabelText("Paste a token")).toBe(input());
     // Nothing to decode yet, so no empty sections and no error.
     expect(screen.queryByRole("heading", { name: "Payload" })).toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("");
   });
 
   it("focuses the input, so a paste does not open a document", () => {
@@ -260,6 +260,20 @@ describe("the JWT page", () => {
       expect(screen.queryByTestId("jwt-payload")).toBeNull();
     });
 
+    it("speaks through a status region that was in the page before the text", async () => {
+      render(<JwtMode />);
+      // A screen reader announces text that changes in a live region, not one
+      // that arrives with it, so the same element has to take the message.
+      const status = screen.getByRole("status");
+      await paste("only.two");
+      expect(screen.getByRole("status")).toBe(status);
+      expect(status.textContent).toContain("3 parts");
+      expect(status.querySelector("#jwt-problem")?.textContent).toContain(
+        "3 parts",
+      );
+      expect(input().getAttribute("aria-describedby")).toContain("jwt-problem");
+    });
+
     it("names the part that is not base64url", async () => {
       render(<JwtMode />);
       await paste(`${base64url("{}")}.not base64!.sig`);
@@ -284,10 +298,10 @@ describe("the JWT page", () => {
     it("clears the problem once the token is whole", async () => {
       render(<JwtMode />);
       const user = await paste("only.two");
-      expect(screen.getByRole("status")).toBeDefined();
+      expect(screen.getByRole("status").textContent).not.toBe("");
       await user.clear(input());
       await user.paste(makeToken(HEADER, PAYLOAD));
-      expect(screen.queryByRole("status")).toBeNull();
+      expect(screen.getByRole("status").textContent).toBe("");
       expect(input().getAttribute("aria-invalid")).toBeNull();
     });
   });

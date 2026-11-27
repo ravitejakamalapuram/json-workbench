@@ -72,22 +72,19 @@ export default function JwtMode() {
             </Button>
           </div>
         </div>
-        {notice && (
-          <p role="status" className="jwt-problem">
-            {notice}
-          </p>
-        )}
-        {problem && (
-          <>
-            <p id="jwt-problem" role="status" className="jwt-problem">
+        {/* In the page before its text changes: a screen reader says what changes in a live region, not what arrives with one. */}
+        <div role="status" className="jwt-status">
+          {notice && <p className="jwt-problem">{notice}</p>}
+          {problem && (
+            <p id="jwt-problem" className="jwt-problem">
               {problem.error}
             </p>
-            {problem.text !== undefined && (
-              <Block title="Decoded text">
-                <pre className="jwt-code">{problem.text}</pre>
-              </Block>
-            )}
-          </>
+          )}
+        </div>
+        {problem?.text !== undefined && (
+          <Block title="Decoded text">
+            <pre className="jwt-code">{problem.text}</pre>
+          </Block>
         )}
         {parts && <Decoded parts={parts} />}
       </div>

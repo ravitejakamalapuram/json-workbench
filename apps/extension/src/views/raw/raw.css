@@ -46,3 +46,11 @@
 * + .raw-status-note {
   margin-left: var(--space-4);
 }
+
+/* Smaller than a toolbar button, so it fits the 32 px bar; pushed to the end. */
+.raw-status-action {
+  flex: none;
+  height: 24px;
+  margin-left: auto;
+  font: inherit;
+}

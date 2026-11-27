@@ -13,6 +13,7 @@ import {
 import { VirtualList, type VirtualListHandle } from "../../app/ui/VirtualList";
 import { spacing } from "../../theme/tokens";
 import type { ParseIssue, ViewProps } from "../../platform/types";
+import { useAppStoreApi } from "../../store";
 import { GoToLine, linesText } from "./GoToLine";
 import { PagerRow } from "./PagerRow";
 import { IDLE, rawState } from "./raw-state";
@@ -57,6 +58,14 @@ function PagerBody({ doc }: ViewProps) {
   /** The row that should have the keyboard focus as soon as the list has mounted it. */
   const focusRow = useRef<number | null>(null);
 
+  // The shell would go on saying Valid for a file it can no longer read.
+  const store = useAppStoreApi();
+  const { failure } = pager;
+  useEffect(() => {
+    if (failure?.changed)
+      store.getState().failDocument(doc.id, failure.message);
+  }, [store, doc.id, failure]);
+
   const issue = status.kind === "invalid" ? status.issues[0] : undefined;
   useEffect(() => {
     if (!issue) return;
@@ -78,6 +87,7 @@ function PagerBody({ doc }: ViewProps) {
       controls: {
         goToError: (at: ParseIssue) =>
           void rowAt(at.byteOffset).then(setTarget, () => undefined),
+        goToLine: () => setGoTo(true),
       },
     });
     return () => rawState.setState(IDLE);
@@ -88,7 +98,7 @@ function PagerBody({ doc }: ViewProps) {
   const continued = here?.continued;
   useEffect(() => {
     if (line !== undefined)
-      rawState.setState({ cursor: { line, column: continued ? null : 1 } });
+      rawState.setState({ cursor: { line, ...(continued && { continued }) } });
   }, [line, continued]);
 
   function reveal(row: number) {
@@ -144,13 +154,7 @@ function PagerBody({ doc }: ViewProps) {
   }
 
   function onKeyDown(event: KeyboardEvent) {
-    const mod = event.ctrlKey || event.metaKey;
-    if (mod && !event.altKey && !event.shiftKey && event.code === "KeyG") {
-      event.preventDefault();
-      setGoTo(true);
-      return;
-    }
-    if (mod || event.altKey) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     // The list's own height: the mounted range is shorter than a screen plus
     // overscan at the start and the end of the document, where one side is missing.
     const viewport =
@@ -183,7 +187,8 @@ function PagerBody({ doc }: ViewProps) {
     [show],
   );
 
-  if (pager.failure) return <p className="raw-message">{pager.failure}</p>;
+  if (pager.failure)
+    return <p className="raw-message">{pager.failure.message}</p>;
   const [first, end] = range;
   const stopAt = active >= first && active < end ? active : first;
   return (

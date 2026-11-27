@@ -2,7 +2,13 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Action, ActionContext, AppState } from "../platform/types";
-import { actionForKey, actionsFor, runAction, shortcutOf } from "./actions";
+import {
+  actionForKey,
+  actionsFor,
+  isTextField,
+  runAction,
+  shortcutOf,
+} from "./actions";
 import { useActionHandler } from "./ui/action-handlers";
 import { ActionsContext, useActionList } from "./ui/actions-context";
 
@@ -21,6 +27,20 @@ function key(init: KeyboardEventInit & { target?: EventTarget }) {
     Object.defineProperty(event, "target", { value: init.target });
   return event;
 }
+
+describe("isTextField", () => {
+  it("is true for what takes typing, and false for anything else", () => {
+    const editable = document.createElement("div");
+    // happy-dom has no contenteditable reflection of its own.
+    Object.defineProperty(editable, "isContentEditable", { value: true });
+    expect(isTextField(document.createElement("input"))).toBe(true);
+    expect(isTextField(document.createElement("textarea"))).toBe(true);
+    expect(isTextField(document.createElement("select"))).toBe(true);
+    expect(isTextField(editable)).toBe(true);
+    expect(isTextField(document.createElement("button"))).toBe(false);
+    expect(isTextField(null)).toBe(false);
+  });
+});
 
 describe("shortcutOf", () => {
   it("writes modifiers in canonical order with Mod for the platform key", () => {

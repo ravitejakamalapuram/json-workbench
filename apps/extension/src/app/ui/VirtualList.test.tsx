@@ -77,6 +77,16 @@ describe("VirtualList at 6M rows", () => {
     expect(rows().length).toBeLessThanOrEqual(20 + 2 * 10 + 1);
   });
 
+  it("reports its top row and returns to it", () => {
+    const { ref } = renderList();
+    act(() => ref.current?.scrollToTop(3_000_000.5));
+    expect(ref.current?.top()).toBe(3_000_000.5);
+    expect(rowIndexes()).toContain(3_000_001);
+    act(() => ref.current?.scrollToTop(ROWS * 2));
+    // As far as the rows allow: the last one ends at the bottom.
+    expect(ref.current?.top()).toBe(ROWS - 20);
+  });
+
   it("maps a dragged scrollbar to rows in proportion", () => {
     const { grid } = renderList();
     grid.scrollTop = (MAX_SPACER_PX - VIEWPORT) / 2;

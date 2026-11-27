@@ -49,6 +49,8 @@ export function useActiveRow(
   model: TreeModel,
   docId: DocId,
   list: RefObject<VirtualListHandle | null>,
+  /** The selection the tree was left with: the list is put back where it was, so revealing this one does not scroll. */
+  left?: Target | null,
 ) {
   const store = useAppStoreApi();
   const selection = useAppStore((state) =>
@@ -64,9 +66,9 @@ export function useActiveRow(
   /** Set by an activation, spent when the active row's element appears. */
   const revealNext = useRef(false);
 
-  const activate = useCallback((path: Path) => {
+  const activate = useCallback((path: Path, scroll = true) => {
     activeRef.current = path;
-    scrollNext.current = path;
+    if (scroll) scrollNext.current = path;
     revealNext.current = true;
     setActive(path);
   }, []);
@@ -134,15 +136,18 @@ export function useActiveRow(
     [model, chooseAt],
   );
 
+  const leftAt = useRef(left);
   useEffect(() => {
     if (!selection) return;
     const target = targetOf(selection);
     if (takeRowFocusRequest()) focusNext.current = true;
     if (sameTarget(chosen.current, target)) return;
     chosen.current = target;
+    const scroll = !(leftAt.current && sameTarget(leftAt.current, target));
+    leftAt.current = null;
     let live = true;
     void model.reveal(target).then((path) => {
-      if (live && path) activate(path);
+      if (live && path) activate(path, scroll);
     });
     return () => {
       live = false;

@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { actionsFor } from "../../app/actions";
+import { actionsFor, runAction } from "../../app/actions";
+import { useGlobalShortcuts } from "../../app/shell/shortcuts";
 import {
   LIMITS,
   type DocumentModel,
@@ -12,9 +13,15 @@ import {
 import { changedBlob, GatedBlob } from "../../testing/blobs";
 import { documentFixture, fakeIndex } from "../../testing/fixtures";
 import { fakeWorker } from "../../testing/fake-worker";
-import { renderWithStore } from "../../testing/render";
+import { useAppStoreApi } from "../../store";
+import { createTestStore, renderWithStore } from "../../testing/render";
 import { rawProblemDetails, rawView } from ".";
-import { createPagerHandlers, type PagerOptions } from "./pager-ops";
+import type { Handlers } from "../../platform/workers/protocol";
+import {
+  createPagerHandlers,
+  type PagerOps,
+  type PagerOptions,
+} from "./pager-ops";
 import { spawnPagerWorker } from "./pager-spawn";
 import { IDLE, rawState } from "./raw-state";
 
@@ -49,10 +56,22 @@ function large(text: string, overrides: Partial<DocumentModel> = {}) {
   });
 }
 
+/** The shell's page-wide shortcuts, over Raw's actions. */
+function Keys({ doc }: { readonly doc: DocumentModel }) {
+  const store = useAppStoreApi();
+  useGlobalShortcuts(rawView.actions ?? [], () => ({
+    state: store.getState(),
+    doc,
+    node: undefined,
+  }));
+  return null;
+}
+
 /** What the shell shows for a document: the view, its status bar and the problem section. */
 function show(doc: DocumentModel) {
   return renderWithStore(
     <Suspense fallback={null}>
+      <Keys doc={doc} />
       <rawView.Component doc={doc} />
       <div data-testid="status-bar">
         {rawView.StatusBar && <rawView.StatusBar doc={doc} />}
@@ -95,7 +114,7 @@ describe("the pager", () => {
     await screen.findByText('{"n":1}');
     await waitFor(() =>
       expect(status()).toBe(
-        "Ln 1, Col 1Read only: files over 2 MB open for reading",
+        "Ln 1Read only: files over 2 MB open for readingGo to line",
       ),
     );
   });
@@ -138,9 +157,9 @@ describe("the pager", () => {
     await screen.findByText('{"n":1}');
     await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
     await user.keyboard("{ArrowDown}{ArrowDown}");
-    expect(status()).toContain("Ln 3, Col 1");
+    expect(status()).toContain("Ln 3");
     await user.keyboard("{ArrowUp}");
-    expect(status()).toContain("Ln 2, Col 1");
+    expect(status()).toContain("Ln 2");
     expect(document.activeElement?.getAttribute("data-row")).toBe("1");
   });
 
@@ -151,10 +170,10 @@ describe("the pager", () => {
     await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
     await user.keyboard("{End}");
     await screen.findByText('{"n":5000}');
-    expect(status()).toContain("Ln 5,000, Col 1");
+    expect(status()).toContain("Ln 5,000");
     await user.keyboard("{Home}");
     await screen.findByText('{"n":1}');
-    expect(status()).toContain("Ln 1, Col 1");
+    expect(status()).toContain("Ln 1");
   });
 
   /** happy-dom has no layout: runs `test` with a list that is ten rows high. */
@@ -186,9 +205,9 @@ describe("the pager", () => {
       await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
       await user.keyboard("{PageDown}");
       // One row of the screen before stays, as in the tree.
-      expect(status()).toContain("Ln 10, Col 1");
+      expect(status()).toContain("Ln 10");
       await user.keyboard("{PageDown}");
-      expect(status()).toContain("Ln 19, Col 1");
+      expect(status()).toContain("Ln 19");
     }));
 
   it("pages back by the same screenful", () =>
@@ -198,9 +217,9 @@ describe("the pager", () => {
       await screen.findByText('{"n":1}');
       await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
       await user.keyboard("{PageDown}{PageDown}{PageUp}");
-      expect(status()).toContain("Ln 10, Col 1");
+      expect(status()).toContain("Ln 10");
       await user.keyboard("{PageUp}{PageUp}");
-      expect(status()).toContain("Ln 1, Col 1");
+      expect(status()).toContain("Ln 1");
     }));
 
   it("has one row in the tab order", async () => {
@@ -241,12 +260,41 @@ describe("go to line", () => {
     );
   });
 
+  it("opens the same input from a Go to line button in the status bar", async () => {
+    const user = userEvent.setup();
+    show(large(lines(2000)));
+    await screen.findByText('{"n":1}');
+    await user.click(
+      within(screen.getByTestId("status-bar")).getByRole("button", {
+        name: "Go to line",
+      }),
+    );
+    expect(document.activeElement).toBe(
+      await screen.findByRole("spinbutton", { name: "Go to line" }),
+    );
+  });
+
+  it("is a registry action on Mod+G for the palette, available only while the pager shows", async () => {
+    const goto = rawView.actions?.find((a) => a.id === "raw.goto-line");
+    expect(goto).toMatchObject({ shortcut: "Mod+G", label: "Go to line" });
+    expect(goto?.placement).toContain("palette");
+    const ctx = { state: {} as never, doc: undefined, node: undefined };
+    expect(goto?.when?.(ctx)).toBe(false);
+    show(large(lines(20)));
+    await screen.findByText('{"n":1}');
+    expect(goto?.when?.(ctx)).toBe(true);
+    await act(() => runAction(goto!, ctx));
+    expect(await screen.findByRole("spinbutton", { name: "Go to line" })).toBe(
+      document.activeElement,
+    );
+  });
+
   it("jumps to the line and puts the focus on its row", async () => {
     const user = userEvent.setup();
     await open(user);
     await user.keyboard("1500{Enter}");
     await screen.findByText('{"n":1500}');
-    expect(status()).toContain("Ln 1,500, Col 1");
+    expect(status()).toContain("Ln 1,500");
     await waitFor(() =>
       expect(document.activeElement).toMatchObject({
         dataset: { testid: "pager-row" },
@@ -263,7 +311,7 @@ describe("go to line", () => {
     expect((await screen.findByRole("status")).textContent).toBe(
       "The document has 50 lines.",
     );
-    expect(status()).toContain("Ln 1, Col 1");
+    expect(status()).toContain("Ln 1");
   });
 
   it('says "1 line", not "1 lines", for a document that is one line', async () => {
@@ -310,7 +358,7 @@ describe("a document with a syntax error", () => {
     expect(
       row.closest("[role=listitem]")?.getAttribute("aria-description"),
     ).toBe("Syntax error");
-    expect(status()).toContain("Ln 301, Col 1");
+    expect(status()).toContain("Ln 301");
     // Keyboard focus follows the jump.
     await waitFor(() =>
       expect(document.activeElement).toMatchObject({
@@ -381,6 +429,43 @@ describe("when it cannot show the document", () => {
     await screen.findByText("File changed on disk. Reopen it.");
   });
 
+  it("ends the document when the file changed on disk, so the shell stops saying Valid", async () => {
+    const doc = large("[]", { source: changedBlob("[]") });
+    const store = createTestStore();
+    store.setState({ docs: [doc], activeDocId: doc.id });
+    renderWithStore(
+      <Suspense fallback={null}>
+        <rawView.Component doc={doc} />
+      </Suspense>,
+      { store },
+    );
+    await waitFor(() =>
+      expect(store.getState().docs[0]?.status).toEqual({
+        kind: "failed",
+        message: "File changed on disk. Reopen it.",
+      }),
+    );
+  });
+
+  it("does not end the document for any other read failure", async () => {
+    const doc = large("[]", { source: changedBlob("[]") });
+    const store = createTestStore();
+    store.setState({ docs: [doc], activeDocId: doc.id });
+    const stopped: Handlers<PagerOps> = {
+      ...createPagerHandlers(),
+      open: () => Promise.reject(new Error("The worker stopped.")),
+    };
+    vi.mocked(spawnPagerWorker).mockImplementation(() => fakeWorker(stopped));
+    renderWithStore(
+      <Suspense fallback={null}>
+        <rawView.Component doc={doc} />
+      </Suspense>,
+      { store },
+    );
+    await screen.findByText("The worker stopped.");
+    expect(store.getState().docs[0]?.status.kind).toBe("ready");
+  });
+
   it("ends its worker when the view goes away", async () => {
     const worker = fakeWorker(createPagerHandlers());
     const terminate = vi.spyOn(worker, "terminate");
@@ -410,7 +495,7 @@ describe("while the scan is still counting rows", () => {
     expect(status()).not.toContain("Ln 5,000");
     source.release();
     await screen.findByText('{"n":5000}');
-    await waitFor(() => expect(status()).toContain("Ln 5,000, Col 1"));
+    await waitFor(() => expect(status()).toContain("Ln 5,000"));
     // The focus goes with it, to the row now in view.
     await waitFor(() =>
       expect(document.activeElement?.getAttribute("data-row")).toBe("4999"),
@@ -443,6 +528,6 @@ describe("while the scan is still counting rows", () => {
     source.release();
     const row = await screen.findByText('{"n":301,}');
     expect(row.closest("[data-error]")).not.toBeNull();
-    await waitFor(() => expect(status()).toContain("Ln 301, Col 1"));
+    await waitFor(() => expect(status()).toContain("Ln 301"));
   });
 });

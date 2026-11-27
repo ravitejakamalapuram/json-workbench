@@ -16,6 +16,10 @@ function matches(action: Action, query: string): boolean {
     .every((word) => label.includes(word));
 }
 
+/** "Expand all" is the exact label, so it is not outranked by "Expand all embedded JSON", which registers first. */
+const isExact = (action: Action, query: string) =>
+  action.label.toLowerCase() === query.trim().toLowerCase();
+
 /**
  * Mod+K: the palette actions that can run now, filtered as you type. The
  * input keeps focus and points at the active option (combobox pattern), so
@@ -33,7 +37,10 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listId = useId();
-  const shown = offered.filter((action) => matches(action, query));
+  // Array.sort is stable, so everything else keeps registry order.
+  const shown = offered
+    .filter((action) => matches(action, query))
+    .sort((a, b) => Number(isExact(b, query)) - Number(isExact(a, query)));
   const optionId = (index: number) => `${listId}-${index}`;
   const close = () => setPaletteOpen(false);
 

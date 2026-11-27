@@ -19,6 +19,7 @@ import {
   renderWithStore,
 } from "../../testing/render";
 import { treeView } from ".";
+import { treeState } from "./tree-state";
 
 afterEach(cleanup);
 
@@ -259,6 +260,57 @@ describe("expand all", () => {
     await waitFor(() =>
       expect(parseInt(body!.style.height) / 28).toBe(1 + 30 + 24 * 400),
     );
+  });
+});
+
+describe("expand all, at its limit", () => {
+  /** The tree's status bar, where the notice goes. */
+  async function showWithStatus(text: string) {
+    const shown = await showTree(text);
+    const StatusBar = treeView.StatusBar!;
+    renderWithStore(<StatusBar doc={shown.store.getState().docs[0]!} />, {
+      store: shown.store,
+    });
+    return shown;
+  }
+  const notice = () => screen.getByRole("status").textContent;
+
+  it("says where it stopped", async () => {
+    // 30 objects of 400 members: opening all would show 12,031 rows.
+    const record = `{${Array.from({ length: 400 }, (_, i) => `"k${i}":${i}`).join(",")}}`;
+    await showWithStatus(`[${Array(30).fill(record).join(",")}]`);
+    expect(notice()).toBe("");
+    await act(() => runAction(action("tree.expandAll"), ctx()));
+    await waitFor(() =>
+      expect(notice()).toBe("Expand all stopped at 10,000 rows."),
+    );
+  });
+
+  it("says so when an array over the limit leaves nothing to open", async () => {
+    await showWithStatus(`[${Array(10_500).fill("[1]").join(",")}]`);
+    await act(() => runAction(action("tree.expandAll"), ctx()));
+    await waitFor(() =>
+      expect(notice()).toBe(
+        "Nothing expanded: the next level would pass the 10,000-row limit.",
+      ),
+    );
+  });
+
+  it("says nothing when everything fits, and drops an earlier notice", async () => {
+    await showWithStatus(ORDER);
+    await act(() => runAction(action("tree.expandAll"), ctx()));
+    await findRow("/nested/deep/flag");
+    expect(notice()).toBe("");
+  });
+
+  it("drops the notice when the tree closes", async () => {
+    const shown = await showWithStatus(
+      `[${Array(10_500).fill("[1]").join(",")}]`,
+    );
+    await act(() => runAction(action("tree.expandAll"), ctx()));
+    await waitFor(() => expect(notice()).not.toBe(""));
+    shown.unmount();
+    expect(treeState.getState().notice).toBe("");
   });
 });
 
@@ -589,9 +641,12 @@ describe("a page that cannot be read", () => {
 
   /**
    * An array of 1,000 numbers whose page at `failAt` fails until `heal()`;
-   * the list is scrolled to row 250 unless `scrolled` is false.
+   * the list is scrolled to row 250 unless `scrolled` is false or another row.
    */
-  async function unreadableSecondPage({ failAt = 200, scrolled = true } = {}) {
+  async function unreadableSecondPage({
+    failAt = [200],
+    scrolled = 250 as number | false,
+  } = {}) {
     let healthy = false;
     const index = fakeIndex({
       node: async (pointer) =>
@@ -605,7 +660,7 @@ describe("a page that cannot be read", () => {
             }
           : null,
       children: async (pointer, offset, limit): Promise<ChildrenPage> => {
-        if (offset === failAt && !healthy) throw changed();
+        if (failAt.includes(offset) && !healthy) throw changed();
         return {
           items: Array.from({ length: limit }, (_, i): NodeInfo => ({
             pointer: `${pointer}/${offset + i}`,
@@ -635,10 +690,10 @@ describe("a page that cannot be read", () => {
       }),
     );
     await findRow("/0");
-    if (scrolled)
+    if (scrolled !== false)
       act(() => {
         const list = screen.getByRole("tree");
-        list.scrollTop = 28 * 250;
+        list.scrollTop = 28 * scrolled;
         list.dispatchEvent(new Event("scroll"));
       });
     return () => {
@@ -646,26 +701,40 @@ describe("a page that cannot be read", () => {
     };
   }
 
-  it("shows an error row with Retry instead of rows that stay on the ellipsis", async () => {
+  it("shows one error row with Retry for the page, and quiet rows under it", async () => {
     await unreadableSecondPage();
     const retry = await screen.findAllByRole("button", { name: "Retry" });
-    expect(retry.length).toBeGreaterThan(0);
+    expect(retry).toHaveLength(1);
     const failed = retry[0]!.closest("[role=treeitem]");
     expect(failed?.textContent).toContain("File changed on disk. Reopen it.");
     expect(failed?.getAttribute("aria-busy")).toBeNull();
-    expect(screen.queryByText("…")).toBeNull();
+    // The other rows of the page do not repeat the chip, and are not "loading" either.
+    const quiet = rows().filter((r) => r.textContent === "…");
+    expect(quiet.length).toBeGreaterThan(10);
+    expect(quiet.every((r) => r.getAttribute("aria-busy") === null)).toBe(true);
+    expect(screen.getAllByText(/File changed on disk/)).toHaveLength(1);
   });
 
-  it("keeps one Retry in the tab order, as the tree keeps one row", async () => {
+  it("shows one error row for each failed page in view", async () => {
+    // Rows 380 to 420 hold the end of page 200 and the start of page 400.
+    await unreadableSecondPage({ failAt: [200, 400], scrolled: 390 });
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2),
+    );
+    expect(screen.getAllByText(/File changed on disk/)).toHaveLength(2);
+  });
+
+  it("keeps one tab stop in the tree, whether it falls on an error row or a quiet one", async () => {
     await unreadableSecondPage();
-    const buttons = await screen.findAllByRole("button", { name: "Retry" });
-    expect(buttons.length).toBeGreaterThan(1);
-    expect(buttons.filter((button) => button.tabIndex === 0)).toHaveLength(1);
+    await screen.findAllByRole("button", { name: "Retry" });
+    const stops = () =>
+      screen.getByRole("tree").querySelectorAll('[tabindex="0"]');
+    expect(stops()).toHaveLength(1);
   });
 
   it("takes the focus to the error row when End moves to a page that cannot be read", async () => {
     const user = userEvent.setup();
-    await unreadableSecondPage({ failAt: 800, scrolled: false });
+    await unreadableSecondPage({ failAt: [800], scrolled: false });
     await user.click(row("/0")!);
     await user.keyboard("{End}");
     // Nothing visible happening would leave a keyboard user guessing.
