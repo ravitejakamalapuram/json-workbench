@@ -27,7 +27,7 @@ describe("decodeUtf8", () => {
     const bytes = bytesOf('"caf', [0xe9], '"');
     const { text, byteAt } = decodeUtf8(bytes);
     expect(text).toBe(new TextDecoder().decode(bytes));
-    expect(text).toBe('"caf�"');
+    expect(text).toBe('"caf\uFFFD"');
     expect([...byteAt]).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
@@ -36,7 +36,7 @@ describe("decodeUtf8", () => {
     const bytes = bytesOf("a", [0xe2, 0x82], "b", [0xe0, 0x80], "c", [0xe2]);
     const { text, byteAt } = decodeUtf8(bytes);
     expect(text).toBe(new TextDecoder().decode(bytes));
-    expect(text).toBe("a�b��c�");
+    expect(text).toBe("a\uFFFDb\uFFFD\uFFFDc\uFFFD");
     expect([...byteAt]).toEqual([0, 1, 3, 4, 5, 6, 7, 8]);
   });
 });
