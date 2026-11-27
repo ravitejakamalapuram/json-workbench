@@ -15,22 +15,16 @@ export type AppStore = StoreApi<AppState>;
 
 export type AppStoreOptions = {
   readonly surface: Surface;
-  /** The doc engine; tests pass fakeOpenIndex from testing/fixtures.ts. */
+  /** The doc engine, openDocument by default; tests pass one from testing/. */
   readonly openIndex?: OpenIndex;
-};
-
-// Placeholder until the doc engine of F1a step 4 is merged: the merge makes
-// `openDocument` from platform/doc/open.ts the default and deletes this.
-const engineNotBuilt: OpenIndex = () => {
-  throw new Error("Opening documents is not available in this build yet.");
 };
 
 export function createAppStore({
   surface,
-  openIndex = engineNotBuilt,
+  openIndex,
 }: AppStoreOptions): AppStore {
   return createStore<AppState>()((...args) => ({
-    ...createDocumentSlice({ openIndex })(...args),
+    ...createDocumentSlice(openIndex ? { openIndex } : {})(...args),
     ...createViewSlice(surface)(...args),
     ...createSettingsSlice()(...args),
     // These two spawn their own workers when they first need them.

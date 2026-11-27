@@ -1,7 +1,7 @@
 // Runs a worker's handlers in-process behind the Worker interface, so tests use
 // the real client, serveWorker and protocol without a browser. Messages cross
-// the way they would cross a real worker: asynchronously, through
-// structuredClone with its transfer list, and nothing after terminate().
+// the way they would cross a real worker: asynchronously, as copies, with
+// transferred buffers detached, and nothing after terminate().
 import type {
   Handlers,
   OpMap,
@@ -14,24 +14,24 @@ export function fakeWorker<M extends OpMap>(handlers: Handlers<M>): Worker {
 }
 
 /**
- * structuredClone would copy a class instance as a plain object and lose its
- * methods, which is how a LosslessNumber or an index would silently break in a
- * real worker. The fake refuses it instead, so the test fails where the app
- * would.
+ * Copies a message the way postMessage would, and refuses what a real worker
+ * could not receive as sent. structuredClone would copy a class instance as a
+ * plain object and lose its methods, which is how a LosslessNumber or an index
+ * would silently break in a real worker; the fake throws instead, so the test
+ * fails where the app would.
  */
-function assertPlain(value: unknown): void {
+function cross(value: unknown): unknown {
   if (
     value === null ||
     (typeof value !== "object" && typeof value !== "function")
   )
-    return;
-  if (
-    value instanceof Blob ||
-    value instanceof ArrayBuffer ||
-    value instanceof Uint8Array
-  )
-    return;
-  if (Array.isArray(value)) return value.forEach(assertPlain);
+    return value;
+  // A Blob is immutable, so sharing it is what cloning it amounts to. Node's
+  // structuredClone would turn happy-dom's Blob and File into empty objects.
+  if (value instanceof Blob) return value;
+  if (value instanceof ArrayBuffer || value instanceof Uint8Array)
+    return structuredClone(value);
+  if (Array.isArray(value)) return value.map(cross);
   const prototype: unknown = Object.getPrototypeOf(value);
   if (
     typeof value === "function" ||
@@ -44,7 +44,9 @@ function assertPlain(value: unknown): void {
       "DataCloneError",
     );
   }
-  Object.values(value).forEach(assertPlain);
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, cross(item)]),
+  );
 }
 
 class FakeWorker extends EventTarget implements Worker {
@@ -83,8 +85,9 @@ class FakeWorker extends EventTarget implements Worker {
 
   #deliver(target: EventTarget, message: unknown, transfer: Transferable[]) {
     if (!this.#alive) return;
-    assertPlain(message);
-    const data: unknown = structuredClone(message, { transfer });
+    const data = cross(message);
+    // Transferring detaches the sender's buffers.
+    if (transfer.length > 0) structuredClone(transfer, { transfer });
     setTimeout(() => {
       if (!this.#alive) return;
       const event = new MessageEvent("message", { data });

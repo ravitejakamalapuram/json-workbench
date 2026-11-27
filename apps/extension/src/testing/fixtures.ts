@@ -1,5 +1,8 @@
 // Shared test data and test doubles for the store and components.
 import { vi, type Mock } from "vitest";
+import { createDocHandlers } from "../platform/doc/doc-ops";
+import { openDocument, type SettledStatus } from "../platform/doc/open";
+import { searchHandlers } from "../platform/doc/search";
 import type {
   DocFormat,
   DocStatus,
@@ -8,7 +11,8 @@ import type {
   IndexProgress,
   IndexSummary,
 } from "../platform/types";
-import type { OpenIndex, SettledStatus } from "../store/document";
+import type { OpenIndex } from "../store/document";
+import { fakeWorker } from "./fake-worker";
 
 /** A document still loading; pass overrides for the state a test needs. */
 export function documentFixture(
@@ -62,8 +66,20 @@ export type PendingOpen = {
 };
 
 /**
- * Stands in for the doc engine (platform/doc/open.ts) in store and shell
- * tests: each call is recorded in `opens` and stays indexing until the test
+ * The real doc engine with its doc and search workers run in-process, so a
+ * test reads a real memory index through the same proxy and protocol the
+ * extension uses. The default engine of testing/render.tsx.
+ */
+export const openInFakeWorker: OpenIndex = (source, format, options) =>
+  openDocument(source, format, {
+    ...options,
+    spawn: () => fakeWorker(createDocHandlers()),
+    spawnSearch: () => fakeWorker(searchHandlers),
+  });
+
+/**
+ * Stands in for the doc engine in store and shell tests that need to see a
+ * document while it is still indexing: each call is recorded in `opens` and stays indexing until the test
  * settles it.
  */
 export function fakeOpenIndex(makeIndex: () => FakeIndex = fakeIndex): {

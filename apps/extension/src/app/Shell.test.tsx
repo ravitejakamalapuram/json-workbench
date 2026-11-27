@@ -8,21 +8,25 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { fakeIndex } from "../testing/fixtures";
-import { renderWithStore, type RenderOptions } from "../testing/render";
+import { fakeIndex, fakeOpenIndex, type FakeIndex } from "../testing/fixtures";
+import { createTestStore, renderWithStore } from "../testing/render";
 import { Shell } from "./Shell";
 
 afterEach(cleanup);
 
-function setup(options?: RenderOptions) {
+/** The shell over a fake engine, so a test sees each document while it indexes and settles it by hand. */
+function setup({ makeIndex }: { makeIndex?: () => FakeIndex } = {}) {
   const user = userEvent.setup();
-  const app = renderWithStore(<Shell />, options);
+  const { openIndex, opens } = fakeOpenIndex(makeIndex);
+  const app = renderWithStore(<Shell />, {
+    store: createTestStore({ openIndex }),
+  });
   async function openFile(name = "orders.json", text = '{"a":1}') {
     const input =
       app.container.querySelector<HTMLInputElement>('input[type="file"]');
     if (!input) throw new Error("no file input");
     await user.upload(input, new File([text], name));
-    const pending = app.opens.at(-1);
+    const pending = opens.at(-1);
     if (!pending) throw new Error("not opened");
     return pending;
   }
@@ -32,7 +36,7 @@ function setup(options?: RenderOptions) {
     await screen.findByText(/Valid/);
     return pending;
   }
-  return { ...app, user, openFile, openReady };
+  return { ...app, opens, user, openFile, openReady };
 }
 
 const modes = () => within(screen.getByRole("navigation", { name: "Modes" }));
@@ -174,6 +178,20 @@ describe("Shell details panel", () => {
     await user.click(details.getByRole("button", { name: "Copy value" }));
     expect(await details.findByText("Value copied.")).toBeDefined();
     expect(await navigator.clipboard.readText()).toBe("79.00");
+  });
+});
+
+describe("Shell with the real doc engine", () => {
+  it("indexes an opened file in the doc worker and says whether it is valid", async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithStore(<Shell />);
+    const input =
+      container.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error("no file input");
+    await user.upload(input, new File(['{"a":1}'], "good.json"));
+    expect(await screen.findByText(/Valid/)).toBe(status());
+    await user.upload(input, new File(['{"a":}'], "bad.json"));
+    expect(await screen.findByText(/Invalid · 1 error/)).toBe(status());
   });
 });
 

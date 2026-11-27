@@ -1,6 +1,7 @@
 // Open documents and their lifecycle: loading -> indexing -> ready, invalid
 // or failed. The index lives in the doc engine's worker; this slice holds its
 // handle and disposes it whenever it drops a live index (close, cancel, edit).
+import { openDocument, type OpenedDocument } from "../platform/doc/open";
 import { detectFormat, indexedFormat, SNIFF_BYTES } from "../platform/formats";
 import {
   LIMITS,
@@ -15,31 +16,20 @@ import {
   type SliceCreator,
 } from "../platform/types";
 
-/** The status indexing ends in. */
-export type SettledStatus = Extract<
-  DocStatus,
-  { kind: "ready" | "invalid" | "failed" }
->;
-
 /**
- * Starts indexing in a new doc worker; `openDocument` in platform/doc/open.ts
- * has this shape. The index answers at once. `finished` never rejects: it
- * settles with the status indexing ends in, having disposed the index unless
- * it is ready, and with the JSON conversion of a YAML input.
+ * Starts indexing in a new doc worker: `openDocument` from platform/doc/open.ts,
+ * which tests replace with the fakes in testing/. The index answers at once.
+ * `finished` never rejects: it settles with the status indexing ends in, having
+ * disposed the index unless it is ready, and with the JSON conversion of a
+ * YAML input.
  */
 export type OpenIndex = (
   source: Blob,
   format: DocFormat,
   options: { readonly onUpdate: (progress: IndexProgress) => void },
-) => {
-  readonly index: DocumentIndex;
-  readonly finished: Promise<{
-    readonly status: SettledStatus;
-    readonly converted?: Blob;
-  }>;
-};
+) => OpenedDocument;
 
-export type DocumentDeps = { readonly openIndex: OpenIndex };
+export type DocumentDeps = { readonly openIndex?: OpenIndex };
 
 const CANCELLED = "Indexing cancelled.";
 const FILE_CHANGED = "File changed on disk. Reopen it.";
@@ -58,8 +48,8 @@ function messageOf(error: unknown): string {
 }
 
 export function createDocumentSlice({
-  openIndex,
-}: DocumentDeps): SliceCreator<DocumentSlice> {
+  openIndex = openDocument,
+}: DocumentDeps = {}): SliceCreator<DocumentSlice> {
   return (set, get) => {
     let lastId = 0;
 
