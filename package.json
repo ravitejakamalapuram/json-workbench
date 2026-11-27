@@ -14,6 +14,7 @@
     "build:cli": "npm run build --workspace @json-workbench/cli",
     "build:vscode": "npm run build --workspace @json-workbench/vscode",
     "package:check": "node scripts/package-check.mjs",
+    "bundle:budget": "node scripts/bundle-budget.mjs",
     "gen:tokens": "node scripts/gen-tokens.mjs",
     "test": "vitest run",
     "test:cli": "node tests/cli_smoke.mjs",

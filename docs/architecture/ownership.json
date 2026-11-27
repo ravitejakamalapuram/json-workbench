@@ -1,0 +1,48 @@
+{
+  "shell": [
+    "apps/extension/src/app/Shell.",
+    "apps/extension/src/app/CommandPalette.",
+    "apps/extension/src/app/DropZone.",
+    "apps/extension/src/app/settings/",
+    "apps/extension/src/app/export/",
+    "apps/extension/src/app/shell/"
+  ],
+  "tree": [
+    "apps/extension/src/views/tree/",
+    "apps/extension/src/features/embedded/"
+  ],
+  "insights": ["apps/extension/src/features/insights/"],
+  "raw": ["apps/extension/src/views/raw/"],
+  "table": ["apps/extension/src/views/table/"],
+  "compare": [
+    "apps/extension/src/features/compare/",
+    "apps/extension/src/store/compare."
+  ],
+  "transform": [
+    "apps/extension/src/features/transform/",
+    "apps/extension/src/store/transform."
+  ],
+  "types": ["apps/extension/src/features/types/"],
+  "jwt": ["apps/extension/src/features/jwt/"],
+  "yaml": ["apps/extension/src/features/yaml/"],
+  "schema": ["apps/extension/src/features/schema/"],
+  "content": ["apps/extension/src/content/"],
+  "tabimport": [
+    "apps/extension/src/background/",
+    "apps/extension/src/devtools/",
+    "apps/extension/devtools.html",
+    "apps/extension/devtools-panel.html"
+  ],
+  "bundle": [
+    "scripts/bundle-budget.mjs",
+    "scripts/bundle-budget.test.mjs",
+    "apps/extension/src/legacy/"
+  ],
+  "f2": [
+    "apps/extension/src/platform/doc/",
+    "apps/extension/src/platform/workers/client.",
+    "apps/extension/src/platform/workers/serve.",
+    "apps/extension/src/testing/",
+    "docs/architecture/TARGET.md"
+  ]
+}
