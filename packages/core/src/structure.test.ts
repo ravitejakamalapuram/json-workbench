@@ -60,6 +60,20 @@ describe("parseJsonStructure", () => {
     });
   });
 
+  it("rejects a trailing comma in an object at the closing brace", async () => {
+    await expect(collect(['{"a":1,}'])).rejects.toMatchObject({
+      name: "JsonSyntaxError",
+      offset: 7,
+    });
+  });
+
+  it("rejects a trailing comma in an array at the closing bracket", async () => {
+    await expect(collect(["[1,2,]"])).rejects.toMatchObject({
+      name: "JsonSyntaxError",
+      offset: 5,
+    });
+  });
+
   it("rejects unclosed containers", async () => {
     await expect(collect(['{"a":[1,2}'])).rejects.toMatchObject({
       name: "JsonSyntaxError",

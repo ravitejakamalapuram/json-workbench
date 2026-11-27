@@ -16,13 +16,15 @@ export type JsonStructureEvent =
       offset: number;
     };
 
+// "key" and "next-value" are the states after a comma: unlike "key-or-end" and
+// "value-or-end" they do not accept the closer, which is what rejects trailing commas.
 interface ObjectFrame {
   kind: "object";
-  state: "key-or-end" | "colon" | "value" | "comma-or-end";
+  state: "key-or-end" | "key" | "colon" | "value" | "comma-or-end";
 }
 interface ArrayFrame {
   kind: "array";
-  state: "value-or-end" | "comma-or-end";
+  state: "value-or-end" | "next-value" | "comma-or-end";
 }
 type Frame = ObjectFrame | ArrayFrame;
 
@@ -125,8 +127,8 @@ export async function* parseJsonStructure(
     }
 
     if (parent.kind === "object") {
-      if (parent.state === "key-or-end") {
-        if (token.kind === "endObject") {
+      if (parent.state === "key-or-end" || parent.state === "key") {
+        if (token.kind === "endObject" && parent.state === "key-or-end") {
           const depth = stack.length - 1;
           stack.pop();
           yield { type: "end-object", depth, offset: token.startOffset };
@@ -157,7 +159,7 @@ export async function* parseJsonStructure(
         continue;
       }
       if (token.kind === "comma") {
-        parent.state = "key-or-end";
+        parent.state = "key";
         continue;
       }
       if (token.kind === "endObject") {
@@ -170,8 +172,8 @@ export async function* parseJsonStructure(
       throw syntax("Expected ',' or '}'", token);
     }
 
-    if (parent.state === "value-or-end") {
-      if (token.kind === "endArray") {
+    if (parent.state === "value-or-end" || parent.state === "next-value") {
+      if (token.kind === "endArray" && parent.state === "value-or-end") {
         const depth = stack.length - 1;
         stack.pop();
         yield { type: "end-array", depth, offset: token.startOffset };
@@ -185,7 +187,7 @@ export async function* parseJsonStructure(
       continue;
     }
     if (token.kind === "comma") {
-      parent.state = "value-or-end";
+      parent.state = "next-value";
       continue;
     }
     if (token.kind === "endArray") {
