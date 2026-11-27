@@ -28,7 +28,7 @@ function setup(options?: RenderOptions) {
   }
   async function openReady(name?: string, text?: string) {
     const pending = await openFile(name, text);
-    pending.resolve({ kind: "ready", summary: { records: 0, nodes: 2 } });
+    pending.settle({ kind: "ready", summary: { records: 0, nodes: 2 } });
     await screen.findByText(/Valid/);
     return pending;
   }
@@ -71,7 +71,7 @@ describe("Shell, with a document", () => {
         .getAttribute("aria-current"),
     ).toBe("page");
     expect(status().textContent).toContain("Indexing");
-    pending.resolve({ kind: "ready", summary: { records: 0, nodes: 2 } });
+    pending.settle({ kind: "ready", summary: { records: 0, nodes: 2 } });
     expect(await screen.findByText(/Valid/)).toBe(status());
     expect(status().textContent).toContain("7 B · 2 nodes");
     expect(
@@ -137,7 +137,7 @@ describe("Shell, with a document", () => {
     expect(
       await screen.findByRole("button", { name: "sample-orders.json" }),
     ).toBeDefined();
-    expect(opens[0]?.request.format).toBe("json");
+    expect(opens[0]?.format).toBe("json");
   });
 });
 

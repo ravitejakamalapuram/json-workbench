@@ -1,6 +1,6 @@
-// Open documents and their lifecycle: loading -> indexing -> ready or invalid,
+// Open documents and their lifecycle: loading -> indexing -> ready, invalid
 // or failed. The index lives in the doc engine's worker; this slice holds its
-// handle and must dispose it whenever a status drops it, or the worker leaks.
+// handle and disposes it whenever it drops a live index (close, cancel, edit).
 import { detectFormat, indexedFormat, SNIFF_BYTES } from "../platform/formats";
 import {
   LIMITS,
@@ -14,17 +14,30 @@ import {
   type IndexProgress,
   type SliceCreator,
 } from "../platform/types";
-import type { OpenResult } from "../platform/workers/protocol";
+
+/** The status indexing ends in. */
+export type SettledStatus = Extract<
+  DocStatus,
+  { kind: "ready" | "invalid" | "failed" }
+>;
 
 /**
- * Starts indexing `source` in a new doc worker. The index answers at once,
- * while `opened` runs to the end of the text (DocOps.open), and dispose()
- * ends the worker. platform/doc provides it.
+ * Starts indexing in a new doc worker; `openDocument` in platform/doc/open.ts
+ * has this shape. The index answers at once. `finished` never rejects: it
+ * settles with the status indexing ends in, having disposed the index unless
+ * it is ready, and with the JSON conversion of a YAML input.
  */
 export type OpenIndex = (
-  request: { readonly source: Blob; readonly format: DocFormat },
-  onProgress: (progress: IndexProgress) => void,
-) => { readonly index: DocumentIndex; readonly opened: Promise<OpenResult> };
+  source: Blob,
+  format: DocFormat,
+  options: { readonly onUpdate: (progress: IndexProgress) => void },
+) => {
+  readonly index: DocumentIndex;
+  readonly finished: Promise<{
+    readonly status: SettledStatus;
+    readonly converted?: Blob;
+  }>;
+};
 
 export type DocumentDeps = { readonly openIndex: OpenIndex };
 
@@ -69,17 +82,19 @@ export function createDocumentSlice({
     function startIndexing(id: DocId, source: Blob, format: DocFormat) {
       let started: ReturnType<OpenIndex> | undefined;
       try {
-        started = openIndex({ source, format }, (progress) => {
-          // Progress before openIndex returns is superseded by the status below.
-          const index = started?.index;
-          if (index && current(id, index))
-            update(id, { status: { kind: "indexing", index, progress } });
+        started = openIndex(source, format, {
+          onUpdate: (progress) => {
+            // Progress before openIndex returns is superseded by the status below.
+            const index = started?.index;
+            if (index && current(id, index))
+              update(id, { status: { kind: "indexing", index, progress } });
+          },
         });
       } catch (error) {
         update(id, { status: { kind: "failed", message: messageOf(error) } });
         return;
       }
-      const { index, opened } = started;
+      const { index, finished } = started;
       update(id, {
         status: {
           kind: "indexing",
@@ -87,26 +102,11 @@ export function createDocumentSlice({
           progress: { indexedBytes: 0, totalBytes: source.size, records: 0 },
         },
       });
-      opened.then(
-        (result) => {
-          if (!current(id, index)) return;
-          // An invalid document has no index: Raw reads around the first
-          // issue straight from the source.
-          if (result.kind === "invalid") index.dispose();
-          update(id, {
-            ...(result.converted && { source: result.converted }),
-            status:
-              result.kind === "ready"
-                ? { kind: "ready", index, summary: result.summary }
-                : { kind: "invalid", issues: result.issues },
-          });
-        },
-        (error: unknown) => {
-          if (!current(id, index)) return;
-          index.dispose();
-          update(id, { status: { kind: "failed", message: messageOf(error) } });
-        },
-      );
+      void finished.then(({ status, converted }) => {
+        // Dropped when the document was closed, cancelled or edited meanwhile.
+        if (current(id, index))
+          update(id, { ...(converted && { source: converted }), status });
+      });
     }
 
     async function detectAndIndex(id: DocId, source: Blob, name: string) {

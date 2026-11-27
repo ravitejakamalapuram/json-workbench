@@ -2,12 +2,13 @@
 import { vi, type Mock } from "vitest";
 import type {
   DocFormat,
+  DocStatus,
   DocumentIndex,
   DocumentModel,
   IndexProgress,
+  IndexSummary,
 } from "../platform/types";
-import type { OpenResult } from "../platform/workers/protocol";
-import type { OpenIndex } from "../store/document";
+import type { OpenIndex, SettledStatus } from "../store/document";
 
 /** A document still loading; pass overrides for the state a test needs. */
 export function documentFixture(
@@ -45,30 +46,52 @@ export function fakeIndex(overrides: Partial<DocumentIndex> = {}): FakeIndex {
   };
 }
 
+/** How indexing ends; settle() adds the index to a ready status. */
+export type Outcome =
+  | { readonly kind: "ready"; readonly summary: IndexSummary }
+  | Extract<DocStatus, { kind: "invalid" | "failed" }>;
+
 /** One call of the fake OpenIndex, settled by the test. */
 export type PendingOpen = {
-  readonly request: { readonly source: Blob; readonly format: DocFormat };
+  readonly source: Blob;
+  readonly format: DocFormat;
   readonly index: FakeIndex;
   progress(progress: IndexProgress): void;
-  resolve(result: OpenResult): void;
-  reject(error: Error): void;
+  /** Settles `finished` as the engine does: only a ready index stays alive. */
+  settle(outcome: Outcome, converted?: Blob): void;
 };
 
 /**
- * Stands in for the doc engine (platform/doc) in store and shell tests: each
- * call is recorded in `opens` and stays indexing until the test settles it.
+ * Stands in for the doc engine (platform/doc/open.ts) in store and shell
+ * tests: each call is recorded in `opens` and stays indexing until the test
+ * settles it.
  */
 export function fakeOpenIndex(makeIndex: () => FakeIndex = fakeIndex): {
   readonly openIndex: OpenIndex;
   readonly opens: PendingOpen[];
 } {
   const opens: PendingOpen[] = [];
-  const openIndex: OpenIndex = (request, onProgress) => {
+  const openIndex: OpenIndex = (source, format, { onUpdate }) => {
     const index = makeIndex();
-    const opened = new Promise<OpenResult>((resolve, reject) =>
-      opens.push({ request, index, progress: onProgress, resolve, reject }),
+    const finished = new Promise<{
+      readonly status: SettledStatus;
+      readonly converted?: Blob;
+    }>((resolve) =>
+      opens.push({
+        source,
+        format,
+        index,
+        progress: onUpdate,
+        settle(outcome, converted) {
+          if (outcome.kind !== "ready") index.dispose();
+          resolve({
+            status: outcome.kind === "ready" ? { ...outcome, index } : outcome,
+            ...(converted && { converted }),
+          });
+        },
+      }),
     );
-    return { index, opened };
+    return { index, finished };
   };
   return { openIndex, opens };
 }

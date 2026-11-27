@@ -43,7 +43,7 @@ describe("openDocument", () => {
   it("detects the format from the first bytes when the request has none", async () => {
     const { open, doc } = setup();
     const { id, pending } = await open("events", '{"a":1}\n{"a":2}\n');
-    expect(pending.request.format).toBe("jsonl");
+    expect(pending.format).toBe("jsonl");
     expect(doc(id)?.format).toBe("jsonl");
   });
 
@@ -56,7 +56,7 @@ describe("openDocument", () => {
     });
     pending.progress({ indexedBytes: 1, totalBytes: 2, records: 0 });
     expect(doc(id)?.status).toMatchObject({ progress: { indexedBytes: 1 } });
-    pending.resolve({ kind: "ready", summary: { records: 0, nodes: 1 } });
+    pending.settle({ kind: "ready", summary: { records: 0, nodes: 1 } });
     await vi.waitFor(() =>
       expect(doc(id)?.status).toEqual({
         kind: "ready",
@@ -66,26 +66,24 @@ describe("openDocument", () => {
     );
   });
 
-  it("settles a late structure error as invalid and ends the index", async () => {
+  it("settles a late structure error as invalid, without an index", async () => {
     const { open, doc } = setup();
     const { id, pending } = await open();
-    pending.resolve({ kind: "invalid", issues: [issue] });
+    pending.settle({ kind: "invalid", issues: [issue] });
     await vi.waitFor(() =>
       expect(doc(id)?.status).toEqual({ kind: "invalid", issues: [issue] }),
     );
-    expect(pending.index.dispose).toHaveBeenCalledOnce();
   });
 
   it("covers a YAML input with its JSON conversion", async () => {
     const { open, doc } = setup();
     const { id, pending } = await open("config.yaml", "a: 1\n");
-    expect(pending.request.format).toBe("yaml");
+    expect(pending.format).toBe("yaml");
     const converted = new Blob(['{"a":1}']);
-    pending.resolve({
-      kind: "ready",
-      summary: { records: 0, nodes: 2 },
+    pending.settle(
+      { kind: "ready", summary: { records: 0, nodes: 2 } },
       converted,
-    });
+    );
     await vi.waitFor(() => expect(doc(id)?.status.kind).toBe("ready"));
     expect(doc(id)?.source).toBe(converted);
     expect(doc(id)?.format).toBe("yaml");
@@ -94,24 +92,34 @@ describe("openDocument", () => {
   it("fails with the engine's message, which the UI shows as it is", async () => {
     const { open, doc } = setup();
     const { id, pending } = await open();
-    pending.reject(new TooLargeError("This file is over the 64 MB limit."));
+    pending.settle({
+      kind: "failed",
+      message: "This file is over the 64 MB limit.",
+    });
     await vi.waitFor(() =>
       expect(doc(id)?.status).toEqual({
         kind: "failed",
         message: "This file is over the 64 MB limit.",
       }),
     );
-    expect(pending.index.dispose).toHaveBeenCalledOnce();
   });
 
-  it("says a file that changed on disk must be reopened", async () => {
-    const { open, doc } = setup();
-    const { id, pending } = await open();
-    pending.reject(
-      Object.assign(new Error("could not be read"), {
-        name: "NotReadableError",
-      }),
-    );
+  it("says a file that changed on disk before its first bytes were read must be reopened", async () => {
+    const { store, doc } = setup();
+    class ChangedFile extends Blob {
+      override slice(): Blob {
+        return this;
+      }
+      override text(): Promise<string> {
+        const error = new Error("could not be read");
+        return Promise.reject(
+          Object.assign(error, { name: "NotReadableError" }),
+        );
+      }
+    }
+    const id = store
+      .getState()
+      .openDocument({ name: "a", origin: "file", source: new ChangedFile() });
     await vi.waitFor(() =>
       expect(doc(id)?.status).toEqual({
         kind: "failed",
@@ -145,7 +153,7 @@ describe("cancelIndexing", () => {
     });
     expect(pending.index.dispose).toHaveBeenCalledOnce();
     pending.progress({ indexedBytes: 2, totalBytes: 2, records: 0 });
-    pending.resolve({ kind: "ready", summary: { records: 0, nodes: 1 } });
+    pending.settle({ kind: "ready", summary: { records: 0, nodes: 1 } });
     await Promise.resolve();
     expect(doc(id)?.status.kind).toBe("failed");
   });
@@ -175,14 +183,14 @@ describe("editDocument", () => {
   it("replaces the source and indexes the new text as JSON", async () => {
     const { store, engine, open, doc } = setup();
     const { id, pending } = await open("a.json", "{}");
-    pending.resolve({ kind: "ready", summary: { records: 0, nodes: 1 } });
+    pending.settle({ kind: "ready", summary: { records: 0, nodes: 1 } });
     await vi.waitFor(() => expect(doc(id)?.status.kind).toBe("ready"));
     store.getState().editDocument(id, '{"a":1}');
     expect(pending.index.dispose).toHaveBeenCalledOnce();
     expect(doc(id)?.edited).toBe(true);
     expect(await doc(id)?.source.text()).toBe('{"a":1}');
     await vi.waitFor(() => expect(engine.opens).toHaveLength(2));
-    expect(engine.opens[1]?.request.format).toBe("json");
+    expect(engine.opens[1]?.format).toBe("json");
     expect(doc(id)?.status).toMatchObject({
       kind: "indexing",
       index: engine.opens[1]?.index,
