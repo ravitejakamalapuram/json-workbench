@@ -26,3 +26,4 @@ export * from "./analytics";
 export * from "./assistant";
 export * from "./embedded";
 export * from "./render";
+export * from "./syntax-messages";

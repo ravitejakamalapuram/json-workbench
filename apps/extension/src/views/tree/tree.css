@@ -1,0 +1,232 @@
+/* The tree view: 28 px rows (VirtualList), the search controls and the
+   breadcrumbs. Lumen tokens only. */
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tree-message {
+  padding: var(--space-4) var(--space-6);
+  color: var(--ink-muted);
+}
+
+.tree-list {
+  flex: 1;
+  min-height: 0;
+  padding-top: var(--space-3);
+}
+
+/* ------------------------------------------------------------- Rows */
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding-right: var(--space-3);
+  /* 24 px, then 20 px per level, as in the Main mockup. */
+  --indent: calc(
+    var(--space-6) + var(--level) * (var(--space-4) + var(--space-1))
+  );
+  padding-left: var(--indent);
+  /* Room for a key and the start of its value past the indent: a deep row
+     scrolls the list sideways (use-active-row reveals it) instead of being
+     clipped in the 400 px panel. */
+  min-width: calc(var(--indent) + 14rem);
+  overflow: hidden;
+  color: var(--ink);
+  font: var(--type-code);
+  cursor: default;
+}
+
+/* The tint alone is about 1.2:1 against the page, so a bar marks the row too. */
+.tree-row[aria-selected="true"] {
+  background: var(--selected);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Forced colors drop backgrounds and shadows: an outline in a system color is
+   what keeps the selected row, tab and rail item visible. */
+@media (forced-colors: active) {
+  .tree-row[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+/* The list clips its rows, so the ring sits inside the row. */
+.tree-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.tree-toggle {
+  flex: none;
+  color: var(--syn-null);
+  cursor: pointer;
+}
+
+.tree-toggle::before {
+  content: "▸";
+}
+
+.tree-toggle[data-open]::before {
+  content: "▾";
+}
+
+.tree-key {
+  flex: none;
+  color: var(--syn-key);
+}
+
+/* A long value gives way to its badges rather than pushing them out of view. */
+.tree-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-string {
+  color: var(--syn-string);
+}
+
+.tree-number {
+  color: var(--syn-number);
+}
+
+.tree-boolean {
+  color: var(--syn-bool);
+}
+
+.tree-null {
+  flex: none;
+  color: var(--syn-null);
+}
+
+.tree-row .badge {
+  flex: none;
+}
+
+.tree-note {
+  flex: none;
+  color: var(--ink-muted);
+  font: var(--type-caption);
+}
+
+/* ----------------------------------------------------------- Search */
+
+.tree-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: var(--type-label);
+}
+
+/* Under the toolbar in a narrow window; it wraps rather than overflow 400 px. */
+.tree-search-row {
+  flex: none;
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.tree-search-input {
+  box-sizing: border-box;
+  width: 160px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  font: var(--type-label);
+}
+
+/* min-width: an input's own minimum is its default size, wider than the
+   basis, which kept the controls on two lines at 1000 px. */
+.tree-search-row .tree-search-input {
+  flex: 1 1 160px;
+  width: auto;
+  min-width: 0;
+}
+
+/* The count and its buttons wrap together: without the group the Close button
+   landed on a line of its own at 1000 px and the arrows split at 400 px. */
+.tree-search-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tree-search-option,
+.tree-search-scope {
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink-muted);
+  font: var(--type-label);
+  cursor: pointer;
+}
+
+.tree-search-option {
+  min-width: 28px;
+  padding: 0 var(--space-1);
+}
+
+.tree-search-option:hover:not(:disabled),
+.tree-search-scope:hover {
+  border-color: var(--line);
+}
+
+.tree-search-option[aria-pressed="true"] {
+  background: var(--selected);
+  color: var(--accent);
+}
+
+.tree-search-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tree-search-count {
+  min-width: 64px;
+  color: var(--ink-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------- Breadcrumbs */
+
+/* A deep path scrolls sideways (kept at its end) rather than wrap the 32 px bar. */
+.tree-crumbs {
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+/* The notice keeps the end of the bar; the path scrolls under it. It wraps
+   rather than clip when the bar is narrower than the sentence. */
+.tree-notice {
+  flex: none;
+  max-width: 100%;
+  margin-left: auto;
+  padding-left: var(--space-3);
+  text-align: right;
+}
+
+.tree-crumb {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tree-crumb:hover {
+  color: var(--accent);
+}

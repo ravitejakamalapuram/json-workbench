@@ -2,6 +2,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { manifestProblems } from "./lib/manifest-policy.mjs";
+import {
+  REQUIRED_FILES,
+  contentProblems,
+  referenceProblems,
+} from "./lib/package-contents.mjs";
 import {
   findVersionDrift,
   readVersionMirrors,
@@ -9,40 +15,25 @@ import {
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const dist = join(root, "apps/extension/dist");
-const required = [
-  "manifest.json",
-  "index.html",
-  "background.js",
-  "json-render.js",
-  "icons/icon-128.png",
-  "jq.wasm",
-  "duckdb-mvp.wasm",
-  "duckdb-browser-mvp.worker.js",
-];
-for (const file of required)
-  if (!existsSync(join(dist, file)))
-    throw new Error(`Missing packaged extension file: ${file}`);
+const contents = contentProblems((file) => existsSync(join(dist, file)));
+if (contents.length)
+  throw new Error(
+    `Packaged extension has the wrong files:\n${contents.map((p) => `  - ${p}`).join("\n")}`,
+  );
 const manifest = JSON.parse(readFileSync(join(dist, "manifest.json"), "utf8"));
-if (manifest.manifest_version !== 3)
-  throw new Error("Packaged manifest is not MV3");
-if (manifest.host_permissions?.length)
-  throw new Error("Packaged manifest must not request host permissions");
-const expectedPermissions = ["activeTab", "sidePanel", "storage", "scripting"];
-if (
-  JSON.stringify(manifest.permissions ?? []) !==
-  JSON.stringify(expectedPermissions)
-)
-  throw new Error("Packaged manifest permissions changed unexpectedly");
-if (
-  JSON.stringify(manifest.optional_permissions ?? []) !==
-  JSON.stringify(["debugger"])
-)
-  throw new Error("Debugger capture must remain opt-in");
-if (
-  JSON.stringify(manifest.optional_host_permissions ?? []) !==
-  JSON.stringify(["<all_urls>"])
-)
-  throw new Error("Auto-render host access must remain an optional permission");
+const has = (file) => existsSync(join(dist, file));
+const problems = [
+  ...manifestProblems(manifest),
+  ...referenceProblems(
+    manifest,
+    readFileSync(join(dist, "index.html"), "utf8"),
+    has,
+  ),
+];
+if (problems.length)
+  throw new Error(
+    `Packaged manifest breaks the policy or names a missing file:\n${problems.map((p) => `  - ${p}`).join("\n")}`,
+  );
 // The packaged manifest version is the single source of truth; every other file
 // that restates it must agree. See scripts/lib/version-consistency.mjs.
 const versionDrift = findVersionDrift(
@@ -59,8 +50,14 @@ const archive = join(tmpdir(), `json-workbench-${process.pid}.zip`);
 try {
   execFileSync("zip", ["-qr", archive, "."], { cwd: dist, stdio: "ignore" });
   const listing = execFileSync("unzip", ["-l", archive], { encoding: "utf8" });
-  for (const file of required)
-    if (!listing.includes(file)) throw new Error(`Archive omitted ${file}`);
+  // Exact names, not substrings: "icons/icon-128.png" must not satisfy "icon-128.png".
+  const archived = new Set(
+    listing
+      .split("\n")
+      .map((line) => line.trim().split(/\s+/).slice(3).join(" ")),
+  );
+  for (const file of REQUIRED_FILES)
+    if (!archived.has(file)) throw new Error(`Archive omitted ${file}`);
   console.log(`Chrome package validation passed (${archive})`);
 } finally {
   if (existsSync(archive)) unlinkSync(archive);

@@ -1,44 +1,41 @@
 # JSON Workbench
 
-A local-first Chrome extension for developers to explore, query, transform, validate, diff, and export JSON/JSONL — including very large files.
+A local-first Chrome side panel for reading, fixing and converting JSON, including files too large for an editor.
 
 **Chrome Web Store**: https://chromewebstore.google.com/detail/json-workbench/higmlhleblpmdogjccpmjlnilpmhohal
 
-## Product vision
+## What it does
 
-Treat JSON manipulation as a reproducible pipeline rather than a one-off formatting task:
+- **Tree**: a virtualized, keyboard-navigable tree with search, breadcrumbs and path copying. JSON stored inside a string value opens as its own tree.
+- **Raw**: a CodeMirror editor with error markers placed by byte offset and one-click fixes (trailing commas, comments, single quotes and the like), format and minify.
+- **Large files**: a byte-range index is built in a worker while the first rows are already on screen, and nothing is loaded whole. Measured: a 308 MB file in Chrome and a 1 GiB file in Node; the limit is set at 1.25 GB, which has not been measured in Chrome.
+- **JWT**: paste a token, or pick a string in the tree, to read its header and claims. The signature is not verified.
+- **YAML in and out**: open `.yaml` and `.yml` files, and convert a document to YAML or back to JSON.
+- **Export**: save as JSON, JSONL, NDJSON, CSV or TSV through the browser's download.
 
-`Source → Inspect → Transform → Validate → Preview → Export`
+## Privacy
 
-The core experience is local-only: user data is processed in the browser, with heavy work delegated to Web Workers/WASM and large inputs handled with streaming/lazy techniques.
+Your JSON never leaves the browser. There is no server, no telemetry and no analytics, and the content security policy stops the extension's pages from loading or connecting to anything outside the extension. The extension asks for two permissions, `sidePanel` and `storage` (your settings). See [PRIVACY.md](PRIVACY.md).
 
-## Current status
+## Develop
 
-The foundation and first vertical slice are implemented on `feat/m0-foundation`:
+Node 22 or later.
 
-- canonical chunk-safe scanner and structural parser for JSON, JSONL, and NDJSON
-- lossless numeric parsing/export, malformed-input diagnostics, progress, and cancellation
-- structure profiling, schema inference, JSON Pointer/JSONPath indexing, validation, and diff APIs
-- serializable pipelines with native transforms, JSONata, an offline jq preview subset, history, recipe import/export, code generation, and export
-- worker-backed extension ingestion with virtualized Tree/Table views, a lazy self-contained Monaco Raw editor, regex search, paste/clipboard support, and local recipe persistence
-- explicit full-file worker execution with bounded materialization, retained-memory telemetry, active JSON-page import, opt-in one-shot JSON network-response capture, and a local DuckDB SQL panel
-- a bundled local CLI and VS Code command package that reuse the versioned core pipeline contract
+```sh
+npm ci
+npm run dev             # Vite dev server of apps/extension (the page, without the extension APIs)
+npm run build           # builds the extension into apps/extension/dist; load that folder in chrome://extensions
+npm test                # Vitest
+npm run typecheck && npm run lint && npm run format:check
+npm run bundle:budget   # after a build: gzip size per chunk and dist content gates
+npm run package:check   # after a build: manifest, permissions and version consistency
+python3 tests/smoke_extension.py   # loads the built extension in Chromium (needs Playwright)
+```
 
-Structural previews remain capped in the UI for responsiveness; explicit Full mode runs in a dedicated worker, reports retained bytes, and fails fast when a configured materialization cap is exceeded. See `docs/STATUS.md` and `docs/FEATURE_CHECKLIST.md` for verified scope and release evidence.
+## Layout
 
-## Planned stack
-
-- Chrome Manifest V3
-- React + TypeScript + Vite
-- Web Workers for parsing/execution/export
-- Virtualized tree/table rendering
-- JSONata as the friendly transformation DSL
-- jq as a power-user/streaming engine
-- JSON Schema validation
-- Lossless numeric handling
-- IndexedDB / OPFS for local persistence where appropriate
-- DuckDB-WASM as a local, packaged analytical/SQL capability
-
-## Quality bar
-
-No feature is complete until it has appropriate unit/integration/browser tests. Large-data features must also have performance/regression coverage. We do not claim software is mathematically bug-free; release candidates must have no known critical/high defects and all automated gates passing.
+- `apps/extension/src/app`: the shell and `registry.ts`, the one list of modes, views and actions.
+- `apps/extension/src/{views,features}`: one directory per view (tree, raw) and feature (embedded JSON, JWT, YAML).
+- `apps/extension/src/platform`: the contracts, the document engine and the worker protocol.
+- `packages/core`: the data logic with no React or Chrome APIs. `packages/cli` and `packages/vscode` reuse it.
+- `docs/architecture/TARGET.md`: the architecture; `docs/design/`: the design decisions and mockups.

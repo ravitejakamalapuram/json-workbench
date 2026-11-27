@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Explore</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#ffffff;--surface:#f6f6f7;--raised:#ffffff;--line:#e3e3e6;--ink:#212121;--ink-muted:#6b6b6b;--accent:#c2410c;--on-accent:#ffffff;--selected:#fdebdd;--syn-key:#1d4f91;--syn-string:#2f7a3d;--syn-number:#a05a00;--syn-bool:#7a3fa0;--syn-null:#6b6b6b;--ok:#1f7a3f;--ok-bg:#e6f4ea;--danger:#c5221f;--danger-bg:#fce8e6;--warn:#8a5a00;--warn-bg:#fef3d7;--info-bg:#fdebdd}
+body{margin:0}
+.r{display:flex;align-items:center;gap:8px;height:28px;font:13px 'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;padding-right:12px}
+.k{color:var(--syn-key)}.s{color:var(--syn-string)}.n{color:var(--syn-number)}.m{color:var(--syn-null)}
+.bd{font:500 11px 'Inter',sans-serif;padding:2px 8px;border-radius:4px}
+.nav{padding:7px 12px;border-radius:6px;font-size:13px;color:var(--ink-muted)}
+.nav.on{background:var(--selected);color:var(--accent);font-weight:600}
+.tab{padding:0 16px;height:40px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-muted);border-right:1px solid var(--line)}
+.tab.on{background:var(--bg);color:var(--ink);box-shadow:inset 0 2px 0 var(--accent)}
+.sub{padding:14px 2px;margin-right:20px;font-size:13px;color:var(--ink-muted)}
+.sub.on{color:var(--ink);font-weight:500;box-shadow:inset 0 -2px 0 var(--accent)}
+</style>
+</helmet>
+<div style="width:1280px;height:800px;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;display:flex;box-sizing:border-box">
+  <div style="width:208px;background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;box-sizing:border-box;display:flex;flex-direction:column;gap:4px">
+    <div style="font-weight:600;font-size:14px;padding:4px 12px 16px"><span style="color:var(--accent)">{ }</span> JSON Workbench</div>
+    <div class="nav on">View</div><div class="nav">Compare</div><div class="nav">Transform</div><div class="nav">Types</div><div class="nav">JWT</div>
+    <div style="font:500 11px 'Inter',sans-serif;color:var(--ink-muted);padding:24px 12px 8px">RECENT</div>
+    <div class="nav" style="color:var(--ink)">orders-response.json</div>
+    <div class="nav">events-2026-10.jsonl</div>
+    <div class="nav">config.yaml</div>
+    <div style="margin-top:auto;font-size:12px;color:var(--ink-muted);padding:0 12px">Local only · nothing uploaded</div>
+  </div>
+  <div style="flex-grow:1;display:flex;flex-direction:column;min-width:0">
+    <div style="display:flex;background:var(--surface);border-bottom:1px solid var(--line)">
+      <div class="tab on">orders-response.json <span style="color:var(--ink-muted)">×</span></div>
+      <div class="tab">events-2026-10.jsonl <span>×</span></div>
+      <div class="tab" style="color:var(--accent)">+ New</div>
+      <div style="margin-left:auto;display:flex;align-items:center;padding-right:16px"><span style="background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:5px 12px;font-size:12px;color:var(--ink-muted);width:200px">Search or Ctrl K</span></div>
+    </div>
+    <div style="height:48px;display:flex;align-items:center;gap:16px;padding:0 24px;font-size:13px;border-bottom:1px solid var(--line)">
+      <span class="sub on">Tree</span><span class="sub" style="margin-left:-12px">Raw</span><span class="sub" style="margin-left:-12px">Table</span>
+      <span style="color:var(--ok);margin-left:8px">● Valid</span><span style="color:var(--ink-muted)">48 KB · 1,284 nodes</span>
+      <div style="flex-grow:1"></div>
+      <span style="color:var(--ink-muted)">Format</span>
+      <span style="background:var(--accent);color:var(--on-accent);border-radius:6px;padding:6px 16px;font-weight:600">Export</span>
+    </div>
+    <div style="display:flex;flex-grow:1;min-height:0">
+      <div style="flex-grow:1;padding:12px 0">
+        <div class="r" style="padding-left:24px"><span class="m">▾</span><span class="m">{5}</span></div>
+        <div class="r" style="padding-left:44px"><span class="k">"id"</span><span class="m">:</span><span class="n">48213</span></div>
+        <div class="r" style="padding-left:44px"><span class="k">"status"</span><span class="m">:</span><span class="s">"paid"</span></div>
+        <div class="r" style="padding-left:44px"><span class="m">▾</span><span class="k">"customer"</span><span class="m">{3}</span></div>
+        <div class="r" style="padding-left:64px"><span class="k">"name"</span><span class="m">:</span><span class="s">"Ada Lovelace"</span></div>
+        <div class="r" style="padding-left:64px"><span class="k">"email"</span><span class="m">:</span><span class="s">"ada@example.com"</span></div>
+        <div class="r" style="padding-left:64px"><span class="k">"tier"</span><span class="m">:</span><span class="m">null</span><span class="bd" style="background:var(--danger-bg);color:var(--danger)">Expected string</span></div>
+        <div class="r" style="padding-left:44px"><span class="m">▾</span><span class="k">"items"</span><span class="m">[3]</span></div>
+        <div class="r" style="padding-left:64px"><span class="m">▾</span><span class="k">0</span><span class="m">{3}</span></div>
+        <div class="r" style="padding-left:84px"><span class="k">"sku"</span><span class="m">:</span><span class="s">"KB-104"</span></div>
+        <div class="r" style="padding-left:84px;background:var(--selected)"><span class="k">"price"</span><span class="m">:</span><span class="n">79.00</span></div>
+        <div class="r" style="padding-left:84px"><span class="k">"qty"</span><span class="m">:</span><span class="n">2</span></div>
+        <div class="r" style="padding-left:64px"><span class="m">▸</span><span class="k">1</span><span class="m">{3}</span></div>
+        <div class="r" style="padding-left:64px"><span class="m">▸</span><span class="k">2</span><span class="m">{3}</span></div>
+        <div class="r" style="padding-left:44px"><span class="k">"payload"</span><span class="m">:</span><span class="s">"{\"event\":\"order.created\",\"id\":48213}"</span><span class="bd" style="background:var(--info-bg);color:var(--accent)">Expand JSON</span></div>
+        <div class="r" style="padding-left:44px"><span class="k">"token"</span><span class="m">:</span><span class="s">"eyJhbGciOiJIUzI1NiIsInR5cCI6…"</span><span class="bd" style="background:var(--info-bg);color:var(--accent)">Decode JWT</span></div>
+        <div class="r" style="padding-left:44px"><span class="k">"total"</span><span class="m">:</span><span class="s">"129.90"</span><span class="bd" style="background:var(--warn-bg);color:var(--warn)">String here, number elsewhere</span></div>
+      </div>
+      <div style="width:288px;border-left:1px solid var(--line);background:var(--surface);padding:24px;box-sizing:border-box;font-size:13px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font:500 11px 'Inter',sans-serif;color:var(--ink-muted)">SELECTED</div>
+          <div style="font:13px 'JetBrains Mono',monospace">$.items[0].price</div>
+          <div style="display:flex;gap:16px;color:var(--accent);font-weight:500"><span>Copy path</span><span>Copy value</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font:500 11px 'Inter',sans-serif;color:var(--ink-muted)">ABOUT THIS FIELD</div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--ink-muted)">Type</span><span>number</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--ink-muted)">In items</span><span>3 of 3</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--ink-muted)">Range</span><span>9.50 to 79.00</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font:500 11px 'Inter',sans-serif;color:var(--ink-muted)">SCHEMA</div>
+          <div style="color:var(--danger)">1 error: customer.tier</div>
+        </div>
+      </div>
+    </div>
+    <div style="height:32px;border-top:1px solid var(--line);background:var(--surface);display:flex;align-items:center;padding:0 24px;font:12px 'JetBrains Mono',monospace;color:var(--ink-muted)">$ › items › 0 › price</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

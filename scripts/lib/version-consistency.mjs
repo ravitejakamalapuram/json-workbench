@@ -17,6 +17,14 @@ function jsonVersion(text) {
   return JSON.parse(text).version ?? null;
 }
 
+// package-lock.json restates the version three times: its own top level and the
+// entries of the root and extension workspaces. `npm install` rewrites them only
+// when someone runs it, so a manual bump leaves them behind.
+const lockVersion =
+  (...path) =>
+  (text) =>
+    path.reduce((node, key) => node?.[key], JSON.parse(text)) ?? null;
+
 // `.appforge/product.yaml` is the only YAML this repo reads and there is no YAML
 // parser in its dependency tree. `current_version` is a top-level scalar, so
 // match the line instead of taking a dependency for one key.
@@ -33,6 +41,17 @@ function yamlCurrentVersion(text) {
 export const VERSION_MIRRORS = [
   { file: "package.json", key: "version", parse: jsonVersion },
   { file: "apps/extension/package.json", key: "version", parse: jsonVersion },
+  { file: "package-lock.json", key: "version", parse: lockVersion("version") },
+  {
+    file: "package-lock.json",
+    key: 'packages[""].version',
+    parse: lockVersion("packages", "", "version"),
+  },
+  {
+    file: "package-lock.json",
+    key: 'packages["apps/extension"].version',
+    parse: lockVersion("packages", "apps/extension", "version"),
+  },
   {
     file: ".appforge/product.yaml",
     key: "current_version",

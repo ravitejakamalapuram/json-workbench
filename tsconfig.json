@@ -9,7 +9,11 @@
     "exactOptionalPropertyTypes": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@json-workbench/core": ["./packages/core/src/index.ts"],
+      "@json-workbench/core/input": ["./packages/core/src/input.ts"]
+    }
   },
   "include": ["packages", "apps"]
 }

@@ -17,7 +17,7 @@ let directory;
 
 // Writes a fixture repo whose mirrors hold the given versions. `root: null` omits
 // `version` from the top-level package.json entirely.
-async function fixture({ root, extension, product }) {
+async function fixture({ root, extension, product, lock = extension }) {
   await writeFile(
     join(directory, "package.json"),
     `${JSON.stringify(
@@ -32,6 +32,20 @@ async function fixture({ root, extension, product }) {
   await writeFile(
     join(directory, "apps/extension/package.json"),
     `${JSON.stringify({ name: "@json-workbench/extension", version: extension }, null, 2)}\n`,
+  );
+  await writeFile(
+    join(directory, "package-lock.json"),
+    `${JSON.stringify(
+      {
+        version: lock,
+        packages: {
+          "": { version: lock },
+          "apps/extension": { version: lock },
+        },
+      },
+      null,
+      2,
+    )}\n`,
   );
   await writeFile(
     join(directory, ".appforge/product.yaml"),
@@ -71,20 +85,34 @@ describe("version consistency", () => {
     expect(findVersionDrift("0.2.1", mirrors)).toEqual([]);
   });
 
-  it("catches the APP-182 drift: manifest bumped, all three mirrors left behind", async () => {
+  it("catches the APP-182 drift: manifest bumped, every mirror left behind", async () => {
     const mirrors = await fixture({
       root: "0.2.0",
       extension: "0.2.0",
       product: 'current_version: "0.2.0"',
     });
     const drift = findVersionDrift("0.2.1", mirrors);
-    expect(drift).toHaveLength(3);
+    expect(drift).toHaveLength(VERSION_MIRRORS.length);
     for (const { file } of VERSION_MIRRORS)
       expect(drift.some((line) => line.startsWith(`${file} `))).toBe(true);
     for (const line of drift) {
       expect(line).toContain("0.2.0");
       expect(line).toContain("0.2.1");
     }
+  });
+
+  it("catches a package-lock.json that was not regenerated after a bump", async () => {
+    const mirrors = await fixture({
+      root: "0.2.1",
+      extension: "0.2.1",
+      product: 'current_version: "0.2.1"',
+      lock: "0.2.0",
+    });
+    expect(findVersionDrift("0.2.1", mirrors)).toEqual([
+      "package-lock.json `version` is 0.2.0; the manifest version is 0.2.1",
+      'package-lock.json `packages[""].version` is 0.2.0; the manifest version is 0.2.1',
+      'package-lock.json `packages["apps/extension"].version` is 0.2.0; the manifest version is 0.2.1',
+    ]);
   });
 
   it("catches a single mirror out of step", async () => {

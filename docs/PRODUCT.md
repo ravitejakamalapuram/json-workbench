@@ -1,75 +1,30 @@
-# Product Requirements
+# Product
 
-## Primary users
+JSON Workbench is a Chrome side panel for developers who read, fix and convert JSON: API responses, fixtures, logs and exports, including files too large for an editor. It is local-first: nothing is uploaded, and there is no telemetry.
 
-Developers debugging API responses, manipulating fixtures, cleaning logs, validating payloads, preparing test data, comparing responses, and converting JSON into other formats.
+## First release (0.3.0)
 
-## MVP
+The scope is fixed in `docs/design/DECISIONS.md` ("First release scope"):
 
-### Input
+- Tree with embedded JSON, search and path copying
+- Raw editor with one-click fixes, format and minify
+- Large files opened in place (measured: 308 MB in Chrome, 1 GiB in Node; the limit is 1.25 GB)
+- JWT decoding
+- YAML in and out
+- Export to JSON, JSONL, NDJSON, CSV and TSV, and conversion to YAML
 
-- Open local JSON/JSONL/NDJSON
-- Drag and drop
-- Paste/clipboard
-- Detect format automatically
-- Do not upload user data
+Out of the first release: compare, transform pipelines, type generation, the table view, schema inference, the in-page viewer, tab import and SQL. Their stubs stay in the source tree but are not registered and do not ship.
 
-### Understand
+## Requirements
 
-- Validity status
-- Structure tree
-- Array/object cardinality
-- Type inference
-- Missing/null/type inconsistency indicators
-- Path copying
+- Opening a file shows progress at once, and no operation freezes the interface.
+- The original input is never changed unless the user edits it in Raw and saves it.
+- Whole-value work has a memory limit that the user can change, and it refuses above it instead of crashing.
+- Keyboard-first with visible focus, usable at the 400 px side-panel width, and status never shown by color alone.
+- Two permissions only (`sidePanel`, `storage`), no host access.
 
-### Explore
+## Non-goals
 
-- Virtualized tree
-- Table view for tabular arrays
-- Raw view
-- Search
-- Keyboard navigation
+Accounts, remote processing, collaboration, AI features and an HTTP client.
 
-### Manipulate
-
-- Filter
-- Map
-- Rename
-- Remove
-- Add field
-- Sort
-- Preview and full run
-- Pipeline reorder/enable/disable
-
-### Output
-
-- Copy result
-- JSON/JSONL/CSV export
-
-## UX requirements
-
-- Loading a file must immediately show useful progress.
-- Large operations must not freeze the interface.
-- Errors identify the step and useful source location when available.
-- Every transformation is reversible via history/step controls.
-- Preview is clearly distinguished from full execution.
-- Original input is immutable unless the user explicitly exports/replaces it outside the application.
-
-## Non-goals for MVP
-
-- Remote server-side processing
-- Accounts/login
-- Collaboration
-- AI-generated transformations
-- Full HTTP client
-- SQL/DuckDB
-
-## Release-quality requirements
-
-- Accessible keyboard navigation for primary workflows
-- Responsive layout for common desktop sizes
-- No secrets or source JSON in logs
-- Minimal extension permissions
-- Automated unit/integration/E2E tests
-- Large-file performance fixtures
+The architecture is in `docs/architecture/TARGET.md`.

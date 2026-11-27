@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>In-page viewer</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#ffffff;--surface:#f6f6f7;--line:#e3e3e6;--ink:#212121;--ink-muted:#6b6b6b;--accent:#c2410c;--on-accent:#ffffff;--syn-key:#1d4f91;--syn-string:#2f7a3d;--syn-number:#a05a00;--syn-null:#6b6b6b}
+body{margin:0}
+.r{display:flex;gap:8px;height:28px;align-items:center;font:13px 'JetBrains Mono',monospace;color:var(--ink)}
+.k{color:var(--syn-key)}.s{color:var(--syn-string)}.n{color:var(--syn-number)}.m{color:var(--syn-null)}
+</style>
+</helmet>
+<div style="width:1000px;height:640px;background:var(--bg);font-family:'Inter',sans-serif;display:flex;flex-direction:column;box-sizing:border-box;color:var(--ink)">
+  <div style="height:40px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;font-size:12px;color:var(--ink-muted)">api.example.com/v1/orders/48213</div>
+  <div style="height:44px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:20px;padding:0 24px;font-size:13px">
+    <span style="color:var(--ink-muted)">JSON · 1.3 KB</span>
+    <div style="flex-grow:1"></div>
+    <span style="box-shadow:inset 0 -2px 0 var(--accent);padding:12px 2px;font-weight:500">Tree</span>
+    <span style="color:var(--ink-muted)">Raw</span>
+    <span style="color:var(--ink-muted)">Collapse all</span>
+    <span style="color:var(--ink-muted)">Copy</span>
+    <span style="background:var(--accent);color:var(--on-accent);border-radius:6px;padding:6px 14px;font-weight:600">Open in Workbench</span>
+  </div>
+  <div style="padding:16px 24px">
+    <div class="r"><span class="m">▾</span><span class="m">{5}</span></div>
+    <div class="r" style="padding-left:20px"><span class="k">"id"</span><span class="m">:</span><span class="n">48213</span></div>
+    <div class="r" style="padding-left:20px"><span class="k">"status"</span><span class="m">:</span><span class="s">"paid"</span></div>
+    <div class="r" style="padding-left:20px"><span class="m">▸</span><span class="k">"customer"</span><span class="m">{3}</span></div>
+    <div class="r" style="padding-left:20px"><span class="m">▸</span><span class="k">"items"</span><span class="m">[3]</span></div>
+    <div class="r" style="padding-left:20px"><span class="k">"total"</span><span class="m">:</span><span class="n">129.9</span></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1000,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

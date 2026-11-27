@@ -6,15 +6,16 @@ The release gate covers the following behaviors:
 - all actions are native buttons or form controls and are reachable with Tab;
 - the tree uses `role=tree`/`role=treeitem`, `aria-level`, and expandable nodes
   expose `aria-expanded`;
-- search, SQL, schema, assistant, and pipeline configuration editors have
-  accessible labels;
+- the tree search, command palette, details panel, Raw editor, settings,
+  JWT and YAML controls have accessible labels;
 - status changes use a polite live region, and icon-only actions have labels;
 - visible focus rings are preserved in both themes;
-- reduced-motion preferences disable non-essential animation and scrolling;
-- table headers and result structure remain semantic HTML.
+- reduced-motion preferences disable non-essential animation and scrolling.
 
-The browser smoke test exercises keyboard-visible controls, tree expansion,
-search, raw editor, SQL, JSONL, and malformed-input paths. Before publishing,
-run it in Chromium with `python3 tests/smoke_extension.py` and manually verify
-screen-reader announcements in the target Chrome side panel because browser
-extension host rendering is not fully reproduced by headless HTTP smoke tests.
+Automated coverage: `tests/smoke_extension.py` checks the manifest, the CSP,
+that every mode and view mounts without a console error, and that the 400 px
+side panel has no overflowing control; `tests/acceptance_extension.py` covers
+tree expansion and search, the Raw error fix, export and the dark theme. The
+component tests cover keyboard paths. Focus order and screen-reader
+announcements are checked by hand in the Chrome side panel before publishing;
+no script does that.

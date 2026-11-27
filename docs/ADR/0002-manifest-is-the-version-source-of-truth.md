@@ -23,9 +23,9 @@ At release time the published version is neither of these: release-platform comp
 
 `apps/extension/manifest.json` is the single source of truth for the version inside this repo. The other three values are mirrors of it and must equal it.
 
-`scripts/package-check.mjs` enforces this: it compares the packaged manifest's `version` against all three mirrors and fails with the list of disagreements. It runs on every pull request through the `quality` job, so drift fails CI in the PR that introduces it rather than surfacing in a later reconciliation PR. `scripts/lib/version-consistency.mjs` holds the comparison and the list of mirrors, and `scripts/lib/version-consistency.test.mjs` covers it under `npm test`.
+`scripts/package-check.mjs` enforces this: it compares the packaged manifest's `version` against every mirror (both `package.json` files, `.appforge/product.yaml` and the three version fields of `package-lock.json`) and fails with the list of disagreements. It runs on every pull request through the `quality` job, so drift fails CI in the PR that introduces it rather than surfacing in a later reconciliation PR. `scripts/lib/version-consistency.mjs` holds the comparison and the list of mirrors, and `scripts/lib/version-consistency.test.mjs` covers it under `npm test`.
 
-The bump itself stays manual, and a version bump is now a four-file edit. Deliberately not adopted: generating the mirrors from the manifest, deleting them (both `package.json` versions are inert, but removing them churns `package-lock.json` for no gate benefit), and extending the gate to require a matching `CHANGELOG.md` section, which is a release-process rule rather than metadata consistency.
+The bump itself stays manual, and a version bump is a manual edit of the manifest and its mirrors. Deliberately not adopted: generating the mirrors from the manifest, deleting them (both `package.json` versions are inert, but removing them churns `package-lock.json` for no gate benefit), and extending the gate to require a matching `CHANGELOG.md` section, which is a release-process rule rather than metadata consistency.
 
 ## Consequences
 

@@ -1,0 +1,135 @@
+/* The JWT page: one quiet column in the shell's workspace. Colors, type and
+   spacing come only from the Lumen tokens. */
+
+.jwt {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-8) var(--space-4);
+  overflow-y: auto;
+}
+
+.jwt-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.jwt-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The size of the empty state's title, so the two pages feel like one app. */
+.jwt-title {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 36px;
+}
+
+.jwt-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.jwt-label {
+  font: var(--type-label);
+}
+
+.jwt-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  font: var(--type-code);
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+
+/* The message under the box says what is wrong; the border only points at it. */
+.jwt-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.jwt-field-foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.jwt-hint {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.jwt-problem {
+  color: var(--danger);
+}
+
+/* Always in the page, so a screen reader hears what lands in it; empty, it is
+   taken out of the flow and leaves no gap in the column. */
+.jwt-status:empty {
+  position: absolute;
+}
+
+/* Regions are separated by a hairline, not boxed. */
+.jwt-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.jwt-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.jwt-code {
+  display: block;
+  margin: 0;
+  font: var(--type-code);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.jwt-claims {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.jwt-claim {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.jwt-claim dt {
+  color: var(--ink-muted);
+}
+
+.jwt-claim dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  margin: 0;
+}
+
+.jwt-claim-detail {
+  flex-basis: 100%;
+  color: var(--ink-muted);
+  font: var(--type-code-small);
+  overflow-wrap: anywhere;
+}

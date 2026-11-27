@@ -1,114 +1,143 @@
-import os
-import re
-import subprocess
-import tempfile
-import time
-from pathlib import Path
+"""Smoke test of the built extension, loaded unpacked in real Chromium.
 
-from playwright.sync_api import sync_playwright
+Proves what a static server could not: Chrome accepts the manifest and starts
+the service worker, the workbench page boots under the extension CSP, WASM
+may instantiate (jq needs 'wasm-unsafe-eval'), the page cannot load or reach anything
+outside the extension, the permissions are exactly the audited list, every mode and view
+mounts without a console error, and the layout fits the 400 px side panel.
+
+    npm run build && CHROMIUM_PATH=/path/to/chrome JWB_SKIP_BUILD=1 python3 tests/smoke_extension.py
+"""
+
+from __future__ import annotations
+
+from playwright.sync_api import Page, expect, sync_playwright
+
+from e2e_support import ConsoleErrors, Steps, assert_fits, build, extension
+
+PERMISSIONS = ["sidePanel", "storage"]
+ABSENT = (
+    "host_permissions",
+    "optional_host_permissions",
+    "optional_permissions",
+    "content_scripts",
+    "devtools_page",
+    "web_accessible_resources",
+)
+EMPTY_WASM = "[0, 97, 115, 109, 1, 0, 0, 0]"  # "\0asm" and version 1
 
 
-ROOT = Path(__file__).resolve().parents[1]
+def check_manifest(page: Page) -> None:
+    manifest = page.evaluate("() => chrome.runtime.getManifest()")
+    assert sorted(manifest["permissions"]) == PERMISSIONS, manifest["permissions"]
+    for absent in ABSENT:
+        assert absent not in manifest, f"{absent}: {manifest[absent]}"
+
+
+def check_wasm(page: Page) -> None:
+    page.evaluate(
+        f"() => WebAssembly.instantiate(new Uint8Array({EMPTY_WASM}).buffer)"
+    )
+
+
+def check_network_blocked(page: Page) -> None:
+    result = page.evaluate(
+        """async () => {
+          const violation = new Promise((resolve) =>
+            document.addEventListener("securitypolicyviolation",
+              (event) => resolve(event.effectiveDirective), { once: true }));
+          try {
+            await fetch("https://example.com/");
+            return { fetched: true };
+          } catch {
+            return { fetched: false, directive: await violation };
+          }
+        }"""
+    )
+    assert result == {"fetched": False, "directive": "connect-src"}, result
+
+
+def check_remote_loads_blocked(page: Page) -> None:
+    """Stylesheets, media and prefetch are refused too, not only fetch (default-src)."""
+    directives = page.evaluate(
+        """async () => {
+          const seen = [];
+          document.addEventListener("securitypolicyviolation",
+            (event) => seen.push(event.effectiveDirective));
+          const link = (rel) => Object.assign(document.createElement("link"),
+            { rel, href: `http://127.0.0.1:9/${rel}` });
+          document.head.append(link("stylesheet"), link("prefetch"));
+          const audio = Object.assign(new Audio(), { src: "http://127.0.0.1:9/a.wav" });
+          audio.load();
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          return seen.sort();
+        }"""
+    )
+    assert directives == ["default-src", "media-src", "style-src-elem"], directives
+
+
+def check_modes_and_views(page: Page) -> None:
+    modes = page.get_by_role("navigation", name="Modes").get_by_role("button")
+    labels = modes.all_inner_texts()
+    assert labels == ["View", "JWT"], labels
+    for label in labels[1:]:
+        modes.filter(has_text=label).click()
+        expect(page.locator("main")).not_to_be_empty()
+    modes.filter(has_text="View").click()
+    page.get_by_role("button", name="Try a sample").click()
+    expect(
+        page.get_by_role("button", name="sample-orders.json", exact=True)
+    ).to_be_visible()
+    for view in ("Tree", "Raw"):
+        page.get_by_role("tab", name=view).click()
+        expect(page.get_by_role("tabpanel")).not_to_be_empty()
 
 
 def main() -> None:
-    subprocess.run(["npm", "run", "build"], cwd=ROOT, check=True)
-    server = subprocess.Popen(
-        ["python3", "-m", "http.server", "4173", "--directory", "apps/extension/dist"],
-        cwd=ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as source:
-            source.write('[{"id":900719925474099312345,"name":"Ada"}]')
-            source_path = source.name
-        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as jsonl:
-            jsonl.write('{"id":1,"name":"One"}\n{"id":2,"name":"Two"}\n')
-            jsonl_path = jsonl.name
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as malformed:
-            malformed.write('{"id":oops}\n')
-            malformed_path = malformed.name
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as embedded:
-            embedded.write('[{"id":1,"payload":"{\\"nested\\":true}"}]')
-            embedded_path = embedded.name
-        try:
-            with sync_playwright() as playwright:
-                browser = playwright.chromium.launch(headless=os.getenv("HEADLESS", "true") == "true")
-                page = browser.new_page(viewport={"width": 1280, "height": 900})
-                page.goto("http://127.0.0.1:4173/", wait_until="networkidle")
-                assert page.get_by_role("heading", name="JSON Workbench").is_visible()
-                page.locator('input[type="file"]').set_input_files(source_path)
-                page.get_by_text("Ready to explore").wait_for(timeout=15_000)
-                assert page.get_by_role("button", name="Tree").is_visible()
-                page.get_by_label("Search values or paths").focus()
-                assert page.get_by_label("Search values or paths").evaluate(
-                    "element => element === document.activeElement"
-                )
-                page.locator(".expand").nth(1).click()
-                assert page.locator('[role="treeitem"]').first.get_attribute("aria-level") == "1"
-                page.get_by_text("900719925474099312345").wait_for(timeout=5_000)
-                page.get_by_placeholder("Search values or paths").fill("Ada")
-                page.get_by_role("button", name="Table").click()
-                assert page.get_by_text("Ada").is_visible()
-                page.get_by_role("button", name="+ Add").click()
-                page.locator("select").first.select_option("full")
-                page.get_by_role("button", name="Run preview").click()
-                page.get_by_text("Preview ready").wait_for(timeout=15_000)
-                page.get_by_text("900719925474099312345").wait_for(timeout=5_000)
-                page.get_by_role("button", name="JSON", exact=True).click()
-                page.get_by_role("button", name="Tree").click()
-                page.get_by_text("Ada").wait_for(timeout=5_000)
-                page.get_by_role("button", name="Raw / code").click()
-                page.locator(".monaco-editor").wait_for(timeout=15_000)
-                page.get_by_role("button", name="Run local SQL").click()
-                page.get_by_text(re.compile(r"SQL complete")).wait_for(timeout=30_000)
-                page.locator('input[type="file"]').first.set_input_files(jsonl_path)
-                page.get_by_text(re.compile(r"JSONL .*2 records")).wait_for(timeout=15_000)
-                page.locator('input[type="file"]').first.set_input_files(malformed_path)
-                page.get_by_text(re.compile(r"(ParseError|JsonSyntaxError):")).wait_for(timeout=15_000)
-                # Reload clean source, then exercise the newly wired features.
-                page.locator('input[type="file"]').first.set_input_files(source_path)
-                page.get_by_text("Ready to explore").wait_for(timeout=15_000)
-                assert page.get_by_test_id("insights-panel").is_visible()
-                page.get_by_test_id("insights-fields").get_by_text(
-                    "name", exact=True
-                ).wait_for(timeout=5_000)
-                page.get_by_test_id("infer-schema-button").click()
-                page.wait_for_timeout(500)
-                schema_value = page.locator(".schema-input").first.input_value()
-                assert '"properties"' in schema_value, schema_value
-                page.get_by_test_id("diff-input").fill(
-                    '[{"id":1,"name":"Zed"},{"id":3,"name":"Nine"}]'
-                )
-                page.get_by_test_id("diff-run-button").click()
-                page.get_by_test_id("diff-results").wait_for(timeout=5_000)
-                assert page.get_by_test_id("diff-results").get_by_text(
-                    re.compile(r"replace|add|remove")
-                ).first.is_visible()
-                # Diff supports side-by-side visual diff and JSON Patch actions.
-                assert page.get_by_test_id("diff-apply-button").is_visible()
-                assert page.get_by_test_id("diff-export-button").is_visible()
-                page.get_by_test_id("diff-visual-button").click()
-                page.get_by_test_id("diff-visual-modal").wait_for(timeout=5_000)
-                assert page.locator(".jwb-diff-replace, .jwb-diff-add, .jwb-diff-remove").count() > 0
-                page.get_by_test_id("diff-visual-close").click()
-                # Embedded (stringified) JSON is detected and listed.
-                page.locator('input[type="file"]').first.set_input_files(embedded_path)
-                page.get_by_text("Ready to explore").wait_for(timeout=15_000)
-                page.get_by_test_id("embedded-list").wait_for(timeout=5_000)
-                assert page.get_by_test_id("embedded-list").get_by_text(
-                    "/0/payload"
-                ).count() > 0
-                browser.close()
-        finally:
-            Path(source_path).unlink(missing_ok=True)
-            Path(jsonl_path).unlink(missing_ok=True)
-            Path(malformed_path).unlink(missing_ok=True)
-            Path(embedded_path).unlink(missing_ok=True)
-    finally:
-        server.terminate()
-        server.wait(timeout=5)
+    build()
+    steps = Steps()
+    with sync_playwright() as playwright, extension(playwright) as (context, id):
+        page = context.new_page()
+        errors = ConsoleErrors(page)
+        page.set_viewport_size({"width": 1280, "height": 800})
+        page.goto(f"chrome-extension://{id}/index.html?surface=tab")
+
+        steps.run(
+            "the workbench page boots in a full tab",
+            lambda: expect(
+                page.get_by_role("heading", name="Drop a file to start")
+            ).to_be_visible(),
+        )
+        steps.run("the manifest has exactly the audited permissions", lambda: check_manifest(page))
+        steps.run("WebAssembly instantiates under the CSP", lambda: check_wasm(page))
+        steps.run("every mode and view mounts", lambda: check_modes_and_views(page))
+        steps.run("no console errors", lambda: _assert_none(errors.messages))
+        # Last on this page: the blocked fetch logs a CSP console error by design.
+        steps.run("the page cannot reach the network", lambda: check_network_blocked(page))
+        steps.run(
+            "remote stylesheets, media and prefetch are blocked",
+            lambda: check_remote_loads_blocked(page),
+        )
+
+        panel = context.new_page()
+        panel_errors = ConsoleErrors(panel)
+        panel.set_viewport_size({"width": 400, "height": 800})
+        panel.goto(f"chrome-extension://{id}/index.html")
+
+        def fits_side_panel() -> None:
+            expect(panel.get_by_test_id("shell-open-file")).to_be_visible()
+            assert_fits(panel)
+            panel.get_by_role("button", name="Try a sample").click()
+            expect(panel.get_by_test_id("shell-status")).to_be_visible()
+            assert_fits(panel)
+            _assert_none(panel_errors.messages)
+
+        steps.run("the side panel layout fits 400 px", fits_side_panel)
+    steps.exit()
+
+
+def _assert_none(messages: list[str]) -> None:
+    assert not messages, messages
 
 
 if __name__ == "__main__":

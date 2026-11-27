@@ -1,12 +1,9 @@
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+// The last build step: Vite has emitted the page and esbuild the service worker;
+// this adds the manifest. Nothing else is copied, so no file outside the build
+// can ship under a built file's name.
 const root = resolve(new URL("..", import.meta.url).pathname);
 const extension = resolve(root, "apps/extension");
 const dist = resolve(extension, "dist");
@@ -20,16 +17,6 @@ writeFileSync(
   resolve(dist, "manifest.json"),
   `${JSON.stringify(manifest, null, 2)}\n`,
 );
-copyFileSync(
-  resolve(extension, "background.js"),
-  resolve(dist, "background.js"),
-);
-const jqWasm = resolve(root, "node_modules/jq-web/jq.wasm");
-if (existsSync(jqWasm)) copyFileSync(jqWasm, resolve(dist, "jq.wasm"));
-for (const asset of ["duckdb-mvp.wasm", "duckdb-browser-mvp.worker.js"]) {
-  const source = resolve(root, "node_modules/@duckdb/duckdb-wasm/dist", asset);
-  if (existsSync(source)) copyFileSync(source, resolve(dist, asset));
-}
 console.log(
   `Prepared Chrome package in ${dirname(resolve(dist, "manifest.json"))}`,
 );

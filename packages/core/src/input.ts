@@ -1,7 +1,5 @@
-import {
-  parse as parseLossless,
-  stringify as stringifyLossless,
-} from "lossless-json";
+import { stringify as stringifyLossless } from "lossless-json";
+import { parseJsonValue } from "./parse-value";
 import { parseJsonStructure, type JsonStructureEvent } from "./structure";
 import type { JsonValue } from "./types";
 
@@ -42,10 +40,11 @@ export class ParseError extends Error {
   }
 }
 
-/** Parse JSON without converting numeric lexemes through IEEE-754 doubles. */
-export function parseJsonValue(text: string): JsonValue {
-  return parseLossless(text.replace(/^\uFEFF/, "")) as JsonValue;
-}
+export {
+  MAX_VALUE_DEPTH,
+  NestingTooDeepError,
+  parseJsonValue,
+} from "./parse-value";
 
 /** Serialize JSON values while retaining LosslessNumber lexemes. */
 export function stringifyJsonValue(value: JsonValue, pretty = false): string {

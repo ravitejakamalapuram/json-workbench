@@ -69,7 +69,12 @@ export function exportDelimited(
   for (const record of records)
     lines.push(
       columns
-        .map((column) => quote(cell(record[column]), delimiter))
+        .map((column) =>
+          quote(
+            cell(Object.hasOwn(record, column) ? record[column] : undefined),
+            delimiter,
+          ),
+        )
         .join(delimiter),
     );
   return `${lines.join("\n")}\n`;

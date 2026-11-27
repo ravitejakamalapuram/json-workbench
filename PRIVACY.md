@@ -2,7 +2,7 @@
 
 Published policy: https://ravitejakamalapuram.github.io/json-workbench.html
 
-_Last updated: September 20, 2026_
+_Last updated: November 27, 2026_
 
 JSON Workbench is built as a local-first developer tool. We respect your privacy and believe that developer data should remain strictly under your control.
 
@@ -10,42 +10,35 @@ JSON Workbench is built as a local-first developer tool. We respect your privacy
 
 JSON Workbench **does not collect, transmit, or sell any personal data, browsing history, or user-provided content**.
 
-- **JSON & Data Payloads**: All JSON, JSONL, NDJSON files, tab contents, and payloads inspected, formatted, or queried in JSON Workbench are processed entirely within your browser's local sandbox using local WebAssembly runtimes (DuckDB WASM, jq-web). Your data is never uploaded to external servers or cloud services.
-- **User Preferences**: The extension stores local settings (such as UI theme, active pipeline definitions, and auto-render preferences) using `chrome.storage.local`. This data never leaves your device.
+- **JSON & Data Payloads**: All JSON, JSONL, NDJSON and YAML files you open, paste or drop, and any token you decode, are processed entirely within your browser, in the extension's page and its background workers. Your data is never uploaded to external servers or cloud services. The extension's pages run under a content security policy (`default-src 'self'`, `connect-src 'self'`) under which Chrome blocks them from loading or connecting to any other address: scripts, stylesheets, fonts, images, media, frames and fetch, XMLHttpRequest and WebSocket connections. This is enforced by Chrome, not only promised.
+- **Web pages and tabs**: the extension does not read the pages you visit or your tabs. It requests no access to websites.
+- **No telemetry**: the extension does not send usage data, analytics, or crash reports. Its code makes no network request.
 
-## 2. Permissions & Data Usage
+## 2. What is stored on your device
 
-- `activeTab`: Used solely to read JSON data from the currently active tab when you explicitly click "Active JSON tab" or "Format current tab". Reading the tab's address requires either this grant (created by opening the side panel from the toolbar icon on that tab) or the optional `<all_urls>` grant below; without one of them the action reports that it cannot see the tab and does nothing.
-- `sidePanel`: Used to display the extension's workbench interface in Chrome's side panel.
-- `storage`: Used to persist local preferences and transform pipelines on your machine.
-- `scripting`: Used to inject the in-page JSON formatter into the active tab upon explicit user request.
-- `debugger` (optional): Requested only if you explicitly choose to capture network JSON responses. Captured responses remain in local memory and are never transmitted.
-- `<all_urls>` (optional): Requested only if you opt in to "Auto-render JSON pages". The default installation requests no host permissions.
+Everything below lives in `chrome.storage.local` on your machine and never leaves it. Settings → "Clear local data" removes all of it; uninstalling the extension does too.
 
-### How "Active JSON tab" reads the page
+| Key                            | What it holds                                                                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `jwb.theme`                    | Light or dark theme.                                                                                                                                                                 |
+| `jwb.materializeLimitMb`       | The memory limit for whole-document operations (32, 64 or 128 MB).                                                                                                                   |
+| `jwb.recents`                  | The newest 10 files you opened or dropped: file name, size and time only, never their content.                                                                                       |
+| `json-workbench:review-prompt` | Whether the one-time "rate this extension" note was shown, and whether a file over 10 MB has been opened. The note is a link to the store page; nothing is sent unless you click it. |
 
-"Active JSON tab" re-requests the address of the tab you are viewing and reads the
-response. Two things about that request are worth stating plainly:
+The storage area is restricted to the extension's own pages and service worker; web pages cannot read it. Text you paste and files you open are not stored: they are held in memory while the document is open.
 
-- **It goes only to the page's own address.** The request is sent to the same URL
-  that is already in your address bar, never to an AppForge server or any third
-  party. Nothing about the request or its response is transmitted anywhere else.
-- **It is sent with your cookies for that site** (`credentials: "include"`). This is
-  necessary rather than incidental: developers usually use this action on an API
-  endpoint they are signed in to, and a request without cookies would come back as a
-  sign-in page or an authorization error instead of the JSON on screen. The practical
-  consequence is that this action causes one additional authenticated request to the
-  page you are on, exactly as reloading that tab would. If the endpoint changes state
-  when it is requested, requesting it twice will do so twice.
+## 3. Permissions & Data Usage
 
-The action is only available for the tab you are looking at, only on a site this
-extension has been granted access to, and only when you press the button.
+- `sidePanel`: Used to display the extension's workbench interface in Chrome's side panel. The toolbar button opens it, and "Open in full tab" opens the same page in a tab, which needs no permission.
+- `storage`: Used for the on-device data listed in section 2.
 
-## 3. Third-Party Services & Analytics
+The extension declares no other permission: no host permissions, no content scripts, no access to your tabs, and no clipboard permission (a paste reaches it through the browser's own paste event). Saving a file goes through your browser's download.
 
-JSON Workbench does not use any third-party analytics, tracking pixels, telemetry services, or advertising networks.
+## 4. Third-Party Services & Analytics
 
-## 4. Contact & Inquiries
+JSON Workbench does not use any third-party analytics, tracking pixels, telemetry services, or advertising networks, and loads no code or fonts from content delivery networks.
+
+## 5. Contact & Inquiries
 
 If you have questions or concerns regarding this privacy policy, please open an issue at:
 https://github.com/ravitejakamalapuram/json-workbench/issues

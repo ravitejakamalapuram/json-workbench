@@ -1,0 +1,584 @@
+/* Layout of the shell, after docs/design/mockups/Main and Empty. The narrow
+   layout keys off data-width (set by use-width.ts), not a media query. */
+
+.shell {
+  display: flex;
+  height: 100%;
+}
+
+.shell-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loading {
+  padding: var(--space-4);
+}
+
+/* --------------------------------------------------------------- Rail */
+
+.rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 208px;
+  padding: var(--space-4) var(--space-3);
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.brand {
+  padding: var(--space-1) var(--space-3) var(--space-4);
+  font: var(--type-body);
+  font-weight: 600;
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rail-item {
+  display: block;
+  width: 100%;
+  padding: 7px var(--space-3);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 16px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-item {
+  cursor: pointer;
+}
+
+.rail-item:hover {
+  color: var(--ink);
+}
+
+.rail-item[aria-current="page"] {
+  background: var(--selected);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (forced-colors: active) {
+  .rail-item[aria-current="page"],
+  .doc-tab[data-active] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+.rail-recents .caption {
+  padding: var(--space-6) var(--space-3) var(--space-2);
+}
+
+.rail-foot {
+  margin-top: auto;
+  padding-top: var(--space-4);
+}
+
+/* Aligned with the item labels; no right padding, so it stays on one line. */
+.rail-note {
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* ---------------------------------------------------------- Tab strip */
+
+.tab-strip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding-right: var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* Only the tabs scroll; the palette button stays in reach. */
+.tab-strip-list {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* The scrolling list clips anything outside it, so the ring is drawn inside
+   the full-height tab buttons. */
+.tab-strip-list :focus-visible {
+  outline-offset: -2px;
+}
+
+.palette-button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 200px;
+  height: 28px;
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--ink-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.doc-tab {
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--line);
+}
+
+.doc-tab[data-active] {
+  background: var(--bg);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.doc-tab-name,
+.doc-tab-close,
+.doc-tab-new {
+  height: 40px;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.doc-tab-name {
+  padding: 0 var(--space-2) 0 var(--space-4);
+}
+
+.doc-tab[data-active] .doc-tab-name {
+  color: var(--ink);
+}
+
+.doc-tab-close {
+  padding: 0 var(--space-3) 0 var(--space-1);
+}
+
+.doc-tab-new {
+  padding: 0 var(--space-4);
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------ Toolbar */
+
+.document {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 48px;
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.doc-status {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.doc-status p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-status progress {
+  width: 80px;
+  accent-color: var(--accent);
+}
+
+.status-ok {
+  color: var(--ok);
+}
+
+.status-danger {
+  color: var(--danger);
+}
+
+/* Why a document failed is read in full: it wraps rather than being cut, and
+   the toolbar grows to fit it. */
+.doc-status .status-danger {
+  padding-block: var(--space-2);
+  white-space: normal;
+}
+
+.status-muted {
+  color: var(--ink-muted);
+}
+
+.toolbar-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* ------------------------------------------------------- View, details */
+
+.document-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.view-panel {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.details {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 288px;
+  padding: var(--space-6);
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.details-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* A section whose component rendered nothing has nothing to say. */
+.details-section:has(> .details-body:empty) {
+  display: none;
+}
+
+.details-path {
+  overflow-wrap: anywhere;
+}
+
+.details-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: calc(-1 * var(--space-3));
+}
+
+.details-notice:empty {
+  display: none;
+}
+
+.details-close {
+  align-self: flex-end;
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0 0;
+}
+
+/* --------------------------------------------------------------- Menu */
+
+.menu-anchor {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 3;
+  min-width: 180px;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  height: var(--row);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--selected);
+}
+
+/* ---------------------------------------------------------- Empty state */
+
+.empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.empty-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 560px;
+}
+
+.empty-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.empty-title {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 36px;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 168px;
+  padding: var(--space-4);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.empty-recent {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.empty-recent:hover > span:first-child {
+  color: var(--accent);
+}
+
+.empty-hint {
+  font-size: 12px;
+}
+
+.paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.paste-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  font: var(--type-code);
+  resize: vertical;
+}
+
+/* ------------------------------------------------------------ Dialogs */
+
+.dialog-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.help-list {
+  margin: 0;
+}
+
+.help-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: var(--row);
+}
+
+.help-row dd {
+  margin: 0;
+}
+
+/* ------------------------------------------------------- Review nudge */
+
+.review-nudge {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-6);
+  border-bottom: 1px solid var(--line);
+  background: var(--info-bg);
+  font-size: 13px;
+}
+
+.review-nudge p {
+  margin-right: auto;
+}
+
+.review-nudge a {
+  text-decoration: none;
+}
+
+/* --------------------------------------------------------- Status bar */
+
+.status-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  /* Grows when a message has to wrap, as a tree notice does in the side panel. */
+  min-height: 32px;
+  padding: var(--space-1) var(--space-6);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: var(--type-code-small);
+}
+
+/* ----------------------------------------------------------- Narrow */
+
+/* Below 640 px (the side panel is about 400 px): the rail becomes a top mode
+   strip with the local-only note on a line below it, the details panel covers
+   the view, and the brand and recents step aside (the empty state lists
+   recents). */
+.shell[data-width="narrow"] {
+  flex-direction: column;
+}
+
+.shell[data-width="narrow"] .rail {
+  flex-flow: row wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: auto;
+  padding: var(--space-2);
+  overflow-x: auto;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.shell[data-width="narrow"] :is(.brand, .rail-recents) {
+  display: none;
+}
+
+.shell[data-width="narrow"] .rail-note {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
+.shell[data-width="narrow"] .rail-list {
+  flex-direction: row;
+}
+
+.shell[data-width="narrow"] .rail-foot {
+  margin: 0 0 0 auto;
+  padding: 0;
+}
+
+.shell[data-width="narrow"] .shell-main {
+  flex: 1;
+  min-height: 0;
+}
+
+.shell[data-width="narrow"] :is(.toolbar, .status-bar, .review-nudge) {
+  padding: 0 var(--space-3);
+}
+
+.shell[data-width="narrow"] .status-bar {
+  padding-block: var(--space-1);
+}
+
+/* Wraps: while a document indexes, its status needs a progress bar and Cancel,
+   and the controls on the right move to a second line rather than squeeze them
+   to nothing. */
+.shell[data-width="narrow"] .toolbar {
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding-block: var(--space-2);
+}
+
+/* The size and node count wait for a wider window; Valid or Invalid stays. */
+.shell[data-width="narrow"] .doc-status .muted,
+.shell[data-width="narrow"] .palette-button .kbd {
+  display: none;
+}
+
+.shell[data-width="narrow"] .palette-button {
+  width: auto;
+  padding-right: var(--space-3);
+}
+
+.shell[data-width="narrow"] .document-body {
+  position: relative;
+}
+
+.shell[data-width="narrow"] .details {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 2;
+  width: min(320px, 100%);
+}
