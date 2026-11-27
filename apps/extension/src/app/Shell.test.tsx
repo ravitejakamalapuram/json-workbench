@@ -242,6 +242,17 @@ describe("Shell with the real doc engine", () => {
   });
 });
 
+describe("Shell empty state", () => {
+  it("returns focus to Paste when the paste box is cancelled", async () => {
+    const user = userEvent.setup();
+    setup();
+    const paste = screen.getByRole("button", { name: "Paste" });
+    await user.click(paste);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(document.activeElement).toBe(paste);
+  });
+});
+
 describe("Shell theme", () => {
   it("applies the theme to the page", () => {
     const { store } = setup();

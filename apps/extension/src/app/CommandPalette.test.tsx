@@ -43,6 +43,12 @@ describe("CommandPalette", () => {
     await user.type(input, "nothing like this");
     expect(options()).toEqual([]);
     expect(within(palette()).getByText("No matching commands.")).toBeDefined();
+    expect(within(palette()).getByRole("status").textContent).toBe(
+      "No matching commands.",
+    );
+    expect(screen.getByRole("combobox").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
   });
 
   it("runs the active command with the arrow keys and Enter", async () => {

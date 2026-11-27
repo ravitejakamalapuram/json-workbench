@@ -9,7 +9,7 @@ export const colors = {
     "ink-muted": "#6b6b6b",
     accent: "#c2410c",
     "on-accent": "#ffffff",
-    selected: "#fdebdd",
+    selected: "#fef0e5",
     "syn-key": "#1d4f91",
     "syn-string": "#2f7a3d",
     "syn-number": "#a05a00",
@@ -21,7 +21,7 @@ export const colors = {
     "danger-bg": "#fce8e6",
     warn: "#8a5a00",
     "warn-bg": "#fef3d7",
-    "info-bg": "#fdebdd",
+    "info-bg": "#fef0e5",
     scrim: "#21212152",
   },
   dark: {

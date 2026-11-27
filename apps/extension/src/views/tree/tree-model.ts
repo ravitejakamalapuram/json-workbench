@@ -361,7 +361,9 @@ export function createTreeModel(
         (batch) => hits.push(...batch),
         controller.signal,
       );
-    } catch {
+    } catch (error) {
+      // Only a closed or cancelled index is a quiet exit; a crashed search is the user's to hear about.
+      ignoreAbort(error);
       return false;
     } finally {
       searches.delete(controller);

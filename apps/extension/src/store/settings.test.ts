@@ -69,6 +69,15 @@ describe("loadSettings", () => {
     });
   });
 
+  it("settles with the defaults when storage cannot be read, so boot can render", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(chrome.storage.local, "get").mockRejectedValue(new Error("gone"));
+    const app = store();
+    await loadSettings(app);
+    expect(app.getState().theme).toBe("light");
+    vi.restoreAllMocks();
+  });
+
   it("ignores values of another shape, which an older version may have written", async () => {
     chrome.storage.local.data.set("jwb.theme", "sepia");
     chrome.storage.local.data.set("jwb.materializeLimitMb", 4096);

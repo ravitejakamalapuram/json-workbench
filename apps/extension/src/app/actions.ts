@@ -37,7 +37,8 @@ export function shortcutOf(
     .join("+");
 }
 
-function available(action: Action, ctx: ActionContext): boolean {
+/** Whether the action can run now: it has a handler and its `when` holds. */
+export function available(action: Action, ctx: ActionContext): boolean {
   return (
     (action.run !== undefined || boundHandler(action.id) !== undefined) &&
     (action.when?.(ctx) ?? true)

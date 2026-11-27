@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { ShellProps } from "../../platform/types";
 import { useAppStore, useAppStoreApi } from "../../store";
 import { useActionList } from "../ui/actions-context";
@@ -14,6 +14,7 @@ export function EmptyState({ openFile, extraSources }: EmptyStateProps) {
   const store = useAppStoreApi();
   const recents = useAppStore((state) => state.recents);
   const [pasting, setPasting] = useState(false);
+  const pasteToggle = useRef<HTMLButtonElement>(null);
 
   async function openSample() {
     // Loaded on demand so the sample generator stays out of the entry chunk.
@@ -46,12 +47,23 @@ export function EmptyState({ openFile, extraSources }: EmptyStateProps) {
           >
             Open file
           </Button>
-          <Button aria-expanded={pasting} onClick={() => setPasting(!pasting)}>
+          <Button
+            ref={pasteToggle}
+            aria-expanded={pasting}
+            onClick={() => setPasting(!pasting)}
+          >
             Paste
           </Button>
           <Button onClick={() => void openSample()}>Try a sample</Button>
         </div>
-        {pasting && <PasteBox onCancel={() => setPasting(false)} />}
+        {pasting && (
+          <PasteBox
+            onCancel={() => {
+              setPasting(false);
+              pasteToggle.current?.focus();
+            }}
+          />
+        )}
         {extraSources}
         {recents.length > 0 && (
           <section aria-labelledby="empty-recent">

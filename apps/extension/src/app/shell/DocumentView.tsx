@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import type { DocumentModel, ViewId } from "../../platform/types";
 import { useAppStore, useAppStoreApi } from "../../store";
 import { actionsFor, runAction } from "../actions";
@@ -31,13 +31,39 @@ export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
   });
   // A view the document does not support falls back to the first that does
   // (the tree supports every document).
+  // While a document re-indexes after an edit, the view that showed it stays:
+  // an invalid document being fixed in Raw would otherwise flip to the tree
+  // for the moment its status reads "indexing", and the editor, its focus and
+  // its undo history would be rebuilt.
+  const lastShown = useRef<{ doc: string; view: ViewId } | undefined>(
+    undefined,
+  );
+  const held =
+    doc.status.kind === "indexing" && lastShown.current?.doc === doc.id
+      ? registry.views.find(
+          (p) => p.id === lastShown.current?.view && p.supports(doc) === true,
+        )
+      : undefined;
   const shown =
+    held ??
     registry.views.find((p) => p.id === view && p.supports(doc) === true) ??
     registry.views.find((p) => p.supports(doc) === true);
+  const panel = useRef<HTMLDivElement>(null);
+  const shownId = shown?.id;
+  useEffect(() => {
+    if (shownId) lastShown.current = { doc: doc.id, view: shownId };
+    // A sample opening or a view switch removes the control that had focus;
+    // the panel takes it, so the next Tab starts inside the document.
+    if (!document.activeElement || document.activeElement === document.body)
+      panel.current?.focus({ preventScroll: true });
+  }, [doc.id, shownId]);
+  // The overlay covers the view without being modal; what is behind it must
+  // not stay in the tab order or the reading order.
+  const covered = detailsOpen && width === "narrow";
 
   return (
     <div className="document">
-      <div className="toolbar">
+      <div className="toolbar" inert={covered}>
         <Tabs
           label="Views"
           tabs={tabs}
@@ -57,6 +83,9 @@ export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
       </div>
       <div className="document-body">
         <div
+          ref={panel}
+          tabIndex={-1}
+          inert={covered}
           role="tabpanel"
           id={PANEL_ID}
           aria-labelledby={shown && `${PANEL_ID}-tab-${shown.id}`}
@@ -98,7 +127,12 @@ function DocStatus({ doc }: { readonly doc: DocumentModel }) {
   const open = actions.find((action) => action.id === "app.open");
   return (
     <div className="doc-status">
-      <p data-testid="shell-status" role="status" className={`status-${tone}`}>
+      <p
+        data-testid="shell-status"
+        role={tone === "danger" ? "alert" : "status"}
+        title={detail ? `${text} · ${detail}` : text}
+        className={`status-${tone}`}
+      >
         {tone !== "muted" && <span aria-hidden="true">● </span>}
         {text}
         {detail && <span className="muted"> · {detail}</span>}

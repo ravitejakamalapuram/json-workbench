@@ -802,3 +802,29 @@ describe("view and section contracts", () => {
     expect(rawProblemDetails.title).toBe("Problem");
   });
 });
+
+describe("the compact problem bar", () => {
+  it("shows the error and its fix above the editor while the details are closed, and applying it keeps focus in the editor", async () => {
+    const user = userEvent.setup();
+    const store = createTestStore();
+    await openText(store, BROKEN);
+    act(() => store.getState().setDetailsOpen(false));
+    renderWithStore(<Front />, { store });
+    const view = await editorView();
+    const bar = await screen.findByTestId("raw-problem-bar");
+    expect(bar.textContent).toContain("Line 4, col 1");
+    await user.click(await screen.findByTestId("raw-bar-fix"));
+    expect(view.state.doc.toString()).not.toContain(",\n}");
+    expect(view.hasFocus).toBe(true);
+  });
+
+  it("stays out of the way of the full block in the open details", async () => {
+    const store = createTestStore();
+    await openText(store, BROKEN);
+    act(() => store.getState().setDetailsOpen(true));
+    renderWithStore(<Front />, { store });
+    await editorView();
+    await screen.findByTestId("raw-error");
+    expect(screen.queryByTestId("raw-problem-bar")).toBeNull();
+  });
+});

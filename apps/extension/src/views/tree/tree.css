@@ -43,8 +43,19 @@
   cursor: default;
 }
 
+/* The tint alone is about 1.2:1 against the page, so a bar marks the row too. */
 .tree-row[aria-selected="true"] {
   background: var(--selected);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Forced colors drop backgrounds and shadows: an outline in a system color is
+   what keeps the selected row, tab and rail item visible. */
+@media (forced-colors: active) {
+  .tree-row[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 /* The list clips its rows, so the ring sits inside the row. */

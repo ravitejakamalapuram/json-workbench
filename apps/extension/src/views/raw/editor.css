@@ -58,7 +58,7 @@
 /* The browser paints the selection (the editor draws none of its own), in
    its own blue unless told otherwise. The text keeps its syntax color. */
 .raw-editor .cm-content ::selection {
-  background: var(--selected);
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .raw-editor .cm-editor .cm-matchingBracket {

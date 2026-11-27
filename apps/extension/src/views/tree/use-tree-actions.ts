@@ -66,10 +66,12 @@ export function useTreeActions(
   );
   useActionHandler(
     EXPAND_ALL_JSON,
-    useCallback(
-      async () =>
-        setNotice((await model.expandAllEmbedded()) ? MOUNTS_STOPPED : ""),
-      [model],
-    ),
+    useCallback(async () => {
+      try {
+        setNotice((await model.expandAllEmbedded()) ? MOUNTS_STOPPED : "");
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : String(error));
+      }
+    }, [model]),
   );
 }

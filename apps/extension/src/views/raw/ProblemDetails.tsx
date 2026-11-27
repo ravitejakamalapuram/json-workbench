@@ -6,8 +6,18 @@ import { useAppStoreApi } from "../../store";
 import { useRaw } from "./raw-state";
 
 /** The parser's message as a sentence. */
-const sentence = (message: string) =>
+export const sentence = (message: string) =>
   message.endsWith(".") ? message : `${message}.`;
+
+/** The first syntax error and the first fix offered for it, if the document has one. */
+export function useProblem({ status }: ViewProps["doc"]) {
+  const problem = useRaw((state) => state.problem);
+  const controls = useRaw((state) => state.controls);
+  const [issue] = status.kind === "invalid" ? status.issues : [];
+  // Fixes computed for an older error, or still being computed, are not offered.
+  const [fix] = issue && problem?.issue === issue ? problem.fixes : [];
+  return { issue, fix, controls };
+}
 
 /**
  * The first syntax error, where it is and what it says, then the repair
@@ -16,10 +26,7 @@ const sentence = (message: string) =>
  */
 export default function ProblemDetails({ doc }: ViewProps) {
   const store = useAppStoreApi();
-  const problem = useRaw((state) => state.problem);
-  const controls = useRaw((state) => state.controls);
-  const { status } = doc;
-  const [issue] = status.kind === "invalid" ? status.issues : [];
+  const { issue, fix, controls } = useProblem(doc);
   if (!issue) return null;
 
   // In the side panel the details cover the editor, so what the button does
@@ -31,8 +38,6 @@ export default function ProblemDetails({ doc }: ViewProps) {
     run();
   };
 
-  // Fixes computed for an older error, or still being computed, are not offered.
-  const [fix] = problem?.issue === issue ? problem.fixes : [];
   return (
     <div className="raw-problem">
       <p className="raw-problem-where" data-testid="raw-error">

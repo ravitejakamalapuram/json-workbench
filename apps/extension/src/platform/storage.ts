@@ -24,18 +24,29 @@ function area(name: "local" | "session"): chrome.storage.StorageArea | null {
 export async function readStored<K extends Key>(
   key: K,
 ): Promise<StoredValues[K] | undefined> {
-  const local = area("local");
-  const value = local ? (await local.get(key))[key] : memory.get(key);
-  return value as StoredValues[K] | undefined;
+  try {
+    const local = area("local");
+    const value = local ? (await local.get(key))[key] : memory.get(key);
+    return value as StoredValues[K] | undefined;
+  } catch (error) {
+    // A setting that cannot be read falls back to its default.
+    console.warn(`Could not read ${key} from storage.`, error);
+    return undefined;
+  }
 }
 
 export async function writeStored<K extends Key>(
   key: K,
   value: StoredValues[K],
 ): Promise<void> {
-  const local = area("local");
-  if (local) await local.set({ [key]: value });
-  else memory.set(key, value);
+  try {
+    const local = area("local");
+    if (local) await local.set({ [key]: value });
+    else memory.set(key, value);
+  } catch (error) {
+    // The UI already shows the new value; losing it on reload is not worth an error screen.
+    console.warn(`Could not save ${key} to storage.`, error);
+  }
 }
 
 export async function clearStored(): Promise<void> {

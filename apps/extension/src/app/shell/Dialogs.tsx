@@ -1,10 +1,12 @@
 import { lazy, Suspense } from "react";
 import type { RecentFile } from "../../platform/types";
-import { useAppStore } from "../../store";
+import { useAppStore, useAppStoreApi } from "../../store";
+import { available } from "../actions";
 import { useActionList } from "../ui/actions-context";
 import { Button } from "../ui/Button";
 import { Kbd } from "../ui/Kbd";
 import { Modal } from "../ui/Modal";
+import { useSelectedNode } from "./selected-node";
 import { closeDialog, useDialog } from "./session";
 
 // Loaded on first use: most sessions never export or open settings.
@@ -51,10 +53,21 @@ export function Dialogs({ openFile }: { readonly openFile: () => void }) {
 const PASTE = { label: "Paste JSON", shortcut: "Mod+V" };
 
 function HelpDialog() {
+  const store = useAppStoreApi();
   const actions = useActionList();
+  const node = useSelectedNode();
+  const state = store.getState();
+  const ctx = {
+    state,
+    doc: state.docs.find((d) => d.id === state.activeDocId),
+    node,
+  };
+  // Only what a key press would do now: the same test the shortcuts use.
   const rows = [
-    ...actions.flatMap(({ label, shortcut }) =>
-      shortcut ? [{ label, shortcut }] : [],
+    ...actions.flatMap((action) =>
+      action.shortcut && available(action, ctx)
+        ? [{ label: action.label, shortcut: action.shortcut }]
+        : [],
     ),
     PASTE,
   ];

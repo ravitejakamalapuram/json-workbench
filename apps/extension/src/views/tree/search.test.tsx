@@ -93,6 +93,22 @@ describe("tree search", () => {
     expect(document.activeElement).toBe(search());
   });
 
+  it("keeps each document's query when the tabs are switched", async () => {
+    const user = userEvent.setup();
+    const { store } = await showTree();
+    const [first] = store.getState().docs;
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.type(search(), "Bruno");
+    await waitFor(() => expect(count().textContent).toBe("1 of 1"));
+    await openText(store, "[1,2]", { name: "other.json" });
+    await waitFor(() => expect(screen.queryByTestId("tree-search")).toBeNull());
+    act(() => store.getState().setActiveDocument(first!.id));
+    await waitFor(() =>
+      expect((search() as HTMLInputElement).value).toBe("Bruno"),
+    );
+    await waitFor(() => expect(count().textContent).toBe("1 of 1"));
+  });
+
   it("steps through matches with Enter, Shift+Enter and Alt+Arrow", async () => {
     const user = userEvent.setup();
     const { store } = await showTree();

@@ -288,6 +288,34 @@ describe("JSON inside strings", () => {
     expect(parseInt(body!.style.height) / 28).toBe(1 + 22 + 20 * 2);
   });
 
+  it("tells the user when the search for embedded JSON fails", async () => {
+    const shown = await showTree(JSON.stringify([{ body: '{"id":1}' }]));
+    const { status } = shown.store.getState().docs[0]!;
+    if (status.kind !== "ready") throw new Error("not ready");
+    vi.spyOn(status.index, "search").mockRejectedValue(
+      new Error("The search worker stopped."),
+    );
+    const StatusBar = treeView.StatusBar!;
+    renderWithStore(<StatusBar doc={shown.store.getState().docs[0]!} />, {
+      store: shown.store,
+    });
+    await act(() =>
+      runAction(
+        embeddedActions.find((a) => a.id === EXPAND_ALL_JSON)!,
+        {
+          state: {} as never,
+          doc: undefined,
+          node: undefined,
+        },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toBe(
+        "The search worker stopped.",
+      ),
+    );
+  });
+
   it("does not bring back mounted JSON after a visit to another mode", async () => {
     const user = userEvent.setup();
     const { store, unmount } = await showTree(ORDER);

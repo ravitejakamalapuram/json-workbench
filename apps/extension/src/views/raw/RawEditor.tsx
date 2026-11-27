@@ -165,6 +165,9 @@ export default function RawEditor({ doc }: ViewProps) {
       controls: {
         applyFix: (fix) => {
           applyChanges(view, fix.changes);
+          // The fix button goes away when the document re-indexes; the editor
+          // takes focus so the keyboard user is not left on the page body.
+          view.focus();
           saver.flush();
         },
         goToError: (issue) => goToError(view, issue),

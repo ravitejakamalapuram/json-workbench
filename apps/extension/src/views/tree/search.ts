@@ -54,9 +54,19 @@ const IDLE: SearchState = {
 
 const store = createStore<SearchState>(() => IDLE);
 
+/**
+ * What the person typed, per index, so a document's query is still there when
+ * its tab comes back; its hits are not kept, they are searched again.
+ */
+const typed = new WeakMap<DocumentIndex, SearchState>();
+
+// One object per remembered state, so a store selector sees the same value on every call.
+const fallback = (owner: DocumentIndex): SearchState =>
+  typed.get(owner) ?? IDLE;
+
 const read = (owner: DocumentIndex) => {
   const state = store.getState();
-  return state.owner === owner ? state : IDLE;
+  return state.owner === owner ? state : fallback(owner);
 };
 
 export function useSearch<T>(
@@ -64,7 +74,7 @@ export function useSearch<T>(
   select: (state: SearchState) => T,
 ): T {
   return useStore(store, (state) =>
-    select(state.owner === owner ? state : IDLE),
+    select(state.owner === owner ? state : owner ? fallback(owner) : IDLE),
   );
 }
 
@@ -72,7 +82,10 @@ export function patchSearch(
   owner: DocumentIndex,
   change: Partial<SearchState>,
 ) {
-  store.setState({ ...read(owner), owner, ...change });
+  const next = { ...read(owner), owner, ...change };
+  store.setState(next);
+  if ("query" in change || "open" in change)
+    typed.set(owner, { ...IDLE, query: next.query, open: next.open });
 }
 
 export function setQuery(owner: DocumentIndex, change: Partial<SearchQuery>) {

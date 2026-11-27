@@ -74,7 +74,7 @@ export function CommandPalette({
           className="palette-input"
           role="combobox"
           aria-label="Search commands"
-          aria-expanded="true"
+          aria-expanded={shown.length > 0}
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={shown[active] ? optionId(active) : undefined}
@@ -102,7 +102,11 @@ export function CommandPalette({
             </li>
           ))}
         </ul>
-        {shown.length === 0 && <p className="muted">No matching commands.</p>}
+        {shown.length === 0 && (
+          <p role="status" className="muted">
+            No matching commands.
+          </p>
+        )}
       </div>
     </Modal>
   );

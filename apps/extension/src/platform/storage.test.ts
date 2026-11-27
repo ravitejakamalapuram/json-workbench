@@ -25,6 +25,21 @@ describe("stored values in the extension", () => {
   });
 });
 
+describe("a failing chrome.storage", () => {
+  it("is logged and never thrown into the caller", async () => {
+    const chrome = installFakeChrome();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(chrome.storage.local, "set").mockRejectedValue(new Error("quota"));
+    vi.spyOn(chrome.storage.local, "get").mockRejectedValue(
+      new Error("context invalidated"),
+    );
+    await expect(writeStored("jwb.theme", "dark")).resolves.toBeUndefined();
+    await expect(readStored("jwb.theme")).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+});
+
 describe("stored values outside the extension", () => {
   it("keeps them in memory, so Vite dev and tests need no chrome", async () => {
     await writeStored("jwb.theme", "dark");
