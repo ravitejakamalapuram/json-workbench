@@ -34,24 +34,20 @@ data_collection:
   stored:
     local:
       [
-        chrome_storage_local_auto_render_flag,
-        chrome_storage_session_pending_payload,
-        localstorage_pipeline_and_theme,
+        chrome_storage_local_settings_recents_pipeline,
+        chrome_storage_session_handoff_60s,
       ]
     remote: []
   transmitted:
     endpoints: []
-    # The one fetch() call re-reads the active tab's own URL, not a third-party
-    # endpoint. It is sent with credentials: "include" so that a JSON API the
-    # developer is signed in to returns the document on screen rather than a login
-    # page; cookies therefore go to that origin, and the request is a second GET of
-    # a URL the user already loaded. Reviewed under APP-81 and kept deliberately —
-    # see appforge-brain engineering/debt.md DEBT-0004. Disclosed in PRIVACY.md
-    # ("How \"Active JSON tab\" reads the page") and in CHROMEWEBSTORE.md.
-  sensitive: [] # user JSON content is processed client-side (WASM: DuckDB-WASM, jq-web) and never leaves the browser
+    # No network request carries user data: the extension-pages CSP sets
+    # connect-src 'self', and the service worker and content script make no
+    # network calls. Tab import reads the
+    # rendered page text; the old credentialed re-fetch is removed (ADR 0005).
+  sensitive: [] # user JSON content is processed client-side (workers, jq-web WASM) and never leaves the browser
   third_party: []
   retention: { local: indefinite_until_user_clears, remote: none }
-  deletion: "Uninstall clears all local/session storage and page localStorage for the extension"
+  deletion: "'Clear local data' in Settings removes every stored key; uninstall clears all local and session storage for the extension"
 security_classification: low
 release_channel: default
 current_version: "0.2.1"

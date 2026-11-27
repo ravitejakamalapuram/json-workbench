@@ -21,11 +21,14 @@
   "side_panel": {
     "default_path": "index.html"
   },
+  "devtools_page": "devtools.html",
   "permissions": ["activeTab", "sidePanel", "storage", "scripting"],
-  "optional_permissions": ["debugger"],
   "optional_host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self'; img-src 'self' data: blob:; frame-src 'none'; form-action 'none'; base-uri 'none'"
   }
 }

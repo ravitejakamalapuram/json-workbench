@@ -41,7 +41,7 @@ import {
   type ValidationDiagnostic,
 } from "@json-workbench/core";
 import { ingestFile, type IngestTask } from "./ingest";
-import { createSampleWorkspace } from "./sample-data";
+import { createSampleWorkspace } from "../app/sample-data";
 import {
   REVIEW_URL,
   chromeLocalStorageArea,
@@ -54,7 +54,7 @@ import {
   shouldShowReviewPrompt,
   type ReviewEvent,
   type ReviewPromptState,
-} from "./review-prompt";
+} from "../app/review-prompt";
 import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";

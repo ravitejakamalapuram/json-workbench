@@ -146,9 +146,9 @@ export function createSampleOrders(count = SAMPLE_ORDER_COUNT): JsonObject[] {
 export function createSampleDiffTarget(
   orders: readonly JsonObject[],
 ): JsonObject[] {
-  const copy = orders.map(
-    (order) => JSON.parse(JSON.stringify(order)) as JsonObject,
-  );
+  // The sample holds only plain numbers and strings, so structuredClone is an
+  // exact deep copy (and keeps JSON.parse out of extension code).
+  const copy = orders.map((order) => structuredClone(order));
   if (copy[0]) copy[0] = { ...copy[0], status: "delivered" };
   if (copy[1])
     copy[1] = { ...copy[1], total: round2(Number(copy[1].total) + 10) };

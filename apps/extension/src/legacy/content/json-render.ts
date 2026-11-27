@@ -1,6 +1,6 @@
-import { parseJsonValue } from "../../../../packages/core/src/input";
-import { renderJsonTreeHtml } from "../../../../packages/core/src/render";
-import type { JsonValue } from "../../../../packages/core/src/types";
+import { parseJsonValue } from "../../../../../packages/core/src/input";
+import { renderJsonTreeHtml } from "../../../../../packages/core/src/render";
+import type { JsonValue } from "../../../../../packages/core/src/types";
 
 interface JwbRuntime {
   sendMessage?: (message: unknown) => void;
