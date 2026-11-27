@@ -73,7 +73,7 @@ Rebuild after changing it.
     no optional permissions and no content script.
   - _Unused permissions_ → the manifest is minimal; `package:check` guards it.
   - _Remote code_ → none; every script is bundled, and the extension pages' CSP
-    blocks any connection to another address.
+    stops pages loading from or connecting to another address.
 
 ## 6. After approval
 

@@ -27,3 +27,28 @@ export function contentProblems(has) {
     ...FORBIDDEN_FILES.filter(has).map((file) => `must not ship ${file}`),
   ];
 }
+
+/** Local files that index.html loads (scripts, stylesheets, icons); remote URLs are the CSP's business. */
+function pageReferences(html) {
+  const found = [];
+  for (const tag of html.match(/<(?:script|link)\b[^>]*>/g) ?? []) {
+    const url = /\b(?:src|href)="([^"]+)"/.exec(tag)?.[1];
+    if (url && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(url))
+      found.push(url.replace(/^\//, "").replace(/[?#].*$/, ""));
+  }
+  return found;
+}
+
+/** Returns one line per file the manifest or index.html names that dist lacks. */
+export function referenceProblems(manifest, indexHtml, has) {
+  const references = [
+    ...Object.values(manifest.icons ?? {}),
+    ...Object.values(manifest.action?.default_icon ?? {}),
+    manifest.background?.service_worker,
+    manifest.side_panel?.default_path,
+    ...pageReferences(indexHtml),
+  ];
+  return [...new Set(references)]
+    .filter((file) => file && !has(file))
+    .map((file) => `referenced but missing ${file}`);
+}

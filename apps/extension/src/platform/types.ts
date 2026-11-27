@@ -1,5 +1,5 @@
 // The contracts every part of the extension builds against (TARGET.md section 3).
-// Frozen at the end of F1a: an owner may add optional fields to its own slice,
+// Frozen: a feature may add optional fields to its own slice,
 // never rename or remove. Types that cross a worker boundary are `type` aliases,
 // not interfaces, so they satisfy `Plain` in platform/workers/protocol.ts.
 import type { PipelineDefinition } from "@json-workbench/core";
@@ -8,7 +8,7 @@ import type { StateCreator } from "zustand";
 import type { CompareSlice } from "../store/compare";
 import type { TransformSlice } from "../store/transform";
 
-const MiB = 1024 * 1024;
+export const MiB = 1024 * 1024;
 
 /** Every size bound in one place. "Chars" are UTF-16 code units; "Bytes" are UTF-8 bytes. */
 export const LIMITS = {

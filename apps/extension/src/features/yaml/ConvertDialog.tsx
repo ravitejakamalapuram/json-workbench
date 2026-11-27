@@ -4,14 +4,13 @@ import { saveFile } from "../../app/export/save-file";
 import { Button } from "../../app/ui/Button";
 import { Modal } from "../../app/ui/Modal";
 import { indexedFormat } from "../../platform/formats";
+import { MiB } from "../../platform/types";
 import type { DocumentModel } from "../../platform/types";
 import { createWorkerClient } from "../../platform/workers/client";
 import { DESCRIPTIONS, renamed } from "./names";
 import { spawnYamlWorker } from "./spawn";
 import type { YamlOps } from "./yaml-ops";
 import "./yaml.css";
-
-const MB = 1024 * 1024;
 
 const PHASE_TEXT = {
   reading: "Reading the document…",
@@ -68,7 +67,7 @@ export function ConvertDialog({
         {
           source: doc.source,
           format: indexedFormat(doc.format),
-          maxBytes: limitMb * MB,
+          maxBytes: limitMb * MiB,
         },
         { signal: controller.signal, onProgress: setPhase },
       );

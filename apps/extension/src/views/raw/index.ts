@@ -1,4 +1,4 @@
-// Owned by item "raw". The exported names are fixed (TARGET.md section 4).
+// The exported names are fixed (TARGET.md section 4).
 import { lazy } from "react";
 import type { DetailsSection, ViewPlugin } from "../../platform/types";
 import { rawActions } from "./actions";

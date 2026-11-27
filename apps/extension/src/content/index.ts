@@ -1,4 +1,3 @@
-// Owned by item "content". F1a stub of the in-page formatter, built by esbuild
-// to dist/json-render.js. The service worker registers it only on origins the
-// user granted, so it runs nowhere until both items are built.
+// Placeholder for the in-page formatter, which is not part of the first release:
+// nothing builds it into dist or registers it.
 export {};

@@ -1,8 +1,7 @@
-// Owned by item "yaml". The exported name is fixed (TARGET.md section 4).
+// The exported name is fixed (TARGET.md section 4).
+import { MiB } from "../../platform/types";
 import type { Action } from "../../platform/types";
 import { DESCRIPTIONS, renamed } from "./names";
-
-const MB = 1024 * 1024;
 
 /**
  * Action has no description field yet, so the sentence travels with the action
@@ -23,7 +22,7 @@ export const yamlActions: readonly DescribedAction[] = [
     when: ({ doc, state }) =>
       doc?.status.kind === "ready" &&
       doc.format !== "yaml" &&
-      doc.source.size <= state.materializeLimitMb * MB,
+      doc.source.size <= state.materializeLimitMb * MiB,
     run: async ({ doc, state }) => {
       if (!doc) return;
       // Loaded on first use: most sessions never convert.

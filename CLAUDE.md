@@ -10,7 +10,7 @@ JSON Workbench: a local-first Chrome MV3 extension (published on the Chrome Web 
 
 Node >= 22, npm workspaces (`apps/*`, `packages/*`).
 
-- `npm run build`: build the extension into `apps/extension/dist` (that dir is what gets loaded in Chrome and packaged): Vite builds the one page `index.html` (side panel, and the full tab with `?surface=tab`), esbuild builds the service worker `background.js`, and `scripts/prepare-extension-package.mjs` writes the manifest. For the Vite dev server run `npm run dev --workspace @json-workbench/extension`; the root `dev` script has no page to serve.
+- `npm run build`: build the extension into `apps/extension/dist` (that dir is what gets loaded in Chrome and packaged): Vite builds the one page `index.html` (side panel, and the full tab with `?surface=tab`), esbuild builds the service worker `background.js`, and `scripts/prepare-extension-package.mjs` writes the manifest. `npm run dev` starts the Vite dev server of `apps/extension`.
 - `npm test`: vitest, matches `packages/**/*.test.ts`, `apps/**/*.test.{ts,tsx}`, `scripts/**/*.test.mjs`. Single file: `npx vitest run packages/core/src/diff.test.ts`; single test: add `-t "name"`.
 - `npm run typecheck`, `npm run lint`, `npm run format:check`: these plus `npm test` are the release `test` command in `release.yaml`.
 - `npm run bench`: large-data benchmarks (`packages/core/src/large-data.bench.ts`).
@@ -33,7 +33,7 @@ Design rules from `docs/ARCHITECTURE.md`: worker-first (never block the UI threa
 
 ## Conventions that aren't obvious
 
-- **Version source of truth** is `apps/extension/manifest.json` (ADR 0002). Root `package.json`, `apps/extension/package.json` and `.appforge/product.yaml` (`current_version`) must mirror it; a bump is a manual four-file edit and `package:check` fails on drift. The actual published version is computed by release-platform from `v*` tags and conventional commits, so use conventional commit messages.
+- **Version source of truth** is `apps/extension/manifest.json` (ADR 0002). Root `package.json`, `apps/extension/package.json`, `.appforge/product.yaml` (`current_version`) and the three version fields of `package-lock.json` must mirror it; a bump is a manual edit of those files and `package:check` fails on drift. The actual published version is computed by release-platform from `v*` tags and conventional commits, so use conventional commit messages.
 - **Permissions are audited**: the manifest declares `sidePanel` and `storage` and nothing else (no host permissions, content script or DevTools page), and `.appforge/permissions.yaml` documents each one. `scripts/lib/manifest-policy.mjs` enforces the list in `package:check` and in `manifest-policy.test.mjs`. Changing manifest permissions means updating that file, the policy, `PRIVACY.md` and the store docs in the same commit; CI posts a permission diff on PRs.
 - Store listing lives in `chrome-store/store.config.json`, `app-metadata.json`, `CHROMEWEBSTORE.md` and `docs/STORE_*.md`; `scripts/lib/store-docs.test.mjs` keeps them in step with the manifest, the stored keys and each other. `npm run chrome-store:*` are release tooling and not part of normal development.
 - Roadmap/status and verified-feature evidence: `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/TESTING.md`. Don't claim a feature works without a test or reproducible manual check.

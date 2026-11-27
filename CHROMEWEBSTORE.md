@@ -1,6 +1,6 @@
 # Chrome Web Store Listing & Publishing Record
 
-_Last Updated: 2026-11-27_
+_Record last verified against the store: 2026-09-23. Anything after that date is unverified._
 
 ---
 
@@ -9,7 +9,7 @@ _Last Updated: 2026-11-27_
 - **Name**: JSON Workbench
 - **Extension ID**: `higmlhleblpmdogjccpmjlnilpmhohal`
 - **Publisher ID**: `9637cb78-fa33-49dd-a4cb-91066ff182e3`
-- **Version**: `0.1.0` published (100%, live), `0.2.0` uploaded and submitted (pending review)
+- **Version**: `0.1.0` published (100%, live), `0.2.0` uploaded and submitted on 2026-09-23. The outcome of 0.2.0 and whether 0.3.0 was uploaded: status unverified, check the Chrome Web Store dashboard
 - **Manifest Version**: `MV3`
 - **Language**: `en`
 - **Category**: `Developer Tools`
@@ -34,7 +34,7 @@ JSON Workbench is a local-first tool for reading and fixing JSON. Open a file, p
 - YAML: open YAML as JSON and save JSON as YAML.
 - Export: save as JSON, JSONL, NDJSON, CSV or TSV, or save the file as it is.
 
-No account, no analytics, no network access: the extension's pages are not allowed to connect to any server. Works in Chrome and Edge 120+.
+No account, no analytics, no network access: the extension's pages are not allowed to load from or connect to any server outside the extension. Works in Chrome and Edge 120+.
 ```
 
 ---
@@ -59,7 +59,7 @@ Google review requires specific plain-English justification for each declared pe
   ⬇
   Local Browser Storage (chrome.storage.local)
 
-  The extension has no backend and makes no network request: its pages run under a content security policy with `connect-src 'self'`, so Chrome refuses a connection to any other address. It reads no web page and no tab.
+  The extension has no backend and makes no network request: its pages run under a content security policy (`default-src 'self'`, `connect-src 'self'`), so Chrome blocks them from loading or connecting to any other address: scripts, stylesheets, fonts, images, media and network connections. It reads no web page and no tab.
 
 - **Data Handling Summary**:
   - **User Preference & Session State**: Collected: Yes | Stored: Local | Purpose: Store the theme, the memory limit and the names of recently opened files.
@@ -96,3 +96,4 @@ Google review requires specific plain-English justification for each declared pe
 | `0.1.0` | 2026-09-20 | Draft / Ready                         | `chrome-store/builds/json-workbench-v0.1.0.zip` | Automated build & verification passed                      |
 | `0.1.0` | 2026-09-23 | Published (100%)                      | —                                               | Listing went public; release run 35891501484               |
 | `0.2.0` | 2026-09-23 | Uploaded / Submitted (pending review) | —                                               | Uploaded and submitted for review; release run 35891501484 |
+| `0.3.0` | 2026-11-27 | Status unverified                     | —                                               | Check the Chrome Web Store dashboard; nothing is recorded  |

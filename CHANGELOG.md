@@ -10,9 +10,10 @@ version is the `version` field in `apps/extension/manifest.json`.
 - A rebuilt interface: a side panel with a tree view (including JSON stored
   inside string values), a Raw editor with one-click fixes, a command palette,
   and settings.
-- Large files up to about 1.25 GB open in place through a byte-range index
-  built in a worker; the first rows appear while the rest of the file is
-  scanned.
+- Large files open in place through a byte-range index built in a worker; the
+  first rows appear while the rest of the file is scanned. Measured up to
+  308 MB in Chrome and 1 GiB in Node; the limit is set at 1.25 GB and has not
+  been measured in Chrome.
 - Permissions reduced to `sidePanel` and `storage`: no `activeTab`,
   `scripting`, optional `debugger` or optional `<all_urls>`.
 

@@ -2,6 +2,7 @@
 // for its rows, then read the few rows on screen (TARGET.md section 5). The
 // pager reads `source` itself, not the doc worker's index, because an invalid
 // document keeps no index and Raw is the view that shows it.
+import { MiB } from "../../platform/types";
 import {
   LineIndex,
   type LineIndexOptions,
@@ -52,7 +53,7 @@ export type PagerOptions = LineIndexOptions & {
 
 /** More rows than a window shows are never asked for, so a call never decodes more than this. */
 export const MAX_ROWS_PER_CALL = 500;
-const SCAN_BYTES = 4 * 1024 * 1024;
+const SCAN_BYTES = 4 * MiB;
 /** A character is at most 4 bytes, so a row cut inside one needs at most 3 more. */
 const CHAR_TAIL = 3;
 

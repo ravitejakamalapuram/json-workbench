@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run dev --workspace @json-workbench/extension",
     "build": "npm run build --workspace @json-workbench/extension",
     "build:cli": "npm run build --workspace @json-workbench/cli",
     "build:vscode": "npm run build --workspace @json-workbench/vscode",

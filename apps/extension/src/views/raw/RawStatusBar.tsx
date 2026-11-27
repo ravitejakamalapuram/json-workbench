@@ -1,8 +1,8 @@
 import { Button } from "../../app/ui/Button";
-import { LIMITS } from "../../platform/types";
+import { LIMITS, MiB } from "../../platform/types";
 import { useRaw } from "./raw-state";
 
-const MB = LIMITS.rawEditChars / (1024 * 1024);
+const MB = LIMITS.rawEditChars / MiB;
 
 /** "Ln 7, Col 24" in the bar under the view (Errors mockup), why the last rewrite did nothing, and Go to line over the pager. */
 export function RawStatusBar() {

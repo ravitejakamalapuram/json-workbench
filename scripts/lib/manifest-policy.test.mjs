@@ -16,7 +16,7 @@ describe("manifest policy", () => {
 
   it("pins the extension-pages CSP string exactly", () => {
     expect(EXTENSION_PAGES_CSP).toBe(
-      "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self'; img-src 'self' data: blob:; frame-src 'none'; form-action 'none'; base-uri 'none'",
+      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'none'; manifest-src 'self'; frame-src 'none'; form-action 'none'; base-uri 'none'",
     );
     const loosened = {
       ...source,

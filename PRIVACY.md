@@ -10,7 +10,7 @@ JSON Workbench is built as a local-first developer tool. We respect your privacy
 
 JSON Workbench **does not collect, transmit, or sell any personal data, browsing history, or user-provided content**.
 
-- **JSON & Data Payloads**: All JSON, JSONL, NDJSON and YAML files you open, paste or drop, and any token you decode, are processed entirely within your browser, in the extension's page and its background workers. Your data is never uploaded to external servers or cloud services. The extension's pages run under a content security policy that blocks network connections to any other address (`connect-src 'self'`), so this is enforced by Chrome, not only promised.
+- **JSON & Data Payloads**: All JSON, JSONL, NDJSON and YAML files you open, paste or drop, and any token you decode, are processed entirely within your browser, in the extension's page and its background workers. Your data is never uploaded to external servers or cloud services. The extension's pages run under a content security policy (`default-src 'self'`, `connect-src 'self'`) under which Chrome blocks them from loading or connecting to any other address: scripts, stylesheets, fonts, images, media, frames and fetch, XMLHttpRequest and WebSocket connections. This is enforced by Chrome, not only promised.
 - **Web pages and tabs**: the extension does not read the pages you visit or your tabs. It requests no access to websites.
 - **No telemetry**: the extension does not send usage data, analytics, or crash reports. Its code makes no network request.
 

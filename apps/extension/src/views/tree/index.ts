@@ -1,4 +1,4 @@
-// Owned by item "tree". The exported name is fixed (TARGET.md section 4).
+// The exported name is fixed (TARGET.md section 4).
 import type { DocumentModel, ViewPlugin } from "../../platform/types";
 import { treeActions } from "./actions";
 import { TreeStatus } from "./TreeStatus";

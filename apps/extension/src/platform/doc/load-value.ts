@@ -10,12 +10,16 @@ import {
   parseJsonValue,
   type JsonValue,
 } from "@json-workbench/core";
-import { TooLargeError, type LoadValueOptions, type Pointer } from "../types";
+import {
+  TooLargeError,
+  type LoadValueOptions,
+  type Pointer,
+  MiB,
+} from "../types";
 import { listItems, type Item, type ListEnv } from "./range-list";
 import { readBytes } from "./read";
 import { sizeText } from "./size-text";
 
-const MB = 1024 * 1024;
 const BOM = [0xef, 0xbb, 0xbf];
 const OPEN_ARRAY = 0x5b;
 const OPEN_OBJECT = 0x7b;
@@ -153,7 +157,7 @@ async function locate(
   const env: ListEnv = {
     source,
     until: source.size,
-    chunkBytes: MB,
+    chunkBytes: MiB,
     known: () => undefined,
   };
   const jsonl = format === "jsonl";

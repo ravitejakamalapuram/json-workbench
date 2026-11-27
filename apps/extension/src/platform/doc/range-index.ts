@@ -24,6 +24,7 @@ import {
   type SearchHit,
   type SearchQuery,
   type SearchSummary,
+  MiB,
 } from "../types";
 import { ByteScanner, type ScanIssue } from "./byte-scan";
 import { PREVIEW_BYTES, primitivePreview } from "./json-string";
@@ -57,7 +58,7 @@ export type BuildOutcome =
   | { readonly kind: "invalid"; readonly issues: readonly ParseIssue[] };
 
 /** The pass reads 1 MiB at a time, so rows are readable after the first. */
-const DEFAULT_CHUNK = 1024 * 1024;
+const DEFAULT_CHUNK = MiB;
 const BOM = [0xef, 0xbb, 0xbf];
 const LF = 0x0a;
 const CR = 0x0d;

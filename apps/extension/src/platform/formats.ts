@@ -9,6 +9,7 @@ import {
   TooLargeError,
   type DocFormat,
   type IndexedFormat,
+  MiB,
 } from "./types";
 
 /** How much of a Blob detectFormat needs to see. */
@@ -39,7 +40,7 @@ export function indexedFormat(format: DocFormat): IndexedFormat {
 export async function yamlToJson(source: Blob): Promise<string> {
   if (source.size > LIMITS.yamlMaxBytes)
     throw new TooLargeError(
-      `YAML files up to ${LIMITS.yamlMaxBytes / 1024 / 1024} MB can be opened. Convert it to JSON first.`,
+      `YAML files up to ${LIMITS.yamlMaxBytes / MiB} MB can be opened. Convert it to JSON first.`,
     );
   const [{ parseYaml }, text] = await Promise.all([
     import("../features/yaml/codec"),

@@ -1,6 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LIMITS, type ViewProps } from "../../platform/types";
+import { LIMITS, type ViewProps, MiB } from "../../platform/types";
 import { createWorkerClient } from "../../platform/workers/client";
 import type { WorkerClient } from "../../platform/workers/protocol";
 import { useAppStoreApi } from "../../store";
@@ -18,7 +18,7 @@ import { Saver } from "./saver";
 import { spawnRawWorker } from "./spawn";
 import "./editor.css";
 
-const MB = LIMITS.rawEditChars / (1024 * 1024);
+const MB = LIMITS.rawEditChars / MiB;
 
 /**
  * The document's text in CodeMirror, editable up to LIMITS.rawEditChars. The

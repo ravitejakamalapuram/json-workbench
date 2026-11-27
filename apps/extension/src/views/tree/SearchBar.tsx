@@ -8,6 +8,7 @@ import {
   LIMITS,
   type DocumentIndex,
   type SearchQuery,
+  MiB,
 } from "../../platform/types";
 import {
   patchSearch,
@@ -73,7 +74,7 @@ function countLabel({
 /** What the worker left out, said so a screen reader gets the whole sentence and the toolbar stays short. */
 function Skipped({ count }: { readonly count: number }) {
   if (count === 0) return null;
-  const size = `${LIMITS.searchTokenBytes / (1024 * 1024)} MB`;
+  const size = `${LIMITS.searchTokenBytes / MiB} MB`;
   const noun = count === 1 ? "value" : "values";
   return (
     <>

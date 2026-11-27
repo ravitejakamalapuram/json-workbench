@@ -1,5 +1,5 @@
-// Owned by item "compare". F1a wrote this file as a stub in its final shape;
-// the item may add optional fields, never rename or remove (TARGET.md section 3).
+// Slice shape for Compare, which is not part of the first release;
+// it may gain optional fields, never rename or remove (TARGET.md section 3).
 import type {
   DocId,
   Pointer,

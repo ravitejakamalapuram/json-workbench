@@ -1,4 +1,4 @@
-// Owned by item "tree": JSON held inside a string value, expanded under its
+// JSON held inside a string value, expanded under its
 // tree row (decision 14). Both actions act on a tree row, so the tree binds
 // them with useActionHandler while it is mounted.
 import { openTextIndex } from "../../platform/doc/open";

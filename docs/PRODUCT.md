@@ -1,6 +1,6 @@
 # Product
 
-JSON Workbench is a Chrome side panel for developers who read, fix and convert JSON: API responses, fixtures, logs and exports, including files of a gigabyte or more. It is local-first: nothing is uploaded, and there is no telemetry.
+JSON Workbench is a Chrome side panel for developers who read, fix and convert JSON: API responses, fixtures, logs and exports, including files too large for an editor. It is local-first: nothing is uploaded, and there is no telemetry.
 
 ## First release (0.3.0)
 
@@ -8,7 +8,7 @@ The scope is fixed in `docs/design/DECISIONS.md` ("First release scope"):
 
 - Tree with embedded JSON, search and path copying
 - Raw editor with one-click fixes, format and minify
-- Large files (about 1.25 GB) opened in place
+- Large files opened in place (measured: 308 MB in Chrome, 1 GiB in Node; the limit is 1.25 GB)
 - JWT decoding
 - YAML in and out
 - Export to JSON, JSONL, NDJSON, CSV and TSV, and conversion to YAML

@@ -10,6 +10,7 @@ import {
   type SearchProgress,
   type SearchQuery,
   type SearchSummary,
+  MiB,
 } from "../types";
 import type { Handlers, SearchOps } from "../workers/protocol";
 import { readBytes } from "./read";
@@ -26,7 +27,7 @@ export type SearchRun = {
   readonly maxTokenBytes?: number;
 };
 
-const DEFAULT_CHUNK = 1024 * 1024;
+const DEFAULT_CHUNK = MiB;
 /**
  * A token that spans chunks is held whole to be matched: its pieces, then a
  * joined copy, then (for a regular expression or an escape) its decoded text

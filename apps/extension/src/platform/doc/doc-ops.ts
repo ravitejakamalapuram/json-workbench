@@ -12,6 +12,7 @@ import {
   TooLargeError,
   type DocFormat,
   type DocumentIndex,
+  MiB,
 } from "../types";
 import type {
   DocOps,
@@ -33,12 +34,11 @@ export type DocOptions = {
   readonly maxBytes?: number;
 };
 
-const MB = 1024 * 1024;
-const GB = 1024 * MB;
+const GB = 1024 * MiB;
 /**
  * Assumption, not measured: the pass keeps a few megabytes per gigabyte, so
- * the limit is what a Blob and a tab's patience hold, a little above the 1 GB
- * the product promises.
+ * the limit is what a Blob and a tab's patience hold. The largest runs were
+ * 308 MB in Chrome and 1 GiB in Node (docs/architecture/TARGET.md, Measured).
  */
 const MAX_BYTES = 1.25 * GB;
 

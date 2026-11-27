@@ -1,4 +1,4 @@
-// Owned by item "table". F1a stub: the exported names are fixed (TARGET.md section 4).
+// Placeholder, not registered in the first release: the exported names are fixed (TARGET.md section 4).
 import { lazy } from "react";
 import type { ViewPlugin } from "../../platform/types";
 

@@ -1,5 +1,5 @@
-// Owned by item "tabimport". F1a stub of the DevTools panel page; the item
-// mounts the shell here with its network list as `extraSources`.
+// Placeholder for the DevTools panel page, which is not part of the first
+// release. It would mount the shell here with its network list as `extraSources`.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Stub } from "../app/ui/Stub";

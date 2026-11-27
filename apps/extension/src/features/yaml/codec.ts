@@ -25,12 +25,12 @@ import {
   type SchemaOptions,
   type ToStringOptions,
 } from "yaml";
-import { LIMITS, TooLargeError } from "../../platform/types";
+import { LIMITS, TooLargeError, MiB } from "../../platform/types";
 
 /** Values an alias may add. A real file reuses a few anchors; a billion-laughs file reaches this in milliseconds. */
 const MAX_ALIASED_VALUES = 1_000_000;
 /** Characters of text an alias may add: one long string is one value, but its JSON is as long as the string. */
-const MAX_ALIASED_CHARS = 32 * 1024 * 1024;
+const MAX_ALIASED_CHARS = 32 * MiB;
 const BINARY_TAG = "tag:yaml.org,2002:binary";
 const JSON_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][-+]?\d+)?$/;
 
@@ -59,7 +59,7 @@ const sentence = (message: string) =>
 export function parseYaml(text: string): JsonValue {
   if (new Blob([text]).size > LIMITS.yamlMaxBytes)
     throw new TooLargeError(
-      `YAML files up to ${LIMITS.yamlMaxBytes / 1024 / 1024} MB can be opened. Convert it to JSON first.`,
+      `YAML files up to ${LIMITS.yamlMaxBytes / MiB} MB can be opened. Convert it to JSON first.`,
     );
   const lines = new LineCounter();
   const at = (offset: number): YamlPosition => {

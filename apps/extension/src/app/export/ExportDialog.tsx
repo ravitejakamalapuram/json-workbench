@@ -2,6 +2,7 @@ import type { ExportFormat } from "@json-workbench/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import { indexedFormat } from "../../platform/formats";
+import { MiB } from "../../platform/types";
 import type { DocumentModel } from "../../platform/types";
 import { createWorkerClient } from "../../platform/workers/client";
 import { useAppStore } from "../../store";
@@ -12,8 +13,6 @@ import "./export.css";
 import type { ExportOps } from "./export-ops";
 import { exportName, saveFile, withExtension } from "./save-file";
 import { spawnExportWorker } from "./spawn";
-
-const MB = 1024 * 1024;
 
 const FORMATS: readonly {
   readonly id: ExportFormat;
@@ -35,7 +34,7 @@ function cannotConvert(doc: DocumentModel, limitMb: number): string | null {
   if (status.kind === "failed") return status.message;
   if (status.kind !== "ready")
     return "Converting is available once the document has loaded.";
-  if (doc.bytes > limitMb * MB)
+  if (doc.bytes > limitMb * MiB)
     return `Converting loads the whole document, and ${formatBytes(doc.bytes)} is over the ${limitMb} MB limit set in Settings. You can still save it as it is.`;
   return null;
 }
@@ -87,7 +86,7 @@ export function ExportDialog({ doc, onClose }: ExportDialogProps) {
           source: doc.source,
           format: indexedFormat(doc.format),
           to,
-          maxBytes: limitMb * MB,
+          maxBytes: limitMb * MiB,
         },
         { signal: controller.signal },
       );

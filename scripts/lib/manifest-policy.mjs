@@ -10,13 +10,18 @@
 // shipped; each returns to this policy, and to .appforge/permissions.yaml, in the
 // change that brings its feature back.
 
-// Applies to every extension page and every worker they start. connect-src
-// 'self' is what keeps user JSON on the device: no page or bundled dependency
-// can reach the network. 'wasm-unsafe-eval' is for jq's WebAssembly only; the
-// first release instantiates none, so it is the first thing to drop if jq does
-// not return.
+// Applies to every extension page and every worker they start. default-src
+// 'self' makes every fetch directive that is not listed below (prefetch,
+// worker, child) local, and connect-src 'self' keeps user JSON on the device:
+// no page or bundled dependency can reach the network. The listed directives
+// are the exceptions: style-src allows inline styles because React style
+// attributes and CodeMirror's runtime <style> need them, while a remote
+// stylesheet is still refused; font-src allows data: for the small fonts the
+// build inlines; media-src is 'none' because nothing plays audio or video.
+// 'wasm-unsafe-eval' is for jq's WebAssembly only; the first release
+// instantiates none, so it is the first thing to drop if jq does not return.
 export const EXTENSION_PAGES_CSP =
-  "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self'; img-src 'self' data: blob:; frame-src 'none'; form-action 'none'; base-uri 'none'";
+  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'none'; manifest-src 'self'; frame-src 'none'; form-action 'none'; base-uri 'none'";
 
 const PERMISSIONS = ["sidePanel", "storage"];
 

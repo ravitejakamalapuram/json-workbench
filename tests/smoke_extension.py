@@ -2,8 +2,8 @@
 
 Proves what a static server could not: Chrome accepts the manifest and starts
 the service worker, the workbench page boots under the extension CSP, WASM
-may instantiate (jq needs 'wasm-unsafe-eval'), the page cannot reach the
-network, the permissions are exactly the audited list, every mode and view
+may instantiate (jq needs 'wasm-unsafe-eval'), the page cannot load or reach anything
+outside the extension, the permissions are exactly the audited list, every mode and view
 mounts without a console error, and the layout fits the 400 px side panel.
 
     npm run build && CHROMIUM_PATH=/path/to/chrome JWB_SKIP_BUILD=1 python3 tests/smoke_extension.py
@@ -57,6 +57,25 @@ def check_network_blocked(page: Page) -> None:
     assert result == {"fetched": False, "directive": "connect-src"}, result
 
 
+def check_remote_loads_blocked(page: Page) -> None:
+    """Stylesheets, media and prefetch are refused too, not only fetch (default-src)."""
+    directives = page.evaluate(
+        """async () => {
+          const seen = [];
+          document.addEventListener("securitypolicyviolation",
+            (event) => seen.push(event.effectiveDirective));
+          const link = (rel) => Object.assign(document.createElement("link"),
+            { rel, href: `http://127.0.0.1:9/${rel}` });
+          document.head.append(link("stylesheet"), link("prefetch"));
+          const audio = Object.assign(new Audio(), { src: "http://127.0.0.1:9/a.wav" });
+          audio.load();
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          return seen.sort();
+        }"""
+    )
+    assert directives == ["default-src", "media-src", "style-src-elem"], directives
+
+
 def check_modes_and_views(page: Page) -> None:
     modes = page.get_by_role("navigation", name="Modes").get_by_role("button")
     labels = modes.all_inner_texts()
@@ -95,6 +114,10 @@ def main() -> None:
         steps.run("no console errors", lambda: _assert_none(errors.messages))
         # Last on this page: the blocked fetch logs a CSP console error by design.
         steps.run("the page cannot reach the network", lambda: check_network_blocked(page))
+        steps.run(
+            "remote stylesheets, media and prefetch are blocked",
+            lambda: check_remote_loads_blocked(page),
+        )
 
         panel = context.new_page()
         panel_errors = ConsoleErrors(panel)

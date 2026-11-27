@@ -25,7 +25,7 @@ JSON Workbench is a local-first tool for reading and fixing JSON. Open a file, p
 - YAML: open YAML as JSON and save JSON as YAML.
 - Export: save as JSON, JSONL, NDJSON, CSV or TSV, or save the file as it is.
 
-No account, no analytics, no network access: the extension's pages are not allowed to connect to any server. Works in Chrome and Edge 120+.
+No account, no analytics, no network access: the extension's pages are not allowed to load from or connect to any server outside the extension. Works in Chrome and Edge 120+.
 ```
 
 ## Privacy and permissions (single purpose + justifications)

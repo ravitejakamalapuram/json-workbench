@@ -1,3 +1,4 @@
+import { MiB } from "../platform/types";
 import { readStored, writeStored } from "../platform/storage";
 
 /**
@@ -11,7 +12,7 @@ export const REVIEW_URL =
   "https://chromewebstore.google.com/detail/higmlhleblpmdogjccpmjlnilpmhohal/reviews";
 export const REVIEW_STORAGE_KEY = "json-workbench:review-prompt" as const;
 export const REVIEW_RUN_THRESHOLD = 3;
-export const REVIEW_LARGE_DOCUMENT_BYTES = 10 * 1024 * 1024;
+export const REVIEW_LARGE_DOCUMENT_BYTES = 10 * MiB;
 
 export interface ReviewPromptState {
   /** Successful pipeline runs on the user's own data. */
