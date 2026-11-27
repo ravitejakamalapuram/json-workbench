@@ -7,6 +7,7 @@ import {
   useEffectEvent,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
 } from "react";
 import { VirtualList, type VirtualListHandle } from "../../app/ui/VirtualList";
@@ -21,6 +22,8 @@ import "./pager.css";
 const OVERSCAN = 10;
 /** Rows of context left around a row that is jumped to. */
 const CONTEXT = 4;
+/** The jump target of End while the scan still counts: whatever the last row turns out to be. */
+const TO_END = Number.MAX_SAFE_INTEGER;
 
 const keys = new WeakMap<Blob, number>();
 let lastKey = 0;
@@ -52,7 +55,8 @@ function PagerBody({ doc }: ViewProps) {
   /** A row to move to as soon as the scan has counted it. */
   const [target, setTarget] = useState<number | null>(null);
   const [errorRow, setErrorRow] = useState<number | null>(null);
-  const focusNext = useRef(false);
+  /** The row that should have the keyboard focus as soon as the list has mounted it. */
+  const focusRow = useRef<number | null>(null);
 
   const issue = status.kind === "invalid" ? status.issues[0] : undefined;
   useEffect(() => {
@@ -96,7 +100,7 @@ function PagerBody({ doc }: ViewProps) {
 
   function move(to: number) {
     const row = Math.min(Math.max(0, to), Math.max(0, rows - 1));
-    focusNext.current = true;
+    focusRow.current = row;
     setActive(row);
     reveal(row);
   }
@@ -106,23 +110,22 @@ function PagerBody({ doc }: ViewProps) {
   // eslint-plugin-react-hooks 5 does not know useEffectEvent.
   const jump = useEffectEvent((row: number) => move(row));
   useEffect(() => {
-    if (target === null) return;
-    if (target >= rows) {
-      if (!scanning) setTarget(null);
-      return;
-    }
+    if (target === null || (target >= rows && scanning)) return;
     setTarget(null);
-    jump(target);
+    // Past the end of a finished scan only End is left: the last row.
+    if (target < rows || target === TO_END) jump(target);
   }, [target, rows, scanning, jump]);
 
-  // Moves the focus to the active row once the list has mounted it.
+  // Moves the focus to the row asked for once the list has mounted it. It
+  // names the row, not "the active one": a jump made in an effect commits
+  // `active` one render later, and the old row must not take the focus then.
   useEffect(() => {
-    if (!focusNext.current) return;
+    if (focusRow.current === null) return;
     const row = box.current?.querySelector<HTMLElement>(
-      `[data-row="${active}"]`,
+      `[data-row="${focusRow.current}"]`,
     );
     if (!row) return;
-    focusNext.current = false;
+    focusRow.current = null;
     row.focus({ preventScroll: true });
   });
 
@@ -160,6 +163,9 @@ function PagerBody({ doc }: ViewProps) {
     }[event.key];
     if (to === undefined) return;
     event.preventDefault();
+    // End before the scan is done goes on to the real end once it is counted;
+    // any other key ends that wait.
+    setTarget(event.key === "End" && scanning ? TO_END : null);
     move(to);
   }
 
@@ -177,7 +183,12 @@ function PagerBody({ doc }: ViewProps) {
   const [first, end] = range;
   const stopAt = active >= first && active < end ? active : first;
   return (
-    <div className="raw-pager" data-testid="raw-pager">
+    <div
+      className="raw-pager"
+      data-testid="raw-pager"
+      // One gutter width for every row, so the text lines up as the count grows.
+      style={{ "--digits": String(pager.lines).length } as CSSProperties}
+    >
       {goTo && (
         <GoToLine
           lines={pager.lines}
@@ -185,7 +196,7 @@ function PagerBody({ doc }: ViewProps) {
           message={message}
           onGo={(wanted) => void goToLine(wanted)}
           onClose={() => {
-            focusNext.current = true;
+            focusRow.current = active;
             setGoTo(false);
           }}
         />

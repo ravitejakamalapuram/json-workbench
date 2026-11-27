@@ -39,7 +39,9 @@
 .raw-pager-number {
   flex: none;
   box-sizing: border-box;
-  width: 56px;
+  /* 56 px, as in the editor, and wider once the line numbers need it, with a
+     little room to their left. */
+  width: max(56px, calc(var(--digits) * 1ch + var(--space-4) + var(--space-2)));
   padding-right: var(--space-4);
   color: var(--ink-muted);
   text-align: right;

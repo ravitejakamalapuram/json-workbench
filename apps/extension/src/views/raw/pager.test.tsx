@@ -9,7 +9,7 @@ import {
   type DocumentModel,
   type ParseIssue,
 } from "../../platform/types";
-import { changedBlob } from "../../testing/blobs";
+import { changedBlob, GatedBlob } from "../../testing/blobs";
 import { documentFixture, fakeIndex } from "../../testing/fixtures";
 import { fakeWorker } from "../../testing/fake-worker";
 import { renderWithStore } from "../../testing/render";
@@ -97,6 +97,16 @@ describe("the pager", () => {
       expect(status()).toBe(
         "Ln 1, Col 1Read only: files over 2 MB open for reading",
       ),
+    );
+  });
+
+  it("makes the gutter as wide as the last line number needs, for every row alike", async () => {
+    show(large(lines(12345)));
+    await screen.findByText('{"n":1}');
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("raw-pager").style.getPropertyValue("--digits"),
+      ).toBe("5"),
     );
   });
 
@@ -193,7 +203,10 @@ describe("go to line", () => {
     await screen.findByText('{"n":1500}');
     expect(status()).toContain("Ln 1,500, Col 1");
     await waitFor(() =>
-      expect(document.activeElement?.textContent).toContain('{"n":1500}'),
+      expect(document.activeElement).toMatchObject({
+        dataset: { testid: "pager-row" },
+        textContent: expect.stringContaining('{"n":1500}'),
+      }),
     );
     expect(screen.queryByRole("spinbutton")).toBeNull();
   });
@@ -241,7 +254,10 @@ describe("a document with a syntax error", () => {
     expect(status()).toContain("Ln 301, Col 1");
     // Keyboard focus follows the jump.
     await waitFor(() =>
-      expect(document.activeElement?.textContent).toContain('{"n":301,}'),
+      expect(document.activeElement).toMatchObject({
+        dataset: { testid: "pager-row" },
+        textContent: expect.stringContaining('{"n":301,}'),
+      }),
     );
   });
 
@@ -301,5 +317,59 @@ describe("when it cannot show the document", () => {
     unmount();
     expect(terminate).toHaveBeenCalled();
     expect(rawState.getState().controls).toBeNull();
+  });
+});
+
+describe("while the scan is still counting rows", () => {
+  // The scan reads 1 KiB at a time and stops at the gate, about 100 rows in.
+  const gated = (text: string) => {
+    options = { chunkBytes: 1024 };
+    return new GatedBlob([text], 1024);
+  };
+
+  it("takes End on to the real last line once the scan has counted it", async () => {
+    const user = userEvent.setup();
+    const source = gated(lines(5000));
+    show(large("", { source }));
+    await screen.findByText('{"n":1}');
+    await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+    await user.keyboard("{End}");
+    expect(status()).not.toContain("Ln 5,000");
+    source.release();
+    await screen.findByText('{"n":5000}');
+    await waitFor(() => expect(status()).toContain("Ln 5,000, Col 1"));
+    // The focus goes with it, to the row now in view.
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute("data-row")).toBe("4999"),
+    );
+  });
+
+  it("goes to an error the scan has not reached yet, once it has counted it", async () => {
+    const user = userEvent.setup();
+    const text = `${lines(300)}\n{"n":301,}\n${lines(5)}`;
+    const source = gated(text);
+    show(
+      large("", {
+        source,
+        status: {
+          kind: "invalid",
+          issues: [
+            {
+              message: "Expected double-quoted property name",
+              byteOffset: text.indexOf("}\n", text.indexOf('{"n":301')),
+              line: 301,
+              column: 9,
+            },
+          ],
+        },
+      }),
+    );
+    await screen.findByText('{"n":1}');
+    await user.click(screen.getByRole("button", { name: "Go to error" }));
+    expect(document.querySelector("[data-error]")).toBeNull();
+    source.release();
+    const row = await screen.findByText('{"n":301,}');
+    expect(row.closest("[data-error]")).not.toBeNull();
+    await waitFor(() => expect(status()).toContain("Ln 301, Col 1"));
   });
 });

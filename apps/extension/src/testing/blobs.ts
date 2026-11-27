@@ -44,3 +44,39 @@ export function changedBlob(...parts: BlobPart[]): Blob {
   blob.change();
   return blob;
 }
+
+/**
+ * A Blob whose reads from `gateFrom` on wait until release() is called, so a
+ * test holds a scan part way through the file and looks at what the view does
+ * with the part that has been counted.
+ */
+export class GatedBlob extends Blob {
+  readonly #gate: Promise<void>;
+  #release: () => void = () => undefined;
+
+  constructor(
+    parts: BlobPart[],
+    readonly gateFrom: number,
+  ) {
+    super(parts);
+    this.#gate = new Promise((resolve) => {
+      this.#release = resolve;
+    });
+  }
+
+  /** The scan goes on. */
+  release(): void {
+    this.#release();
+  }
+
+  override slice(start?: number, end?: number, type?: string): Blob {
+    const part = super.slice(start, end, type);
+    if ((start ?? 0) < this.gateFrom) return part;
+    const read = part.arrayBuffer.bind(part);
+    part.arrayBuffer = async () => {
+      await this.#gate;
+      return read();
+    };
+    return part;
+  }
+}

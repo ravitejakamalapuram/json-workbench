@@ -391,6 +391,28 @@ The 1 GB engine, F2, 2026-11-27: Intel Xeon @ 2.10 GHz, 4 vCPUs shared with othe
 - `loadValue` of a value at the materialize limits, each in a fresh process (`JWB_BENCH_LOADS`, `NODE_OPTIONS=--expose-gc`): a 62 MiB value (limit 64 MiB) took 3.0 s, peaked at 728 MiB RSS (133 MiB before) and kept 454 MiB of heap after a collection; a 126 MiB value (limit 128 MiB) took 5.5 s, peaked at 1,392 MiB and kept 911 MiB. That is about 7.3x the source bytes retained and about 10x at the peak, not the 6x and "about 400 MB at the default" that section 5 assumed. The cost is the lossless parse in core (one `LosslessNumber` object per number), not the byte scan.
 - A 1 GiB file with one line: the line number of its last byte costs one 8 MiB read (3 ms), because the line index also keeps a checkpoint every 8 MiB.
 
+The real extension in Chromium, F2, 2026-11-27: this container (4 shared vCPUs), Playwright's Chromium build 1243 with the built extension loaded unpacked, the files picked through the real Open file control (`set_input_files`), one run per file, no warm-up. The three large files are 308 MB (294 MiB): 1,263,345 records of about 240 bytes each as JSONL, as `{"data":[...]}`, and as a one-line array. The fourth is 48 MiB, with a missing comma on line 209,677. Times are from the file being set to the thing being on screen; "long tasks" are `PerformanceObserver` `longtask` entries of the page (the main thread only; the workers are not covered); "loop gap" is the slowest `setInterval(20)` tick beyond its 20 ms, sampled over each phase.
+
+| 308 MB file                                    | JSONL    | `{"data":[...]}` | one line | invalid (48 MiB) |
+| ---------------------------------------------- | -------- | ---------------- | -------- | ---------------- |
+| first rows on screen, progress bar showing     | 0.19 s   | 0.13 s           | 0.23 s   | 0.85 s           |
+| indexing done ("Valid", record count)          | 2.33 s   | 2.82 s           | 2.33 s   | 0.85 s (verdict) |
+| Tree, End to the last record on screen         | 0.04 s   | 0.04 s           | 0.04 s   |                  |
+| search, one record 5 from the end, "1 of 1"    | 4.36 s   | 4.88 s           | 4.86 s   |                  |
+| Raw pager, first rows                          | 0.33 s   | 0.34 s           | 0.35 s   |                  |
+| Raw pager, End to the last line (scan counted) | 1.11 s   | 1.11 s           | 0.93 s   |                  |
+| Raw pager, go to a line (Mod+G)                | 0.06 s   | 0.06 s           |          |                  |
+| Raw pager, Go to error                         |          |                  |          | 0.11 s           |
+| slowest loop gap, whole run                    | 46 ms    | 42 ms            | 42 ms    | 43 ms            |
+| longest long task (over 50 ms)                 | none     | none             | 52 ms    | none             |
+| main-thread JS heap at the end                 | 8 MB     | 7 MB             | 8 MB     | 6 MB             |
+| Chromium RSS, all processes, at the end        | 1,075 MB | 1,087 MB         | 1,082 MB | 963 MB           |
+
+- Search was started with a query that has to read the whole file, replaced 300 ms later by the needle: one search worker was alive after the first query and none after the second (the old one was terminated), and the needle was found in 4.4-4.9 s, about the cost of one pass over the file.
+- The one-line file opens, indexes and scrolls like the others: its pager rows are 2,000-byte pieces, End shows "Ln 1 (continued)" on the last piece, and ten wheel steps moved the first row from 0 to 708. The one long task (52 ms) came in the wheel phase. The one-line file was run twice (End from the start, then the wheel from the top); every figure but the wheel's is from the first run, which showed no long task, and the second run's loop gaps were not recorded.
+- Above `materializeLimitMb` (64 MB) Export names the limit and offers only "Save without converting"; the review nudge is on screen at 294 MB. Neither is a measurement of speed.
+- Not measured in Chrome: a 1 GiB file, a second tab, and any run on a quiet machine. The two Chromium RSS figures are the sum of every Chromium process (the extension page, its workers and the browser), not the page's own share.
+
 The F1a build, 2026-11-27 (this repository's container, shared with another job):
 
 - `entry-index-*.js` 4,433 B raw, 1.9 kB gzip; `shared-*.js` (React, ReactDOM) 221,809 B raw, 69.0 kB gzip; `background.js` 64 B; `json-render.js` 25 B.
