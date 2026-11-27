@@ -7,12 +7,9 @@
     "apps/extension/src/app/export/",
     "apps/extension/src/app/shell/"
   ],
-  "tree": [
-    "apps/extension/src/views/tree/",
-    "apps/extension/src/features/embedded/"
-  ],
+  "tree": ["apps/extension/src/features/embedded/"],
   "insights": ["apps/extension/src/features/insights/"],
-  "raw": ["apps/extension/src/views/raw/"],
+  "raw": [],
   "table": ["apps/extension/src/views/table/"],
   "compare": [
     "apps/extension/src/features/compare/",
@@ -43,6 +40,8 @@
     "apps/extension/src/platform/workers/client.",
     "apps/extension/src/platform/workers/serve.",
     "apps/extension/src/testing/",
-    "docs/architecture/TARGET.md"
+    "docs/architecture/TARGET.md",
+    "apps/extension/src/views/raw/",
+    "apps/extension/src/views/tree/"
   ]
 }
