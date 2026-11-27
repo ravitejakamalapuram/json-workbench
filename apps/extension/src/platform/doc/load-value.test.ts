@@ -143,6 +143,19 @@ describe("loadValue", () => {
       );
     });
 
+    it("refuses a document dense in values before parsing it, as a number costs far more memory than its bytes", async () => {
+      // 6,000 bytes, well under maxBytes, but 3,000 values of about 64 bytes each.
+      const dense = blob(`[${"1,".repeat(2_999)}1]`);
+      const refused = loadValue(dense, "", { ...json, maxBytes: 16 * KiB });
+      await expect(refused).rejects.toBeInstanceOf(TooLargeError);
+      await expect(refused).rejects.toThrow(/about 3,000 values/);
+      // Commas inside strings are not values; a sparse document loads.
+      const wide = blob(`["${",".repeat(5_000)}"]`);
+      expect(
+        await loadValue(wide, "", { ...json, maxBytes: 16 * KiB }),
+      ).toEqual([",".repeat(5_000)]);
+    });
+
     it("refuses the whole file above maxBytes and says how much it can load", async () => {
       const refused = loadValue(blob(array), "", {
         ...json,

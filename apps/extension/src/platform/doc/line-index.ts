@@ -7,11 +7,36 @@
 // file for each window.
 import { readBytes } from "./read";
 
-const NEWLINE = 0x0a;
+const LF = 0x0a;
+const CR = 0x0d;
 const BLOCK_BYTES = 256 * 1024;
 
 /** Bytes per row; the pager shows about this many characters of a long line. */
 export const ROW_BYTES = 2000;
+
+/**
+ * Calls `visit(at, length)` for each line break starting before `limit`: LF,
+ * CRLF or a lone CR, the three an editor (CodeMirror) breaks lines at. A CR
+ * last in `bytes` is reported with length 1 whatever follows.
+ */
+export function scanBreaks(
+  bytes: Uint8Array,
+  visit: (at: number, length: number) => void,
+  limit = bytes.length,
+): void {
+  // Each search resumes where it stopped, so a file with no CR is read once.
+  let lf = bytes.indexOf(LF);
+  let cr = bytes.indexOf(CR);
+  for (;;) {
+    const at = cr === -1 || (lf !== -1 && lf < cr) ? lf : cr;
+    if (at === -1 || at >= limit) return;
+    const length = bytes[at] === CR && bytes[at + 1] === LF ? 2 : 1;
+    visit(at, length);
+    const from = at + length;
+    if (lf !== -1 && lf < from) lf = bytes.indexOf(LF, from);
+    if (cr !== -1 && cr < from) cr = bytes.indexOf(CR, from);
+  }
+}
 
 /** One row of the text. Rows tile it: each starts where the previous one's `next` says. */
 export type RowSpan = {
@@ -22,9 +47,9 @@ export type RowSpan = {
   /** A piece of a long line other than the first, shown without a number. */
   readonly continued: boolean;
   readonly byteStart: number;
-  /** Exclusive, and without the newline that ends the line. */
+  /** Exclusive, and without the line break that ends the line. */
   readonly byteEnd: number;
-  /** Where the following row starts: past the newline when this row ends its line. */
+  /** Where the following row starts: past the line break when this row ends its line. */
   readonly next: number;
 };
 
@@ -47,6 +72,8 @@ export class LineIndex {
   #lineStart = 0;
   #lineNumber = 1;
   #rowsDone = 0;
+  /** The last chunk ended in a CR, which an LF at the start of the next one turns into a CRLF. */
+  #crEndsChunk = false;
   #seen = 0;
 
   constructor(
@@ -62,17 +89,23 @@ export class LineIndex {
 
   /** Counts the next chunk; chunks arrive in order, `base` being the file offset of its first byte. */
   add(bytes: Uint8Array, base: number): void {
-    for (
-      let at = bytes.indexOf(NEWLINE);
-      at !== -1;
-      at = bytes.indexOf(NEWLINE, at + 1)
-    )
-      this.#endLine(base + at);
-    this.#seen = base + bytes.length;
+    // The LF of a CRLF split across chunks belongs to the line already ended.
+    const end = base + bytes.length;
+    if (this.#crEndsChunk && bytes[0] === LF) {
+      this.#lineStart = base + 1;
+      bytes = bytes.subarray(1);
+      base += 1;
+    }
+    this.#crEndsChunk = false;
+    scanBreaks(bytes, (at, length) => {
+      this.#endLine(base + at, length);
+      this.#crEndsChunk = bytes[at] === CR && at + 1 === bytes.length;
+    });
+    this.#seen = end;
     this.#cover(this.#seen, false);
   }
 
-  #endLine(newline: number): void {
+  #endLine(newline: number, breakLength: number): void {
     const length = newline - this.#lineStart;
     const rows =
       length <= this.#rowBytes ? 1 : Math.ceil(length / this.#rowBytes);
@@ -81,7 +114,7 @@ export class LineIndex {
       this.#cover(newline, true);
     this.#rowsDone += rows;
     this.#lineNumber += 1;
-    this.#lineStart = newline + 1;
+    this.#lineStart = newline + breakLength;
   }
 
   /**
@@ -130,7 +163,7 @@ export class LineIndex {
   async *#rowsFrom(checkpoint: number): AsyncGenerator<RowSpan> {
     const size = this.#source.size;
     const width = this.#rowBytes;
-    const blockBytes = Math.max(BLOCK_BYTES, width + 1);
+    const blockBytes = Math.max(BLOCK_BYTES, width + 2);
     let at = this.#offsets[checkpoint] ?? 0;
     let row = checkpoint * this.#every;
     let line = this.#lineOf[checkpoint] ?? 1;
@@ -138,21 +171,30 @@ export class LineIndex {
     let block = new Uint8Array(0);
     let blockStart = 0;
     while (at < size) {
-      // A row and the byte after it, which says whether the line goes on.
+      // A row, the byte after it (which says whether the line goes on) and one
+      // more, to tell a lone CR from the CR of a CRLF.
       if (
-        at + width + 1 > blockStart + block.length &&
+        at + width + 2 > blockStart + block.length &&
         blockStart + block.length < size
       ) {
         blockStart = at;
         block = await readBytes(this.#source, at, at + blockBytes);
       }
       const from = at - blockStart;
-      const window = block.subarray(from, from + width + 1);
-      const found = window.indexOf(NEWLINE);
+      const window = block.subarray(from, from + width + 2);
+      let found = -1;
+      let breakLength = 0;
+      scanBreaks(
+        window,
+        (index, length) => {
+          if (found === -1) [found, breakLength] = [index, length];
+        },
+        width + 1,
+      );
       const endsLine = found !== -1 || window.length <= width;
       const byteEnd =
         at + (found !== -1 ? found : Math.min(window.length, width));
-      const next = found !== -1 ? byteEnd + 1 : byteEnd;
+      const next = found !== -1 ? byteEnd + breakLength : byteEnd;
       yield { row, line, continued, byteStart: at, byteEnd, next };
       row += 1;
       at = next;
@@ -161,7 +203,7 @@ export class LineIndex {
     }
   }
 
-  /** The line, from 1, that holds `byteOffset`: one more than the newlines before it. A newline ends its own line. */
+  /** The line, from 1, that holds `byteOffset`: one more than the line breaks that end before it. A break ends its own line, and a CRLF ends at its LF. */
   async lineAt(byteOffset: number): Promise<number> {
     const target = Math.min(Math.max(0, byteOffset), this.#source.size);
     const checkpoint = this.#lastWhere(
@@ -177,14 +219,13 @@ export class LineIndex {
       const block = await readBytes(
         this.#source,
         from,
-        Math.min(target, from + BLOCK_BYTES),
+        // One byte more: the LF after a CR that ends the block.
+        Math.min(this.#source.size, from + BLOCK_BYTES + 1),
       );
-      for (
-        let at = block.indexOf(NEWLINE);
-        at !== -1;
-        at = block.indexOf(NEWLINE, at + 1)
-      )
-        line += 1;
+      const end = Math.min(target, from + BLOCK_BYTES);
+      scanBreaks(block, (at, length) => {
+        if (from + at + length - 1 < end) line += 1;
+      });
     }
     return line;
   }

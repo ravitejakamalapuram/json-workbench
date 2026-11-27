@@ -4,25 +4,37 @@ import { LineIndex, type LineIndexOptions, type RowSpan } from "./line-index";
 
 const encode = (text: string) => new TextEncoder().encode(text);
 
-/** The definition lineAt must meet: one more than the newlines before the offset. */
+/** Where each line break (LF, CRLF or a lone CR) starts, and how long it is. */
+function breaks(bytes: Uint8Array) {
+  const found: { at: number; length: number }[] = [];
+  for (let at = 0; at < bytes.length; at += 1) {
+    if (bytes[at] === 0x0a) found.push({ at, length: 1 });
+    else if (bytes[at] === 0x0d) {
+      const length = bytes[at + 1] === 0x0a ? 2 : 1;
+      found.push({ at, length });
+      at += length - 1;
+    }
+  }
+  return found;
+}
+
+/** The definition lineAt must meet: one more than the breaks that end before the offset. */
 function naive(bytes: Uint8Array, offset: number) {
-  let line = 1;
-  for (let at = 0; at < Math.min(offset, bytes.length); at += 1)
-    if (bytes[at] === 0x0a) line += 1;
-  return line;
+  return 1 + breaks(bytes).filter((b) => b.at + b.length - 1 < offset).length;
 }
 
 /**
  * The rows by their definition: a line of n bytes is max(1, ceil(n / width))
- * rows, cut every `width` bytes from its start, and the newline belongs to the
- * last of them. A text that ends in a newline has no row after it.
+ * rows, cut every `width` bytes from its start, and the line break belongs to the
+ * last of them. A text that ends in a line break has no row after it.
  */
 function naiveRows(bytes: Uint8Array, width: number): RowSpan[] {
   const rows: RowSpan[] = [];
   let line = 1;
+  const all = breaks(bytes);
   for (let start = 0; start < bytes.length; line += 1) {
-    const found = bytes.indexOf(0x0a, start);
-    const stop = found === -1 ? bytes.length : found;
+    const found = all.find((b) => b.at >= start);
+    const stop = found ? found.at : bytes.length;
     const parts = Math.max(1, Math.ceil((stop - start) / width));
     for (let part = 0; part < parts; part += 1) {
       const from = start + part * width;
@@ -34,10 +46,10 @@ function naiveRows(bytes: Uint8Array, width: number): RowSpan[] {
         continued: part > 0,
         byteStart: from,
         byteEnd: end,
-        next: last && found !== -1 ? end + 1 : end,
+        next: last && found ? end + found.length : end,
       });
     }
-    start = stop + 1;
+    start = stop + (found?.length ?? 1);
   }
   return rows;
 }
@@ -56,6 +68,7 @@ function indexed(
 
 const SHAPES: Record<string, string> = {
   "short lines, blank lines and CRLF": "a\n\nbé\r\n\n\nlast line\nx\n\n\n",
+  "lone CR, CRLF and LF mixed": "a\rbc\r\rd\r\ne\n\rf\r",
   "no newline at the end": "a\nbcdefghij\nk",
   "a line of exactly two rows": "0123456789\n0123456789abcdefghij\nz\n",
   "a line that ends where a row ends": "abcde\n01234\n56789\nfghij\n",

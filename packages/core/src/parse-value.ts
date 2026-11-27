@@ -70,8 +70,14 @@ function same(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
  * Parse JSON without converting numeric lexemes through IEEE-754 doubles. A
  * syntax error is a JsonSyntaxError whose offset counts characters of `text`
  * (after a BOM); deeper nesting than MAX_VALUE_DEPTH is a NestingTooDeepError.
+ * A repeated key keeps its last value, as the indexes and loadValue("/k") do;
+ * `strictDuplicates` refuses one whose value differs, for a reader that must
+ * say so (the JWT view).
  */
-export function parseJsonValue(text: string): JsonValue {
+export function parseJsonValue(
+  text: string,
+  options: { readonly strictDuplicates?: boolean } = {},
+): JsonValue {
   const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const length = source.length;
   let at = 0;
@@ -176,22 +182,24 @@ export function parseJsonValue(text: string): JsonValue {
       if (source.charCodeAt(at) !== 0x3a) failHere(SYNTAX.expectedColon);
       at += 1;
       const member = readValue(depth, SYNTAX.expectedPropertyValue);
-      if (!Object.hasOwn(result, key)) {
-        // An assignment to "__proto__" sets the prototype and drops the member.
-        if (key === "__proto__")
-          Object.defineProperty(result, key, {
-            value: member,
-            enumerable: true,
-            writable: true,
-            configurable: true,
-          });
-        else result[key] = member;
-      } else if (!same(member, result[key])) {
+      if (
+        options.strictDuplicates &&
+        Object.hasOwn(result, key) &&
+        !same(member, result[key])
+      )
         fail(
           `Duplicate key '${key}' encountered at position ${keyAt + 1}`,
           keyAt,
         );
-      }
+      // An assignment to "__proto__" sets the prototype and drops the member.
+      if (key === "__proto__")
+        Object.defineProperty(result, key, {
+          value: member,
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+      else result[key] = member;
       skip();
       const code = source.charCodeAt(at);
       if (code === 0x7d) {

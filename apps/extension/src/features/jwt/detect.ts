@@ -60,7 +60,7 @@ function decodePart(
   const text = utf8.decode(bytes);
   let value: JsonValue;
   try {
-    value = parseJsonValue(text);
+    value = parseJsonValue(text, { strictDuplicates: true });
   } catch (error) {
     if (error instanceof NestingTooDeepError)
       return {

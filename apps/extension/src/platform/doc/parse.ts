@@ -47,9 +47,13 @@ export async function parseTree(
   let nodes = 0;
 
   const issueAt = (unit: number, message: string): ParseIssue => {
+    // LF, CRLF and a lone CR each end a line, as in the editor.
     let line = 1;
-    for (let at = 0; at < unit; at += 1) if (text[at] === "\n") line += 1;
-    const lineStart = unit > 0 ? text.lastIndexOf("\n", unit - 1) + 1 : 0;
+    let lineStart = 0;
+    for (const found of text.slice(0, unit).matchAll(/\r\n?|\n/g)) {
+      line += 1;
+      lineStart = found.index + found[0].length;
+    }
     return {
       message,
       byteOffset: byte(unit),

@@ -22,6 +22,32 @@ const OPEN_OBJECT = 0x7b;
 const isSpace = (byte: number) =>
   byte === 0x20 || byte === 0x0a || byte === 0x0d || byte === 0x09;
 
+/**
+ * What a parsed value costs in memory, in source bytes it stands for: a number
+ * is a LosslessNumber object, its lexeme string and an array slot, about 64
+ * bytes whatever its width, so "[1,1,1,...]" grows about 25 times on parse
+ * where typical data grows about 6 times. maxBytes is a budget of 6 bytes of
+ * heap per source byte, so it also buys maxBytes / 10 values.
+ */
+const BYTES_PER_VALUE = 10;
+/** Too few to matter whatever the limit, so a tiny limit never refuses a small document by count. */
+const MIN_VALUES = 1_000;
+
+/** Values in the bytes of a JSON text: its commas and colons outside strings, plus one. */
+function countValues(bytes: Uint8Array): number {
+  let values = 1;
+  let inString = false;
+  for (let at = 0; at < bytes.length; at += 1) {
+    const byte = bytes[at];
+    if (inString) {
+      if (byte === 0x5c) at += 1;
+      else if (byte === 0x22) inString = false;
+    } else if (byte === 0x22) inString = true;
+    else if (byte === 0x2c || byte === 0x3a) values += 1;
+  }
+  return values;
+}
+
 /** The bytes of one value in the source; `end` is exclusive. */
 type Range = { readonly start: number; readonly end: number };
 
@@ -193,7 +219,21 @@ export async function loadValue(
     throw new TooLargeError(
       `This ${segments.length === 0 ? "document" : "value"} is larger than ${sizeText(options.maxBytes)}, the most this can load.`,
     );
-  const text = new TextDecoder().decode(await readBytes(source, start, end));
+  const bytes = await readBytes(source, start, end);
+  // Every value takes at least two bytes with its separator, so a text this
+  // short cannot hold too many and is not counted.
+  const maxValues = Math.max(
+    MIN_VALUES,
+    Math.floor(options.maxBytes / BYTES_PER_VALUE),
+  );
+  if (bytes.length > maxValues * 2) {
+    const values = countValues(bytes);
+    if (values > maxValues)
+      throw new TooLargeError(
+        `This ${segments.length === 0 ? "document" : "value"} has about ${values.toLocaleString("en-US")} values, more than the ${maxValues.toLocaleString("en-US")} that fit in memory under the ${sizeText(options.maxBytes)} limit.`,
+      );
+  }
+  const text = new TextDecoder().decode(bytes);
   return options.format === "jsonl" && segments.length === 0
     ? records(text, options.maxRecords)
     : parseJsonValue(text);

@@ -34,7 +34,7 @@ async function bothSay(
   ];
 }
 
-const PIECES = [...'{}[],:"\\u1-.e+ \nxé?0'].concat(
+const PIECES = [...'{}[],:"\\u1-.e+ \n\rxé?0'].concat(
   [
     "12",
     "true",
@@ -72,6 +72,18 @@ describe("the memory index and the range index", () => {
         for (const [small, large] of await bothSay(text, format))
           expect(large, JSON.stringify(text)).toEqual(small);
     });
+
+  it("count a lone CR, CRLF and LF as one line break each, as the editor does", async () => {
+    for (const [text, line, column] of [
+      ['{\r"a":1,\r"b":}', 3, 5],
+      ['{\r\n"a":1,\r\n"b":}', 3, 5],
+      ['{\n"a":1,\r"b":}', 3, 5],
+    ] as const)
+      for (const [small, large] of await bothSay(text, "json")) {
+        expect(small, JSON.stringify(text)).toMatchObject({ line, column });
+        expect(large, JSON.stringify(text)).toEqual(small);
+      }
+  });
 
   it("give one verdict, sentence and place to every cut of a document", async () => {
     for (let end = 0; end <= DOCUMENT.length; end += 1) {

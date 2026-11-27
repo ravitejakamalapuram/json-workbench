@@ -59,7 +59,8 @@ export type BuildOutcome =
 /** The pass reads 1 MiB at a time, so rows are readable after the first. */
 const DEFAULT_CHUNK = 1024 * 1024;
 const BOM = [0xef, 0xbb, 0xbf];
-const NEWLINE = 0x0a;
+const LF = 0x0a;
+const CR = 0x0d;
 const OPEN_ARRAY = 0x5b;
 
 /** Keeps a U+FEFF inside the text; a leading BOM is skipped by offset instead. */
@@ -217,7 +218,8 @@ export class RangeIndex implements DocumentIndex {
     let lineStart = 0;
     for (let to = offset; to > 0;) {
       const from = Math.max(0, to - DEFAULT_CHUNK);
-      const at = (await this.#read(from, to)).lastIndexOf(NEWLINE);
+      const chunk = await this.#read(from, to);
+      const at = Math.max(chunk.lastIndexOf(LF), chunk.lastIndexOf(CR));
       if (at !== -1) {
         lineStart = from + at + 1;
         break;

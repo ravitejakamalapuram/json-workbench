@@ -57,8 +57,12 @@ describe("a member named __proto__", () => {
   });
 
   it("is a duplicate like any other key", () => {
-    expect(() => parseJsonValue('{"__proto__":1,"__proto__":2}')).toThrow(
+    const text = '{"__proto__":1,"__proto__":2}';
+    expect(() => parseJsonValue(text, { strictDuplicates: true })).toThrow(
       /^Duplicate key '__proto__' encountered/,
+    );
+    expect(stringifyJsonValue(parseJsonValue(text), false)).toBe(
+      '{"__proto__":2}',
     );
   });
 });
@@ -139,8 +143,6 @@ describe("agrees with the lossless-json parser on everything but those two", () 
     '"\\u12zz"',
     "[1] x",
     "'a'",
-    '{"a":1,"a":2}',
-    '{"a":[1],"a":[2]}',
   ];
 
   it.each(valid)("reads %j to the same value", (text) => {
@@ -153,9 +155,27 @@ describe("agrees with the lossless-json parser on everything but those two", () 
   });
 
   it("names a repeated key the way the JWT view expects", () => {
-    expect(() => parseJsonValue('{"exp":1,"sub":"a","exp":2}')).toThrow(
-      /^Duplicate key 'exp' encountered/,
+    expect(() =>
+      parseJsonValue('{"exp":1,"sub":"a","exp":2}', { strictDuplicates: true }),
+    ).toThrow(/^Duplicate key 'exp' encountered/);
+  });
+
+  it("prints a control character in a syntax error as an escape", () => {
+    expect(() => parseJsonValue("\u0000[1]")).toThrow(
+      "Unexpected character '\\u0000'",
     );
+    expect(() => parseJsonValue("[1, \u2028]")).toThrow(
+      "Unexpected character '\\u2028'",
+    );
+  });
+
+  it("keeps the last of a repeated key unless told to refuse it", () => {
+    expect(stringifyJsonValue(parseJsonValue('{"a":1,"a":2}'), false)).toBe(
+      '{"a":2}',
+    );
+    expect(() =>
+      parseJsonValue('{"a":1,"a":2}', { strictDuplicates: true }),
+    ).toThrow(/^Duplicate key 'a' encountered/);
   });
 
   it("points a syntax error at its character", () => {

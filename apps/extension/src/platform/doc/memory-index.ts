@@ -20,6 +20,7 @@ import {
 } from "../types";
 import { preview } from "./json-string";
 import { parseTree, type Entry } from "./parse";
+import { scanBreaks } from "./line-index";
 import { searchInline } from "./search";
 import { decodeUtf8, type DecodedText } from "./utf8";
 
@@ -216,10 +217,14 @@ export class MemoryIndex implements DocumentIndex {
   async lineAt(byteOffset: number): Promise<number> {
     const end = Math.min(Math.max(0, byteOffset), this.bytes.length);
     let line = 1;
-    for (let at = this.bytes.indexOf(0x0a); at !== -1 && at < end;) {
-      line++;
-      at = this.bytes.indexOf(0x0a, at + 1);
-    }
+    // Stops at the target: a break starting at or after it cannot end before it.
+    scanBreaks(
+      this.bytes,
+      (at, length) => {
+        if (at + length - 1 < end) line++;
+      },
+      end,
+    );
     return line;
   }
 
