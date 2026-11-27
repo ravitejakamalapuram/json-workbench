@@ -28,6 +28,21 @@
   margin-top: var(--space-2);
 }
 
+/* The bar is 32 px high and a 400 px panel is narrow: the position never
+   breaks ("Ln 1, Col" and "1"), and a long note is cut with an ellipsis (its
+   title has all of it). */
+.raw-status-cursor {
+  flex: none;
+  white-space: nowrap;
+}
+
 .raw-status-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+* + .raw-status-note {
   margin-left: var(--space-4);
 }

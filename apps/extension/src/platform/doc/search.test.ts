@@ -206,6 +206,24 @@ describe("searchBlob", () => {
     expect(source.reads).toBe(source.size + 3);
   });
 
+  it("settles a string that ends the file, whichever way the chunks fall", async () => {
+    // No byte follows it to say whether it is a key, so only the end does.
+    const source = new Blob(['"needle"']);
+    for (const chunkBytes of [1, 3, 8, 100]) {
+      const { hits } = await run(source, query("needle"), { chunkBytes });
+      expect(await found(source, hits), `chunk ${chunkBytes}`).toEqual([
+        ["value", '"needle"'],
+      ]);
+    }
+  });
+
+  it("folds case by the rules of the text, not of the bytes", async () => {
+    // U+212A (Kelvin sign) lower-cases to an ASCII "k"; its bytes say nothing alike.
+    const source = new Blob(['["\u212a", "x\u212a"]']);
+    const { hits } = await run(source, query("k"));
+    expect(hits).toHaveLength(2);
+  });
+
   it("finds a match in a string of many chunks", async () => {
     const source = new Blob([`["${"ab".repeat(5000)}END"]`]);
     const { hits } = await run(source, query("bEnd"), { chunkBytes: 100 });

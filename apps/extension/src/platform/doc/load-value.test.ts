@@ -100,6 +100,17 @@ describe("loadValue", () => {
       expect(ok).toHaveLength(400_000);
     });
 
+    it("loads a value of exactly maxBytes and refuses one byte more", async () => {
+      const source = blob('{"s":"abcdef"}');
+      // The value is the 8 bytes of "abcdef" with its quotes.
+      expect(await loadValue(source, "/s", { ...json, maxBytes: 8 })).toBe(
+        "abcdef",
+      );
+      await expect(
+        loadValue(source, "/s", { ...json, maxBytes: 7 }),
+      ).rejects.toBeInstanceOf(TooLargeError);
+    });
+
     it("loads a member of a wrapper without the rest of the file", async () => {
       const source = blob(wrapper);
       const small = { ...json, maxBytes: KiB };

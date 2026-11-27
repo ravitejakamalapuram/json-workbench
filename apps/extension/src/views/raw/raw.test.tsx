@@ -6,8 +6,9 @@ import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { actionForKey, actionsFor, runAction } from "../../app/actions";
+import { ViewportHeightContext } from "../../app/ui/VirtualList";
 import { LIMITS, type DocumentModel } from "../../platform/types";
-import { useAppStore } from "../../store";
+import { AppStoreProvider, useAppStore } from "../../store";
 import {
   documentFixture,
   fakeIndex,
@@ -133,6 +134,36 @@ describe("the editor", () => {
       .querySelector<HTMLElement>(".cm-editor");
     const view = dom && EditorView.findFromDOM(dom);
     expect(view?.state.readOnly).toBe(true);
+  });
+
+  it("keeps the editor a document is in when an edit takes its bytes past the limit", async () => {
+    // The store counts UTF-16 units, the pager is chosen by bytes: a few
+    // non-ASCII characters can pass one limit and not the other mid-edit.
+    const doc = documentFixture({ source: new Blob(['{"a":1}']) });
+    const { rerender, store } = renderWithStore(
+      <Suspense fallback={null}>
+        <rawView.Component doc={doc} />
+      </Suspense>,
+    );
+    await screen.findByTestId("raw-editor");
+    // Wrapped as renderWithStore wraps, or React would mount a new tree.
+    rerender(
+      <AppStoreProvider value={store}>
+        <ViewportHeightContext.Provider value={560}>
+          <Suspense fallback={null}>
+            <rawView.Component
+              doc={{ ...doc, bytes: LIMITS.rawEditChars + 1 }}
+            />
+          </Suspense>
+        </ViewportHeightContext.Provider>
+      </AppStoreProvider>,
+    );
+    // The pager is a lazy chunk: give it the time it would need to appear.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(screen.getByTestId("raw-editor")).toBeDefined();
+    expect(screen.queryByTestId("raw-pager")).toBeNull();
   });
 
   it("gives a document over the limit the pager, and its failure the plain message", async () => {

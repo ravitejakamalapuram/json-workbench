@@ -31,6 +31,8 @@ export function PagerRow({
       data-row={index}
       data-active={active || undefined}
       data-error={error || undefined}
+      // The tint and the wavy underline are visual; this is what a screen reader hears.
+      aria-description={error ? "Syntax error" : undefined}
       tabIndex={stop ? 0 : -1}
       onClick={() => onSelect(index)}
     >

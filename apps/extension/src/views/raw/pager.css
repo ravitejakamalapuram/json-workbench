@@ -2,6 +2,7 @@
    for the line number and the text from there, as in the editor. */
 
 .raw-pager {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -68,15 +69,25 @@
   text-underline-offset: 4px;
 }
 
-/* Go to line: a row above the text that wraps in a 400 px panel. */
+/* Go to line: a card over the top corner of the rows, as a find box is. In
+   the flow of the list it would shorten it, and the active row (the error
+   after "Go to error", or the last one after End) would slide under the
+   status bar. It wraps in a 400 px panel. */
 .raw-goto {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-2);
+  right: var(--space-3);
   display: flex;
-  flex: none;
   flex-wrap: wrap;
   align-items: center;
+  box-sizing: border-box;
+  max-width: calc(100% - 2 * var(--space-3));
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
   font: var(--type-label);
 }
 

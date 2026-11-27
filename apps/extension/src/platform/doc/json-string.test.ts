@@ -63,6 +63,13 @@ describe("primitivePreview", () => {
     expect(cut.text).toBe("a".repeat(LIMITS.previewChars - 1));
   });
 
+  it("reads enough bytes of a string of six-byte escapes to fill the preview", () => {
+    // \u00e9 is six bytes for one unit: the worst case the byte budget covers.
+    const cut = preview(`"${"\\u00e9".repeat(LIMITS.previewChars + 50)}"`);
+    expect(cut.truncated).toBe(true);
+    expect(cut.text).toBe("é".repeat(LIMITS.previewChars));
+  });
+
   it("keeps a string of exactly the preview length whole", () => {
     expect(preview(`"${"b".repeat(LIMITS.previewChars)}"`)).toEqual({
       text: "b".repeat(LIMITS.previewChars),

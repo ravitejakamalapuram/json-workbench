@@ -11,15 +11,14 @@ import {
   type KeyboardEvent,
 } from "react";
 import { VirtualList, type VirtualListHandle } from "../../app/ui/VirtualList";
+import { spacing } from "../../theme/tokens";
 import type { ParseIssue, ViewProps } from "../../platform/types";
-import { GoToLine } from "./GoToLine";
+import { GoToLine, linesText } from "./GoToLine";
 import { PagerRow } from "./PagerRow";
 import { IDLE, rawState } from "./raw-state";
 import { usePager } from "./use-pager";
 import "./pager.css";
 
-/** VirtualList mounts this many rows beyond each edge of the screen. */
-const OVERSCAN = 10;
 /** Rows of context left around a row that is jumped to. */
 const CONTEXT = 4;
 /** The jump target of End while the scan still counts: whatever the last row turns out to be. */
@@ -135,7 +134,7 @@ function PagerBody({ doc }: ViewProps) {
       setMessage(
         scanning
           ? `Line ${wanted.toLocaleString("en-US")} is not counted yet.`
-          : `The document has ${pager.lines.toLocaleString("en-US")} lines.`,
+          : `The document has ${linesText(pager.lines)}.`,
       );
       return;
     }
@@ -152,7 +151,12 @@ function PagerBody({ doc }: ViewProps) {
       return;
     }
     if (mod || event.altKey) return;
-    const screen = Math.max(1, range[1] - range[0] - 2 * OVERSCAN);
+    // The list's own height: the mounted range is shorter than a screen plus
+    // overscan at the start and the end of the document, where one side is missing.
+    const viewport =
+      box.current?.querySelector<HTMLElement>('[role="list"]')?.clientHeight ??
+      0;
+    const screen = Math.max(1, Math.floor(viewport / spacing.row) - 1);
     const to = {
       ArrowDown: active + 1,
       ArrowUp: active - 1,

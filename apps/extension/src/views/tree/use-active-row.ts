@@ -73,7 +73,15 @@ export function useActiveRow(
 
   const choose = useCallback(
     (row: Row, focus = false) => {
-      if (!row.node) return;
+      if (!row.node) {
+        // A page that could not be read still takes the list and the focus to
+        // its error row, or End would seem to do nothing.
+        if (row.failure) {
+          focusNext.current = focus;
+          activate(row.path);
+        }
+        return;
+      }
       const target = { via: row.scope.via, pointer: row.node.pointer };
       chosen.current = target;
       focusNext.current = focus;

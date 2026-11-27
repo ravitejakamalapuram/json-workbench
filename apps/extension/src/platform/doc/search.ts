@@ -222,19 +222,19 @@ export async function searchBlob(
   const head = await readBytes(source, 0, BOM.length);
   let at = BOM.every((byte, index) => head[index] === byte) ? BOM.length : 0;
   // The next chunk is read while this one is searched.
-  const fetch = (from: number) => {
+  const readAhead = (from: number) => {
     const reading = readBytes(source, from, from + chunkBytes);
     // A rejection is reported where it is awaited, if the pass gets there.
     reading.catch(() => undefined);
     return reading;
   };
-  let next = at < size ? fetch(at) : undefined;
+  let next = at < size ? readAhead(at) : undefined;
   while (next && !search.capped) {
     signal?.throwIfAborted();
     const bytes = await next;
     const base = at;
     at += bytes.length;
-    next = at < size ? fetch(at) : undefined;
+    next = at < size ? readAhead(at) : undefined;
     search.feed(bytes, base);
   }
   if (!search.capped) search.finish(size);

@@ -69,11 +69,13 @@ export function TreeRow({
   } as const;
   if (!node && row.failure)
     return (
-      <div {...common} tabIndex={-1}>
+      <div {...common} ref={focusRef} tabIndex={-1}>
         <span className="badge badge-danger">{row.failure}</span>
         <button
           type="button"
           className="badge badge-info"
+          // Like the badges of a loaded row: only the tab stop's are in the tab order.
+          tabIndex={tabStop ? 0 : -1}
           onClick={() => onRetry(row)}
         >
           Retry

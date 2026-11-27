@@ -12,7 +12,11 @@ type GoToLineProps = {
   readonly onClose: () => void;
 };
 
-/** The small input above the rows that Mod+G opens. */
+/** "1 line", "2 lines": the count of lines read so far, with "+" while the scan still counts. */
+export const linesText = (lines: number, scanning = false) =>
+  `${lines.toLocaleString("en-US")}${scanning ? "+" : ""} line${lines === 1 && !scanning ? "" : "s"}`;
+
+/** The small input over the top corner of the rows that Mod+G opens. */
 export function GoToLine({
   lines,
   scanning,
@@ -49,10 +53,7 @@ export function GoToLine({
         required
       />
       <Button type="submit">Go</Button>
-      <span className="muted">
-        of {lines.toLocaleString("en-US")}
-        {scanning ? "+" : ""} lines
-      </span>
+      <span className="muted">of {linesText(lines, scanning)}</span>
       {message && <span role="status">{message}</span>}
     </form>
   );

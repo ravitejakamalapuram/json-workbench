@@ -36,7 +36,8 @@ export default function ProblemDetails({ doc }: ViewProps) {
   return (
     <div className="raw-problem">
       <p className="raw-problem-where" data-testid="raw-error">
-        Line {issue.line}, column {issue.column}
+        Line {issue.line.toLocaleString("en-US")}, column{" "}
+        {issue.column.toLocaleString("en-US")}
       </p>
       <p>{sentence(issue.message)}</p>
       {fix?.hint && <p className="muted">{fix.hint}</p>}

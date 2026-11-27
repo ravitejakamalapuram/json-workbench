@@ -62,6 +62,9 @@ const OPEN_ARRAY = 0x5b;
 const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
 const empty = { total: 0, totalFinal: true } as const;
 
+/** What `#childAt` answers when the pass has not scanned far enough to tell. */
+const UNSURE = Symbol("unsure");
+
 /** A container to list the children of, with what is known of it. */
 type Parent = {
   readonly kind: "array" | "object" | "records";
@@ -91,6 +94,10 @@ export class RangeIndex implements DocumentIndex {
   #frontier = 0;
   #final = false;
   #disposed = false;
+  /** The pass has stopped, whichever way it ended: nothing more will be scanned. */
+  #ended = false;
+  /** Callers of pointerAt that wait for the pass to take its next step. */
+  #waiting: (() => void)[] = [];
   #started!: () => void;
   readonly #firstRows = new Promise<void>((resolve) => {
     this.#started = resolve;
@@ -131,25 +138,26 @@ export class RangeIndex implements DocumentIndex {
       });
 
       // The next chunk is read while this one is scanned.
-      const fetch = (at: number) => {
+      const readAhead = (at: number) => {
         const reading = this.#read(at, at + this.#chunk);
         // A rejection is reported where it is awaited, if the pass gets there.
         reading.catch(() => undefined);
         return reading;
       };
       let at = this.#bom;
-      let next = at < size ? fetch(at) : undefined;
+      let next = at < size ? readAhead(at) : undefined;
       while (next) {
         signal?.throwIfAborted();
         if (this.#disposed) throw new DOMException("Disposed.", "AbortError");
         const bytes = await next;
         const base = at;
         at += bytes.length;
-        next = at < size ? fetch(at) : undefined;
+        next = at < size ? readAhead(at) : undefined;
         const issue = scanner.write(bytes, base);
         this.#lines.add(bytes, base);
         this.#frontier = at;
         this.#started();
+        this.#wake();
         onProgress?.({
           indexedBytes: at,
           totalBytes: size,
@@ -168,7 +176,19 @@ export class RangeIndex implements DocumentIndex {
       };
     } finally {
       this.#started();
+      this.#ended = true;
+      this.#wake();
     }
+  }
+
+  /** Resolves when the pass has gone past `seen` bytes or has ended. */
+  #advanced(seen: number): Promise<void> {
+    if (this.#ended || this.#frontier > seen) return Promise.resolve();
+    return new Promise((wake) => this.#waiting.push(wake));
+  }
+
+  #wake(): void {
+    for (const wake of this.#waiting.splice(0)) wake();
   }
 
   #records(): number {
@@ -369,8 +389,16 @@ export class RangeIndex implements DocumentIndex {
     return { item, keys, positions };
   }
 
-  /** The child of `parent` whose member contains the byte offset, scanning from the nearest checkpoint. */
-  async #childAt(parent: Parent, offset: number): Promise<Item | undefined> {
+  /**
+   * The child of `parent` whose member contains the byte offset, scanning from
+   * the nearest checkpoint. A member is listed once its value is complete, so
+   * an offset past the last listed child of a container still being scanned
+   * may be inside one that is not listed yet.
+   */
+  async #childAt(
+    parent: Parent,
+    offset: number,
+  ): Promise<Item | typeof UNSURE | undefined> {
     // A container's children follow its opening byte; a JSONL root has none.
     const first = parent.kind === "records" ? parent.start : parent.start + 1;
     if (offset < first || (parent.end >= 0 && offset >= parent.end))
@@ -385,6 +413,9 @@ export class RangeIndex implements DocumentIndex {
         else high = middle;
       }
     }
+    // Whether the pass was over is judged when `until` is taken: it may end
+    // while the listing reads, and what it has not listed then is still unread.
+    const ended = this.#ended;
     const listing = listItems(this.#env(), {
       kind: parent.kind,
       start: parent.start,
@@ -409,7 +440,7 @@ export class RangeIndex implements DocumentIndex {
     } finally {
       await listing.return({ count: 0, end: -1 });
     }
-    return undefined;
+    return parent.end < 0 && !ended ? UNSURE : undefined;
   }
 
   // -------------------------------------------------------- DocumentIndex
@@ -462,11 +493,26 @@ export class RangeIndex implements DocumentIndex {
 
   async pointerAt(byteOffset: number): Promise<Pointer> {
     await this.#firstRows;
+    // A search can run ahead of this pass: until the pass has gone far enough
+    // to tell, wait for its next step instead of answering with a container.
+    for (;;) {
+      const seen = this.#frontier;
+      const pointer = await this.#pointerAt(byteOffset);
+      if (pointer !== UNSURE) return pointer;
+      await this.#advanced(seen);
+    }
+  }
+
+  async #pointerAt(byteOffset: number): Promise<Pointer | typeof UNSURE> {
+    const ended = this.#ended;
     let item = await this.#rootItem();
+    if (!item) return ended ? "" : UNSURE;
     const keys: (string | number)[] = [];
     for (;;) {
-      const parent = item && this.#parentOf(item, keys.length);
-      const child = parent && (await this.#childAt(parent, byteOffset));
+      const parent = this.#parentOf(item, keys.length);
+      if (!parent) return toJsonPointer(keys);
+      const child = await this.#childAt(parent, byteOffset);
+      if (child === UNSURE) return UNSURE;
       if (!child) return toJsonPointer(keys);
       keys.push(child.key);
       item = child;
@@ -537,6 +583,8 @@ export class RangeIndex implements DocumentIndex {
   /** Stops the pass; there is nothing else to release. */
   dispose(): void {
     this.#disposed = true;
+    this.#ended = true;
+    this.#wake();
   }
 }
 

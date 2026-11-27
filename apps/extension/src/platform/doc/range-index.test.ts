@@ -154,6 +154,40 @@ describe("range index", () => {
     await expect(building).rejects.toMatchObject({ name: "AbortError" });
   });
 
+  it("waits for the pass to reach a byte before it says what is there", async () => {
+    // A search can run ahead of the index; its hit must not resolve to the
+    // nearest container that has been scanned.
+    const text = `[${numbers(100)}]`;
+    const source = new GatedBlob([bytesOf(text)], 20);
+    const index = new RangeIndex(source, "json", { chunkBytes: 10 });
+    const building = index.build();
+    await index.children("", 0, 1);
+
+    let answer: string | undefined;
+    const asked = index
+      .pointerAt(text.indexOf(",99") + 1)
+      .then((pointer) => (answer = pointer));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(answer).toBeUndefined();
+
+    source.release();
+    await building;
+    await asked;
+    expect(answer).toBe("/99");
+  });
+
+  it("answers pointerAt at once for a byte past an invalid document's error", async () => {
+    const index = new RangeIndex(
+      new Blob([bytesOf("[1,2 3,4,5,6,7,8,9]")]),
+      "json",
+      {
+        chunkBytes: 4,
+      },
+    );
+    expect(await index.build()).toMatchObject({ kind: "invalid" });
+    expect(await index.pointerAt(17)).toBe("");
+  });
+
   it("lists a wrapper's array before the rest of the file is read", async () => {
     const rows = Array.from({ length: 50 }, (_, id) => `{"id":${id}}`).join(
       ",",
@@ -178,6 +212,20 @@ describe("range index", () => {
     index.dispose();
     source.release();
     await expect(building).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("jumps over a big closed container when it lists its siblings", async () => {
+    // 600 strings of 1 KB: few children, but over the size the pass remembers.
+    const heavy = Array.from({ length: 600 }, () => `"${"x".repeat(1000)}"`);
+    const source = new CountingBlob([
+      // A later sibling container takes the place of "big" as the one open at its depth.
+      bytesOf(`{"big":[${heavy.join(",")}],"next":[1],"after":2}`),
+    ]);
+    const index = new RangeIndex(source, "json");
+    await index.build();
+    source.reads = 0;
+    expect(await index.node("/after")).toMatchObject({ text: "2" });
+    expect(source.reads).toBeLessThan(100 * 1024);
   });
 
   it("finishes with a final total once the pass completes", async () => {

@@ -142,6 +142,13 @@ describe("doc worker handlers", () => {
       });
     });
 
+    it("opens a source of exactly the limit", async () => {
+      const handlers = createDocHandlers({ maxBytes: 1024 * 1024 });
+      const text = `[${"1,".repeat(524_286)}1] `;
+      expect(new Blob([text]).size).toBe(1024 * 1024);
+      expect(await open(handlers, text)).toMatchObject({ kind: "ready" });
+    });
+
     it("no longer refuses what only the memory index could not hold", async () => {
       const handlers = createDocHandlers();
       const text = `[${"1,".repeat(1024 * 1024)}1]`;

@@ -587,8 +587,11 @@ describe("a page that cannot be read", () => {
       name: "NotReadableError",
     });
 
-  /** An array of 1,000 numbers whose second page fails until `heal()`. */
-  async function unreadableSecondPage() {
+  /**
+   * An array of 1,000 numbers whose page at `failAt` fails until `heal()`;
+   * the list is scrolled to row 250 unless `scrolled` is false.
+   */
+  async function unreadableSecondPage({ failAt = 200, scrolled = true } = {}) {
     let healthy = false;
     const index = fakeIndex({
       node: async (pointer) =>
@@ -602,7 +605,7 @@ describe("a page that cannot be read", () => {
             }
           : null,
       children: async (pointer, offset, limit): Promise<ChildrenPage> => {
-        if (offset === 200 && !healthy) throw changed();
+        if (offset === failAt && !healthy) throw changed();
         return {
           items: Array.from({ length: limit }, (_, i): NodeInfo => ({
             pointer: `${pointer}/${offset + i}`,
@@ -632,11 +635,12 @@ describe("a page that cannot be read", () => {
       }),
     );
     await findRow("/0");
-    act(() => {
-      const list = screen.getByRole("tree");
-      list.scrollTop = 28 * 250;
-      list.dispatchEvent(new Event("scroll"));
-    });
+    if (scrolled)
+      act(() => {
+        const list = screen.getByRole("tree");
+        list.scrollTop = 28 * 250;
+        list.dispatchEvent(new Event("scroll"));
+      });
     return () => {
       healthy = true;
     };
@@ -650,6 +654,30 @@ describe("a page that cannot be read", () => {
     expect(failed?.textContent).toContain("File changed on disk. Reopen it.");
     expect(failed?.getAttribute("aria-busy")).toBeNull();
     expect(screen.queryByText("…")).toBeNull();
+  });
+
+  it("keeps one Retry in the tab order, as the tree keeps one row", async () => {
+    await unreadableSecondPage();
+    const buttons = await screen.findAllByRole("button", { name: "Retry" });
+    expect(buttons.length).toBeGreaterThan(1);
+    expect(buttons.filter((button) => button.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it("takes the focus to the error row when End moves to a page that cannot be read", async () => {
+    const user = userEvent.setup();
+    await unreadableSecondPage({ failAt: 800, scrolled: false });
+    await user.click(row("/0")!);
+    await user.keyboard("{End}");
+    // Nothing visible happening would leave a keyboard user guessing.
+    await waitFor(() =>
+      expect(document.activeElement).toMatchObject({
+        textContent: expect.stringContaining("File changed on disk."),
+      }),
+    );
+    expect(document.activeElement?.getAttribute("role")).toBe("treeitem");
+    // From there the keys go on working: Up reaches the last row that was read.
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement?.getAttribute("role")).toBe("treeitem");
   });
 
   it("reads the page again on Retry, and the rows come back", async () => {

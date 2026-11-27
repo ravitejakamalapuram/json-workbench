@@ -157,14 +157,59 @@ describe("the pager", () => {
     expect(status()).toContain("Ln 1, Col 1");
   });
 
-  it("pages by a screenful", async () => {
-    const user = userEvent.setup();
-    show(large(lines(500)));
+  /** happy-dom has no layout: runs `test` with a list that is ten rows high. */
+  async function withTenRows(test: () => Promise<void>) {
+    const height = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "clientHeight",
+    );
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.getAttribute("role") === "list" ? 28 * 10 : 0;
+      },
+    });
+    try {
+      await test();
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", height!);
+    }
+  }
+
+  // The mounted range is shorter than a screen plus overscan at the start and
+  // the end of the document, where one side is missing: not a measure of it.
+  it("pages by the height of the list, also at the start", () =>
+    withTenRows(async () => {
+      const user = userEvent.setup();
+      show(large(lines(500)));
+      await screen.findByText('{"n":1}');
+      await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+      await user.keyboard("{PageDown}");
+      // One row of the screen before stays, as in the tree.
+      expect(status()).toContain("Ln 10, Col 1");
+      await user.keyboard("{PageDown}");
+      expect(status()).toContain("Ln 19, Col 1");
+    }));
+
+  it("pages back by the same screenful", () =>
+    withTenRows(async () => {
+      const user = userEvent.setup();
+      show(large(lines(500)));
+      await screen.findByText('{"n":1}');
+      await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+      await user.keyboard("{PageDown}{PageDown}{PageUp}");
+      expect(status()).toContain("Ln 10, Col 1");
+      await user.keyboard("{PageUp}{PageUp}");
+      expect(status()).toContain("Ln 1, Col 1");
+    }));
+
+  it("has one row in the tab order", async () => {
+    show(large(lines(100)));
     await screen.findByText('{"n":1}');
-    await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
-    await user.keyboard("{PageDown}");
-    const [line] = /Ln (\d+)/.exec(status() ?? "")?.slice(1) ?? [];
-    expect(Number(line)).toBeGreaterThan(10);
+    const stops = screen
+      .getAllByTestId("pager-row")
+      .filter((row) => row.tabIndex === 0);
+    expect(stops).toHaveLength(1);
   });
 
   it("only keeps the rows near the screen", async () => {
@@ -221,6 +266,16 @@ describe("go to line", () => {
     expect(status()).toContain("Ln 1, Col 1");
   });
 
+  it('says "1 line", not "1 lines", for a document that is one line', async () => {
+    const user = userEvent.setup();
+    await open(user, 1);
+    await waitFor(() => expect(screen.getByText(/of 1 line$/)).toBeDefined());
+    await user.keyboard("2{Enter}");
+    expect((await screen.findByRole("status")).textContent).toBe(
+      "The document has 1 line.",
+    );
+  });
+
   it("closes on Escape and gives the focus back to the rows", async () => {
     const user = userEvent.setup();
     await open(user);
@@ -251,6 +306,10 @@ describe("a document with a syntax error", () => {
     await user.click(screen.getByRole("button", { name: "Go to error" }));
     const row = await screen.findByText('{"n":301,}');
     expect(row.closest("[data-error]")).not.toBeNull();
+    // Not by color or underline alone.
+    expect(
+      row.closest("[role=listitem]")?.getAttribute("aria-description"),
+    ).toBe("Syntax error");
     expect(status()).toContain("Ln 301, Col 1");
     // Keyboard focus follows the jump.
     await waitFor(() =>
@@ -258,6 +317,20 @@ describe("a document with a syntax error", () => {
         dataset: { testid: "pager-row" },
         textContent: expect.stringContaining('{"n":301,}'),
       }),
+    );
+  });
+
+  it("writes the position of a far error with separators, as the status bar does", async () => {
+    show(
+      large(text, {
+        status: {
+          kind: "invalid",
+          issues: [{ ...issue, line: 1_012_058, column: 1_036 }],
+        },
+      }),
+    );
+    expect((await screen.findByTestId("raw-error")).textContent).toBe(
+      "Line 1,012,058, column 1,036",
     );
   });
 
