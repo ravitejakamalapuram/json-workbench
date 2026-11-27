@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { documentIndexContract } from "../../testing/index-contract";
+import {
+  documentIndexContract,
+  invalidDocumentContract,
+} from "../../testing/index-contract";
 import { indexedFormat, yamlToJson } from "../formats";
 import type { DocFormat, IndexedFormat } from "../types";
 import { buildMemoryIndex } from "./memory-index";
@@ -26,6 +29,13 @@ async function makeIndex(source: Blob, format: DocFormat) {
 
 describe("memory index", () => {
   documentIndexContract(makeIndex);
+  invalidDocumentContract(async (source, format) => {
+    const built = await buildMemoryIndex(
+      new Uint8Array(await source.arrayBuffer()),
+      indexedFormat(format),
+    );
+    return built.kind === "invalid" ? built.issues : [];
+  });
 
   it("counts records and nodes", async () => {
     const cases = [

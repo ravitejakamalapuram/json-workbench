@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { fakeWorker } from "../../testing/fake-worker";
-import { documentIndexContract } from "../../testing/index-contract";
+import {
+  documentIndexContract,
+  invalidDocumentContract,
+} from "../../testing/index-contract";
 import { yamlToJson } from "../formats";
-import { LIMITS, type DocFormat, type IndexProgress } from "../types";
-import { createDocHandlers } from "./doc-ops";
+import type { DocFormat, IndexProgress } from "../types";
+import { createDocHandlers, type DocOptions } from "./doc-ops";
 import { openDocument, openTextIndex, type OpenOptions } from "./open";
 import { searchHandlers } from "./search";
 
@@ -12,10 +15,10 @@ vi.mock(
   async () => (await import("../../testing/index-contract")).testYamlCodec,
 );
 
-function setup() {
+function setup(docOptions: DocOptions = {}) {
   const workers: Worker[] = [];
   const spawn = () => {
-    const worker = fakeWorker(createDocHandlers());
+    const worker = fakeWorker(createDocHandlers(docOptions));
     workers.push(worker);
     return worker;
   };
@@ -34,10 +37,25 @@ function setup() {
 }
 
 describe("openDocument", () => {
-  describe("the index proxy over the doc worker", () => {
-    const { open } = setup();
-    documentIndexContract(async (source, format) => open(source, format).index);
-  });
+  // The proxy must not care which engine sits behind it: the memory index by
+  // default, the range index when every source is "large" and read 5 bytes at a time.
+  const engines: [string, DocOptions][] = [
+    ["memory index", {}],
+    ["range index", { rangeAboveBytes: 0, chunkBytes: 5 }],
+  ];
+  for (const [name, docOptions] of engines)
+    describe(`the index proxy over the doc worker, ${name}`, () => {
+      const { open } = setup(docOptions);
+      documentIndexContract(async (source, format) => {
+        const { status } = await open(source, format).finished;
+        if (status.kind !== "ready") throw new Error("Not ready.");
+        return status.index;
+      });
+      invalidDocumentContract(async (source, format) => {
+        const { status } = await open(source, format).finished;
+        return status.kind === "invalid" ? status.issues : [];
+      });
+    });
 
   it("answers while indexing runs and settles ready with the summary", async () => {
     const updates: IndexProgress[] = [];
@@ -88,12 +106,12 @@ describe("openDocument", () => {
   });
 
   it("fails with the reason when the document is too large", async () => {
-    const { open } = setup();
-    const big = new Blob([new Uint8Array(LIMITS.rawEditChars + 1)]);
+    const { open } = setup({ maxBytes: 1024 * 1024 });
+    const big = new Blob([new Uint8Array(2 * 1024 * 1024)]);
     const { status } = await open(big).finished;
     expect(status).toEqual({
       kind: "failed",
-      message: expect.stringContaining("2 MB"),
+      message: "This file is 2 MB. JSON Workbench opens files up to 1 MB.",
     });
   });
 

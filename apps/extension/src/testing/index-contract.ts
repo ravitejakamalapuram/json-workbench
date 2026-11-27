@@ -11,8 +11,9 @@ import {
   type DocFormat,
   type DocumentIndex,
   type NodeInfo,
+  type ParseIssue,
 } from "../platform/types";
-import { bytesOf, FIXTURES, WRAPPER } from "./index-fixtures";
+import { bytesOf, FIXTURES, INVALID_FIXTURES, WRAPPER } from "./index-fixtures";
 
 /** The walk expects totalFinal pages, so a progressive index resolves once it is complete. */
 export type MakeIndex = (
@@ -30,7 +31,43 @@ export const testYamlCodec = {
   stringifyYaml: (value: JsonValue) => stringifyYamlText(value),
 };
 
-/** Visits every node by paging children() two at a time, with the child positions from the root. */
+/** Indexes an invalid document and returns what the engine reported about it. */
+export type Diagnose = (
+  source: Blob,
+  format: DocFormat,
+) => Promise<readonly ParseIssue[]>;
+
+/**
+ * Every engine puts the same document's first error at the same byte, line and
+ * column: a file must not change verdict, or move its error, when it crosses
+ * the size that switches engines.
+ */
+export function invalidDocumentContract(diagnose: Diagnose): void {
+  for (const fixture of INVALID_FIXTURES)
+    it(`reports ${fixture.name}`, async () => {
+      const issues = await diagnose(new Blob([fixture.bytes]), fixture.format);
+      expect(issues).toHaveLength(1);
+      expect(issues[0]).toMatchObject(fixture.issue);
+      expect(issues[0]?.message).not.toBe("");
+    });
+}
+
+/**
+ * Where the walk starts each two-child page. Every page of a small container;
+ * for one with more than a page of children, the ends and the places around
+ * the range index's 64-child checkpoints, because asking about all of 1,000+
+ * children costs a few thousand queries, each a message round trip in the proxy tests.
+ */
+function pageStarts(count: number): number[] {
+  if (count <= LIMITS.pageSize)
+    return Array.from({ length: Math.ceil(count / 2) }, (_, at) => at * 2);
+  const even = (value: number) => value - (value % 2);
+  return [
+    ...new Set([0, 62, 64, 126, 128, even(count / 2), even(count - 1)]),
+  ].sort((a, b) => a - b);
+}
+
+/** Visits every node by paging children() two at a time (sampled for a big container), with the child positions from the root. */
 async function walk(
   index: DocumentIndex,
   visit: (node: NodeInfo, positions: readonly number[]) => Promise<void>,
@@ -41,7 +78,7 @@ async function walk(
   for (let next = queue.shift(); next; next = queue.shift()) {
     const [node, positions] = next;
     await visit(node, positions);
-    for (let offset = 0; offset < (node.childCount ?? 0); offset += 2) {
+    for (const offset of pageStarts(node.childCount ?? 0)) {
       const page = await index.children(node.pointer, offset, 2);
       expect(page.totalFinal).toBe(true);
       expect(page.total).toBe(node.childCount);

@@ -19,6 +19,7 @@ import {
   type SearchQuery,
   type SearchSummary,
 } from "../types";
+import { preview } from "./json-string";
 import { parseTree, type Entry } from "./parse";
 import { searchText } from "./search";
 import { decodeUtf8, type DecodedText } from "./utf8";
@@ -45,15 +46,6 @@ export async function buildMemoryIndex(
     kind: "ready",
     index: new MemoryIndex(bytes, decoded, root, { records, nodes }),
   };
-}
-
-/** Primitive text cut at LIMITS.previewChars, never inside a surrogate pair. */
-function preview(text: string): { text: string; truncated?: true } {
-  if (text.length <= LIMITS.previewChars) return { text };
-  let end = LIMITS.previewChars;
-  const last = text.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
-  return { text: text.slice(0, end), truncated: true };
 }
 
 function cell(entry: Entry): Cell {
