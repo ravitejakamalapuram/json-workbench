@@ -3,6 +3,33 @@
 All notable changes to JSON Workbench are documented here. The Chrome extension
 version is the `version` field in `apps/extension/manifest.json`.
 
+## [0.3.0] - 2026-11-27
+
+### Changed
+
+- A rebuilt interface: a side panel with a tree view (including JSON stored
+  inside string values), a Raw editor with one-click fixes, a command palette,
+  and settings.
+- Large files up to about 1.25 GB open in place through a byte-range index
+  built in a worker; the first rows appear while the rest of the file is
+  scanned.
+- Permissions reduced to `sidePanel` and `storage`: no `activeTab`,
+  `scripting`, optional `debugger` or optional `<all_urls>`.
+
+### Added
+
+- JWT decoding from a pasted token or a string in the tree.
+- YAML in and out: open `.yaml` and `.yml` files, convert to YAML and back to
+  JSON.
+- A bundle budget check (`npm run bundle:budget`) in CI.
+
+### Removed
+
+Features of 0.2.x that are not in this release: Compare, the Transform
+pipeline (filter, map, JSONata, jq), Types, Table, schema inference and
+validation, DuckDB SQL, the in-page viewer and auto-render, and tab import with
+network capture. Monaco is replaced by CodeMirror.
+
 ## [0.2.0] - 2026-09-23
 
 ### Added

@@ -30,11 +30,7 @@
     "apps/extension/devtools.html",
     "apps/extension/devtools-panel.html"
   ],
-  "bundle": [
-    "scripts/bundle-budget.mjs",
-    "scripts/bundle-budget.test.mjs",
-    "apps/extension/src/legacy/"
-  ],
+  "bundle": ["scripts/bundle-budget.mjs", "scripts/bundle-budget.test.mjs"],
   "f2": [
     "apps/extension/src/platform/doc/",
     "apps/extension/src/platform/workers/client.",

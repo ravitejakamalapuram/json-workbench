@@ -10,10 +10,10 @@ The shipped extension lazy-loads DuckDB-WASM for a SQL panel. Its wasm is about 
 
 ## Decision
 
-DuckDB is not part of the default (Store) build. The package step no longer copies its assets, nothing in the new UI imports it, and its panel is deleted with `src/legacy/`. Decision 1 allows SQL to return as an optional add-on, but none is planned; it comes back only on request, from git history.
+DuckDB is not part of the default (Store) build. The package step no longer copies its assets, nothing in the new UI imports it, and its panel was deleted with the old UI. Decision 1 allows SQL to return as an optional add-on, but none is planned; it comes back only on request, from git history.
 
 ## Consequences
 
 - The package shrinks by about 39 MB and the bundle budget forbids any file matching `duckdb` in `dist` (TARGET.md section 6).
-- `@duckdb/duckdb-wasm` stays in `apps/extension/package.json` only until `src/legacy/` is deleted, because the legacy code still type-checks against it.
+- `@duckdb/duckdb-wasm` is no longer a dependency of the extension. It stays in `packages/core` for the CLI and VS Code packages (`analytics.ts`).
 - Users who relied on SQL lose it. jq (lazy WASM, 2.8 MB, loaded only by the transform worker) and JSONata remain for queries.

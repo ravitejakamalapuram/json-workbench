@@ -106,7 +106,7 @@ describe("store documents", () => {
       })) {
         const path = `${directory}${entry.name}`;
         if (entry.isDirectory()) {
-          if (entry.name !== "legacy") walk(`${path}/`);
+          walk(`${path}/`);
         } else if (/\.tsx?$/.test(entry.name) && !/\.test\./.test(entry.name)) {
           const source = read(path);
           for (const match of source.matchAll(/writeStored\(\s*"([^"]+)"/g))

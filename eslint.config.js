@@ -31,12 +31,7 @@ const NO_JSON_PARSE = {
 
 export default tseslint.config(
   {
-    ignores: [
-      "**/dist/**",
-      "**/node_modules/**",
-      // The old UI, kept only as a reference to port from; nothing imports it.
-      "apps/extension/src/legacy/**",
-    ],
+    ignores: ["**/dist/**", "**/node_modules/**"],
   },
   ...tseslint.configs.recommended,
   {

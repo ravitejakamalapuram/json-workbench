@@ -12,7 +12,7 @@ What Raw needs is smaller: JSON highlighting, a precise error underline, markers
 
 ## Decision
 
-Raw uses CodeMirror 6: `@codemirror/{state,view,commands,language,lint,search,lang-json}` and `@lezer/highlight`, in its own lazy chunk (`views-raw-*`). The Lumen theme is built from `theme/tokens.ts`, with 28 px lines to match the tree rows. Monaco, `@monaco-editor/react` and their fonts are removed when `src/legacy/` is deleted.
+Raw uses CodeMirror 6: `@codemirror/{state,view,commands,language,lint,search,lang-json}` and `@lezer/highlight`, in its own lazy chunk (`views-raw-*`). The Lumen theme is built from `theme/tokens.ts`, with 28 px lines to match the tree rows. Monaco, `@monaco-editor/react` and the old UI's fonts are removed from the dependencies.
 
 ## Consequences
 

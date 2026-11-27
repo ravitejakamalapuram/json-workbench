@@ -15,6 +15,5 @@
       "@json-workbench/core/input": ["./packages/core/src/input.ts"]
     }
   },
-  "include": ["packages", "apps"],
-  "exclude": ["apps/extension/src/legacy"]
+  "include": ["packages", "apps"]
 }

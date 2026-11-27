@@ -46,6 +46,6 @@ data_collection:
   deletion: "'Clear local data' in Settings removes every stored key; uninstall clears all local storage for the extension"
 security_classification: low
 release_channel: default
-current_version: "0.2.1"
+current_version: 0.3.0
 kill_policy: null
 scale_policy: null # this is the founder's current active growth-sprint priority (P4 in TASKS.md)
