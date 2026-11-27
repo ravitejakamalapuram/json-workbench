@@ -7,6 +7,7 @@ import {
   PARTIAL_FLUSH_MS,
   PROGRESS_INTERVAL_MS,
   toWireError,
+  transferables,
   type DocOps,
   type Handlers,
   type Op,
@@ -98,5 +99,17 @@ describe("protocol", () => {
     expect(aborted.name).toBe("AbortError");
     const other = fromWireError({ name: "JsonSyntaxError", message: "Bad" });
     expect([other.name, other.message]).toEqual(["JsonSyntaxError", "Bad"]);
+  });
+
+  it("lists every buffer once for the transfer list, never a Blob", () => {
+    const bytes = new Uint8Array(4);
+    const buffer = new ArrayBuffer(2);
+    const found = transferables({
+      bytes,
+      again: [bytes, buffer],
+      buffer,
+      blob: new Blob(["x"]),
+    });
+    expect(found).toEqual([bytes.buffer, buffer]);
   });
 });

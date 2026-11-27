@@ -111,7 +111,8 @@ export type ClientOptions = {
 
 /** The worker side of postMessage, typed without the WebWorker lib. */
 export interface WorkerScope {
-  postMessage(message: FromWorker): void;
+  /** `options.transfer` moves ArrayBuffers instead of copying them. */
+  postMessage(message: FromWorker, options?: StructuredSerializeOptions): void;
   addEventListener(
     type: "message",
     listener: (event: MessageEvent<ToWorker>) => void,
@@ -128,6 +129,30 @@ export function fromWireError({ name, message }: WireError): Error {
   if (name === "TooLargeError") return new TooLargeError(message);
   if (name === "AbortError") return new DOMException(message, "AbortError");
   return Object.assign(new Error(message), { name });
+}
+
+/**
+ * Every ArrayBuffer in a message, so postMessage moves them instead of copying
+ * (a Uint8Array moves its whole buffer). The sender's copy is detached, so
+ * never send a view of bytes you keep. Each buffer is listed once, because
+ * postMessage throws on a duplicate.
+ */
+export function transferables(value: Plain): ArrayBuffer[] {
+  const found = new Set<ArrayBuffer>();
+  const visit = (item: Plain): void => {
+    if (item instanceof ArrayBuffer) found.add(item);
+    else if (item instanceof Uint8Array) {
+      if (item.buffer instanceof ArrayBuffer) found.add(item.buffer);
+    } else if (Array.isArray(item)) item.forEach(visit);
+    else if (
+      item !== null &&
+      typeof item === "object" &&
+      !(item instanceof Blob)
+    )
+      Object.values(item).forEach(visit);
+  };
+  visit(value);
+  return [...found];
 }
 
 // ------------------------------------------------------------- doc worker
