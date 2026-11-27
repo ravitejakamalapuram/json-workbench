@@ -4,7 +4,7 @@ import { documentFixture } from "../testing/fixtures";
 import { registry } from "./registry";
 
 /**
- * Shortcut namespaces (TARGET.md 3.4): an action may only use a shortcut of
+ * Shortcut namespaces (TARGET.md, after section 3.3): an action may only use a shortcut of
  * the item its id names, so items built in parallel cannot collide.
  */
 const NAMESPACES: Readonly<Record<string, RegExp>> = {

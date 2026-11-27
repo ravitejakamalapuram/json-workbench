@@ -41,6 +41,9 @@ export default defineConfig({
     ],
   },
   build: {
+    // Chrome supports modulepreload natively; the polyfill would be the only
+    // code of an empty entry and turn it into a "shared" chunk.
+    modulePreload: { polyfill: false },
     rollupOptions: {
       input: {
         index: at("index.html"),

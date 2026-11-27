@@ -1,5 +1,5 @@
 // Owned by item "compare". F1a wrote this file as a stub in its final shape;
-// the item may add optional fields, never rename or remove (TARGET.md 3.3).
+// the item may add optional fields, never rename or remove (TARGET.md section 3).
 import type {
   DocId,
   Pointer,

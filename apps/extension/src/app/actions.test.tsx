@@ -1,9 +1,13 @@
 // @vitest-environment happy-dom
-import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Action, ActionContext, AppState } from "../platform/types";
 import { actionForKey, actionsFor, runAction, shortcutOf } from "./actions";
 import { useActionHandler } from "./ui/action-handlers";
+import { ActionsContext, useActionList } from "./ui/actions-context";
+
+// Without vitest globals Testing Library cannot register its own cleanup.
+afterEach(cleanup);
 
 const ctx: ActionContext = {
   state: {} as AppState,
@@ -162,5 +166,42 @@ describe("useActionHandler", () => {
 
     mounted.unmount();
     expect(actionsFor([unbound], ctx, "palette")).toEqual([]);
+  });
+});
+
+function RowBadges() {
+  const actions = actionsFor(useActionList(), ctx, "row");
+  return (
+    <>
+      {actions.map((action) => (
+        <button key={action.id} type="button">
+          {action.label}
+        </button>
+      ))}
+    </>
+  );
+}
+
+describe("ActionsContext", () => {
+  it("gives a view the registry's row actions without importing the registry", () => {
+    const decode: Action = {
+      id: "jwt.decode",
+      label: "Decode JWT",
+      placement: ["row"],
+      run: vi.fn(),
+    };
+    const { getAllByRole } = render(
+      <ActionsContext.Provider value={[format, decode]}>
+        <RowBadges />
+      </ActionsContext.Provider>,
+    );
+    expect(getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Decode JWT",
+    ]);
+  });
+
+  it("offers nothing outside the shell", () => {
+    const { queryAllByRole } = render(<RowBadges />);
+    expect(queryAllByRole("button")).toEqual([]);
   });
 });
