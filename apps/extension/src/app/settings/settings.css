@@ -1,0 +1,68 @@
+/* The Settings dialog: groups separated by space, not boxes. */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings-group legend {
+  padding-bottom: var(--space-2);
+}
+
+.settings-group ul {
+  align-self: stretch;
+}
+
+.settings-choices {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.settings-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.settings-choice input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.settings-select {
+  height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+}
+
+.settings-recent {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-1) 0;
+}
+
+.settings-recent > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Buttons are text buttons; pull them left so their label lines up with the text above. */
+.settings-group > .button {
+  margin-left: calc(-1 * var(--space-3));
+}

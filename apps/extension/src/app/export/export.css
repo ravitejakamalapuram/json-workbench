@@ -1,0 +1,42 @@
+/* The Export dialog. */
+
+.export {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.export-formats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.export-formats legend {
+  padding-bottom: var(--space-2);
+}
+
+.export-format {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--row);
+  cursor: pointer;
+}
+
+.export-format input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.export-format .muted {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.export-error {
+  color: var(--danger);
+}

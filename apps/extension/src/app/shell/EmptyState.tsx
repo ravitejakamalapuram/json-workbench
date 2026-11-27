@@ -1,15 +1,18 @@
-import type { DragEvent } from "react";
+import { useId, useState } from "react";
 import type { ShellProps } from "../../platform/types";
 import { useAppStore, useAppStoreApi } from "../../store";
 import { Button } from "../ui/Button";
+import { Kbd } from "../ui/Kbd";
 import { dayLabel, formatBytes } from "./format";
+import { openPasted, openRecent } from "./open";
 
 type EmptyStateProps = ShellProps & { readonly openFile: () => void };
 
-/** What the workspace shows with no document (Empty mockup). */
+/** What the workspace shows with no document (Empty mockup). The whole page takes a dropped file. */
 export function EmptyState({ openFile, extraSources }: EmptyStateProps) {
   const store = useAppStoreApi();
   const recents = useAppStore((state) => state.recents);
+  const [pasting, setPasting] = useState(false);
 
   async function openSample() {
     // Loaded on demand so the sample generator stays out of the entry chunk.
@@ -23,22 +26,8 @@ export function EmptyState({ openFile, extraSources }: EmptyStateProps) {
     });
   }
 
-  function onDrop(event: DragEvent) {
-    event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file)
-      store
-        .getState()
-        .openDocument({ name: file.name, origin: "file", source: file });
-  }
-
   return (
-    <section
-      className="empty"
-      aria-labelledby="empty-title"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={onDrop}
-    >
+    <section className="empty" aria-labelledby="empty-title">
       <div className="empty-column">
         <div className="empty-intro">
           <h2 id="empty-title" className="empty-title">
@@ -56,8 +45,12 @@ export function EmptyState({ openFile, extraSources }: EmptyStateProps) {
           >
             Open file
           </Button>
+          <Button aria-expanded={pasting} onClick={() => setPasting(!pasting)}>
+            Paste
+          </Button>
           <Button onClick={() => void openSample()}>Try a sample</Button>
         </div>
+        {pasting && <PasteBox onCancel={() => setPasting(false)} />}
         {extraSources}
         {recents.length > 0 && (
           <section aria-labelledby="empty-recent">
@@ -66,17 +59,62 @@ export function EmptyState({ openFile, extraSources }: EmptyStateProps) {
             </h3>
             <ul>
               {recents.map((file) => (
-                <li key={file.name} className="empty-recent">
-                  <span>{file.name}</span>
-                  <span className="muted">
-                    {formatBytes(file.bytes)} · {dayLabel(file.openedAt)}
-                  </span>
+                <li key={file.name}>
+                  <button
+                    type="button"
+                    className="empty-recent"
+                    onClick={() => openRecent(store.getState(), file)}
+                  >
+                    <span>{file.name}</span>
+                    <span className="muted">
+                      {formatBytes(file.bytes)} · {dayLabel(file.openedAt)}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
           </section>
         )}
+        <p className="empty-hint muted">
+          <Kbd shortcut="Mod+V" /> to paste · <Kbd shortcut="Mod+K" /> for
+          commands · <Kbd shortcut="?" /> for shortcuts
+        </p>
       </div>
     </section>
+  );
+}
+
+function PasteBox({ onCancel }: { readonly onCancel: () => void }) {
+  const store = useAppStoreApi();
+  const [text, setText] = useState("");
+  const id = useId();
+  return (
+    <form
+      className="paste-box"
+      onSubmit={(event) => {
+        event.preventDefault();
+        openPasted(store.getState(), text);
+      }}
+    >
+      <label htmlFor={id} className="caption">
+        Paste JSON
+      </label>
+      <textarea
+        id={id}
+        className="paste-input"
+        rows={8}
+        spellCheck={false}
+        autoFocus
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+      />
+      <div className="dialog-actions">
+        <Button onClick={onCancel}>Cancel</Button>
+        {/* A text button: Open file stays the screen's one primary. */}
+        <Button type="submit" disabled={!text.trim()}>
+          Open
+        </Button>
+      </div>
+    </form>
   );
 }

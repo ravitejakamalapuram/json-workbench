@@ -9,6 +9,8 @@ import { Tabs, type TabItem } from "../ui/Tabs";
 import { DetailsPanel } from "./DetailsPanel";
 import { statusLabel } from "./format";
 import { Loading } from "./Loading";
+import { OverflowMenu, type MenuItem } from "./OverflowMenu";
+import { useWidth } from "./use-width";
 
 const PANEL_ID = "view-panel";
 
@@ -17,6 +19,7 @@ export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
   const view = useAppStore((state) => state.view);
   const setView = useAppStore((state) => state.setView);
   const detailsOpen = useAppStore((state) => state.detailsOpen);
+  const width = useWidth();
 
   const tabs = registry.views.map((plugin): TabItem<ViewId> => {
     const supported = plugin.supports(doc);
@@ -49,7 +52,7 @@ export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
               <shown.Toolbar doc={doc} />
             </Suspense>
           )}
-          <ToolbarActions doc={doc} />
+          <ToolbarActions doc={doc} compact={width !== "wide"} />
         </div>
       </div>
       <div className="document-body">
@@ -66,7 +69,13 @@ export function DocumentView({ doc }: { readonly doc: DocumentModel }) {
             </Suspense>
           )}
         </div>
-        {detailsOpen && shown && <DetailsPanel doc={doc} view={shown.id} />}
+        {detailsOpen && shown && (
+          <DetailsPanel
+            doc={doc}
+            view={shown.id}
+            overlay={width === "narrow"}
+          />
+        )}
       </div>
       {/* Always present in view mode, so the layout does not jump when a view has nothing to say. */}
       <div className="status-bar" data-testid="view-status-bar">
@@ -105,18 +114,56 @@ function DocStatus({ doc }: { readonly doc: DocumentModel }) {
   );
 }
 
-/** Registry actions placed on the toolbar; at most one is the filled primary (Export). */
-function ToolbarActions({ doc }: { readonly doc: DocumentModel }) {
+type ToolbarActionsProps = {
+  readonly doc: DocumentModel;
+  /** Up to 1100 px the secondary controls go into More, so the toolbar does not crowd. */
+  readonly compact: boolean;
+};
+
+/** Registry actions placed on the toolbar and the details toggle; the one primary (Export) comes last. */
+function ToolbarActions({ doc, compact }: ToolbarActionsProps) {
   const store = useAppStoreApi();
   const actions = useActionList();
+  const detailsOpen = useAppStore((state) => state.detailsOpen);
+  const setDetailsOpen = useAppStore((state) => state.setDetailsOpen);
   const context = () => ({ state: store.getState(), doc, node: undefined });
-  return actionsFor(actions, context(), "toolbar").map((action) => (
-    <Button
-      key={action.id}
-      variant={action.primary ? "primary" : "text"}
-      onClick={() => void runAction(action, context())}
-    >
-      {action.label}
-    </Button>
-  ));
+  const offered = actionsFor(actions, context(), "toolbar");
+  const secondary: MenuItem[] = [
+    ...offered
+      .filter((action) => !action.primary)
+      .map((action) => ({
+        id: action.id,
+        label: action.label,
+        onSelect: () => void runAction(action, context()),
+      })),
+    {
+      id: "details",
+      label: detailsOpen ? "Hide details" : "Show details",
+      onSelect: () => setDetailsOpen(!detailsOpen),
+    },
+  ];
+  return (
+    <>
+      {compact ? (
+        <OverflowMenu items={secondary} />
+      ) : (
+        secondary.map((item) => (
+          <Button key={item.id} onClick={item.onSelect}>
+            {item.label}
+          </Button>
+        ))
+      )}
+      {offered
+        .filter((action) => action.primary)
+        .map((action) => (
+          <Button
+            key={action.id}
+            variant="primary"
+            onClick={() => void runAction(action, context())}
+          >
+            {action.label}
+          </Button>
+        ))}
+    </>
+  );
 }

@@ -1,6 +1,6 @@
 // Words for the shell: sizes, days, paths and document status.
 import { fromJsonPointer, toJsonPath } from "@json-workbench/core";
-import type { DocumentModel, Pointer } from "../../platform/types";
+import type { DocumentModel, Pointer, Selection } from "../../platform/types";
 
 const UNITS = ["B", "KB", "MB", "GB"];
 
@@ -40,6 +40,15 @@ export function pathLabel(pointer: Pointer): string {
       /^(?:0|[1-9]\d*)$/.test(segment) ? Number(segment) : segment,
     ),
   );
+}
+
+/**
+ * The selection's path, through each expanded string for embedded JSON:
+ * "$.payload → $.event". No JSONPath reaches inside a string, so the hops are
+ * shown, and copied, as such.
+ */
+export function selectionLabel({ pointer, via = [] }: Selection): string {
+  return [...via, pointer].map(pathLabel).join(" → ");
 }
 
 export type StatusLabel = {

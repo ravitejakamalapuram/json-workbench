@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { documentFixture, fakeIndex } from "../../testing/fixtures";
-import { dayLabel, formatBytes, pathLabel, statusLabel } from "./format";
+import {
+  dayLabel,
+  formatBytes,
+  pathLabel,
+  selectionLabel,
+  statusLabel,
+} from "./format";
 
 describe("formatBytes", () => {
   it("uses the largest unit that keeps a number of at least 1", () => {
@@ -29,6 +35,19 @@ describe("pathLabel", () => {
     expect(pathLabel("")).toBe("$");
     expect(pathLabel("/items/0/price")).toBe("$.items[0].price");
     expect(pathLabel("/a~1b/first name")).toBe('$["a/b"]["first name"]');
+  });
+});
+
+describe("selectionLabel", () => {
+  it("shows each expanded string on the way to an embedded node", () => {
+    expect(selectionLabel({ docId: "d", pointer: "/a/0" })).toBe("$.a[0]");
+    expect(
+      selectionLabel({
+        docId: "d",
+        pointer: "/event",
+        via: ["/payload", "/inner"],
+      }),
+    ).toBe("$.payload → $.inner → $.event");
   });
 });
 
