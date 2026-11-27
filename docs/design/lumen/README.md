@@ -21,7 +21,7 @@ Lumen is built for long sessions, in the spirit of Postman and jsondiff.com: a b
 
 ## Visual foundations
 
-- **Color:** two themes, Light (default) and Dark. Text on its surface is 4.5:1 or better in both. Backgrounds `ok-bg`, `warn-bg` and `danger-bg` tint whole rows for compare and errors; pair them with `ok`, `warn`, `danger` text.
+- **Color:** two themes, Light (default) and Dark. Text on its surface is 4.5:1 or better in both. Backgrounds `ok-bg`, `warn-bg` and `danger-bg` tint whole rows for compare and errors; pair them with `ok`, `warn`, `danger` text. Dialogs sit on `scrim`, which darkens the page behind them in both themes.
 - **Type:** Inter for UI, JetBrains Mono for data. UI body is 14/20; code is 13/24 so rows are easy to scan.
 - **Spacing:** a 4px grid. Tree and code rows are `row` (28px). Panels use `space-4` padding.
 - **Radius:** `radius-md` for controls, `radius-sm` for badges, `radius-lg` for the drop zone.
@@ -30,13 +30,13 @@ Lumen is built for long sessions, in the spirit of Postman and jsondiff.com: a b
 
 ## Syntax color map
 
-| Value | Token |
-| --- | --- |
-| key | `syn-key` |
-| string | `syn-string` |
-| number | `syn-number` |
-| true, false | `syn-bool` |
-| null, braces, counts | `syn-null` |
+| Value                | Token        |
+| -------------------- | ------------ |
+| key                  | `syn-key`    |
+| string               | `syn-string` |
+| number               | `syn-number` |
+| true, false          | `syn-bool`   |
+| null, braces, counts | `syn-null`   |
 
 ## Patterns
 
