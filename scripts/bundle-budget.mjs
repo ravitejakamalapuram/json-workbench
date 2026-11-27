@@ -28,7 +28,7 @@ export const LIMITS = {
     "worker-export": 10,
     "worker-features-yaml": 35,
     "worker-pager": 3,
-    "worker-raw": 5,
+    "worker-raw": 6,
     "worker-search": 3,
     "worker-yaml": 26,
   },
