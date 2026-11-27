@@ -135,7 +135,7 @@ describe("the editor", () => {
     expect(view?.state.readOnly).toBe(true);
   });
 
-  it("explains a document that is too large instead of loading it", () => {
+  it("gives a document over the limit the pager, and its failure the plain message", async () => {
     const doc = documentFixture({
       bytes: LIMITS.rawEditChars + 1,
       status: { kind: "failed", message: "Too large." },
@@ -145,9 +145,8 @@ describe("the editor", () => {
         <rawView.Component doc={doc} />
       </Suspense>,
     );
-    return screen
-      .findByText("This document is larger than 2 MB, the most Raw can edit.")
-      .then(() => expect(screen.queryByTestId("raw-editor")).toBeNull());
+    await screen.findByText("Too large.");
+    expect(screen.queryByTestId("raw-editor")).toBeNull();
   });
 });
 

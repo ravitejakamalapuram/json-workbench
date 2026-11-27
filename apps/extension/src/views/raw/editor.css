@@ -1,0 +1,143 @@
+/* Raw: CodeMirror in Lumen. CodeMirror brings a light theme of its own; every
+   rule here repeats `.cm-editor` to outrank it, and takes its colors from tokens. */
+
+.raw-editor {
+  height: 100%;
+}
+
+.raw-editor .cm-editor {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font: var(--type-code);
+}
+
+/* The focus ring is drawn by a pseudo-element, not `outline`: the gutters are
+   sticky at z-index 200 and paint over the left strip of an outline. */
+.raw-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.raw-editor .cm-editor.cm-focused::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+}
+
+/* 28 px lines, as in the tree. */
+.raw-editor .cm-editor .cm-scroller {
+  font: inherit;
+  line-height: var(--row);
+}
+
+.raw-editor .cm-editor .cm-content {
+  padding: var(--space-3) 0;
+  caret-color: var(--ink);
+}
+
+/* The gutter owns the 16 px between a number and its text (Errors mockup), so
+   the text starts 56 px from the edge, as in the tree. */
+.raw-editor .cm-editor .cm-line {
+  padding: 0 var(--space-4) 0 0;
+}
+
+.raw-editor .cm-editor .cm-gutters {
+  border: 0;
+  background: var(--bg);
+  color: var(--ink-muted);
+}
+
+.raw-editor .cm-editor .cm-gutter.cm-lineNumbers .cm-gutterElement {
+  min-width: 56px;
+  padding: 0 var(--space-4) 0 0;
+}
+
+/* The browser paints the selection (the editor draws none of its own), in
+   its own blue unless told otherwise. The text keeps its syntax color. */
+.raw-editor .cm-content ::selection {
+  background: var(--selected);
+}
+
+.raw-editor .cm-editor .cm-matchingBracket {
+  background: var(--selected);
+  outline: 1px solid var(--line);
+}
+
+/* Syntax: Lumen's map (null, braces and separators share one quiet color). */
+.raw-editor .tok-propertyName {
+  color: var(--syn-key);
+}
+
+.raw-editor .tok-string {
+  color: var(--syn-string);
+}
+
+.raw-editor .tok-number {
+  color: var(--syn-number);
+}
+
+.raw-editor .tok-bool {
+  color: var(--syn-bool);
+}
+
+.raw-editor .tok-atom,
+.raw-editor .tok-punctuation {
+  color: var(--syn-null);
+}
+
+/* The error: a tinted line, a colored number and a wavy underline, so it is
+   never color alone. */
+.raw-editor .cm-editor .raw-error-line,
+.raw-editor .cm-editor .cm-gutterElement.raw-error-number {
+  background: var(--danger-bg);
+}
+
+.raw-editor .cm-editor .cm-gutterElement.raw-error-number {
+  color: var(--danger);
+}
+
+.raw-editor .raw-error-token {
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: 4px;
+}
+
+/* Search panel, restyled from CodeMirror's light default. */
+.raw-editor .cm-editor .cm-panels {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.raw-editor .cm-editor .cm-panels .cm-textfield {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.raw-editor .cm-editor .cm-panels .cm-button {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* CodeMirror sets these at 70 to 80 percent of the code size, which is 9 px
+   for the buttons; they take the label size of the rest of the UI. */
+.raw-editor .cm-editor .cm-panels .cm-search label,
+.raw-editor .cm-editor .cm-panels .cm-search .cm-button,
+.raw-editor .cm-editor .cm-panels .cm-search .cm-textfield {
+  font: var(--type-label);
+}
+
+.raw-editor .cm-editor .cm-searchMatch {
+  background: var(--warn-bg);
+}
+
+.raw-editor .cm-editor .cm-searchMatch.cm-searchMatch-selected {
+  background: var(--selected);
+  outline: 1px solid var(--accent);
+}

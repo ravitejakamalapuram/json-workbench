@@ -1,6 +1,6 @@
 // The CodeMirror 6 editor of Raw: JSON highlighting, search, undo, the error
 // marks and the few commands the view needs. Colors and metrics live in
-// raw.css, in Lumen tokens; CodeMirror's own theme is overridden there.
+// editor.css, in Lumen tokens; CodeMirror's own theme is overridden there.
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { json } from "@codemirror/lang-json";
 import { bracketMatching, syntaxHighlighting } from "@codemirror/language";
@@ -97,7 +97,7 @@ export function markError(view: EditorView, issue: ParseIssue | null) {
   });
 }
 
-/** Three lines of raw.css's 28 px rows. */
+/** Three lines of editor.css's 28 px rows. */
 const CONTEXT = 84;
 
 export function goToError(view: EditorView, issue: ParseIssue) {

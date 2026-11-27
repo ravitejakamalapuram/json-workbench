@@ -3,16 +3,19 @@
 // toolbar actions while it renders, before the lazy view has mounted and
 // after it has gone, and a binding would show Format late and keep it in the tree.
 import type { Action, ActionContext } from "../../platform/types";
+import { isPaged } from "./paged";
 import { rawState } from "./raw-state";
 
 /**
- * Only a valid JSON text can be rewritten: JSONL is one value per line, and
- * YAML is shown read-only. Each edit sends a valid document through
+ * Only a valid JSON text can be rewritten: JSONL is one value per line, YAML
+ * is shown read-only, and a document the pager shows is not edited at all.
+ * Each edit sends a valid document through
  * "indexing" again; it keeps its buttons then, or the toolbar would jump
  * twice per pause in typing.
  */
 const rewritable = ({ state, doc }: ActionContext) => {
-  if (state.view !== "raw" || doc?.format !== "json") return false;
+  if (state.view !== "raw" || doc?.format !== "json" || isPaged(doc))
+    return false;
   const { kind } = doc.status;
   return (
     kind === "ready" ||
@@ -29,14 +32,14 @@ export const rawActions: readonly Action[] = [
     shortcut: "Mod+Shift+F",
     placement: ["palette", "toolbar"],
     when: rewritable,
-    run: () => controls()?.format(),
+    run: () => controls()?.format?.(),
   },
   {
     id: "raw.minify",
     label: "Minify",
     placement: ["palette", "toolbar"],
     when: rewritable,
-    run: () => controls()?.minify(),
+    run: () => controls()?.minify?.(),
   },
   {
     // The problem block offers the same fix under its own name ("Add commas").
@@ -45,11 +48,11 @@ export const rawActions: readonly Action[] = [
     label: "Apply fix",
     shortcut: "Mod+.",
     placement: ["palette"],
-    when: ({ doc }) => doc?.status.kind === "invalid",
+    when: ({ doc }) => doc?.status.kind === "invalid" && !isPaged(doc),
     run: () => {
       const { problem, controls: raw } = rawState.getState();
       const [fix] = problem?.fixes ?? [];
-      if (fix) raw?.applyFix(fix);
+      if (fix) raw?.applyFix?.(fix);
     },
   },
 ];

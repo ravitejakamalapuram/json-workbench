@@ -45,7 +45,7 @@ export default function ProblemDetails({ doc }: ViewProps) {
           <Button
             variant="primary"
             data-testid="raw-apply-fix"
-            onClick={(event) => act(event, () => controls?.applyFix(fix))}
+            onClick={(event) => act(event, () => controls?.applyFix?.(fix))}
           >
             {fix.label}
           </Button>

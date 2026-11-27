@@ -1,0 +1,305 @@
+// @vitest-environment happy-dom
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Suspense } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { actionsFor } from "../../app/actions";
+import {
+  LIMITS,
+  type DocumentModel,
+  type ParseIssue,
+} from "../../platform/types";
+import { changedBlob } from "../../testing/blobs";
+import { documentFixture, fakeIndex } from "../../testing/fixtures";
+import { fakeWorker } from "../../testing/fake-worker";
+import { renderWithStore } from "../../testing/render";
+import { rawProblemDetails, rawView } from ".";
+import { createPagerHandlers, type PagerOptions } from "./pager-ops";
+import { spawnPagerWorker } from "./pager-spawn";
+import { IDLE, rawState } from "./raw-state";
+
+vi.mock("./pager-spawn", () => ({ spawnPagerWorker: vi.fn() }));
+
+/** Small rows and chunks, so the tests cross every seam with a few lines. */
+let options: PagerOptions = {};
+beforeEach(() => {
+  options = {};
+  vi.mocked(spawnPagerWorker).mockReset();
+  vi.mocked(spawnPagerWorker).mockImplementation(() =>
+    fakeWorker(createPagerHandlers(options)),
+  );
+  rawState.setState(IDLE);
+});
+afterEach(cleanup);
+
+const ready = {
+  kind: "ready",
+  index: fakeIndex(),
+  summary: { records: 0, nodes: null },
+} as const;
+
+/** The document says it is over the limit; its Blob is as small as the test needs. */
+function large(text: string, overrides: Partial<DocumentModel> = {}) {
+  return documentFixture({
+    name: "big.jsonl",
+    bytes: LIMITS.rawEditChars + 1,
+    source: new Blob([text]),
+    status: ready,
+    ...overrides,
+  });
+}
+
+/** What the shell shows for a document: the view, its status bar and the problem section. */
+function show(doc: DocumentModel) {
+  return renderWithStore(
+    <Suspense fallback={null}>
+      <rawView.Component doc={doc} />
+      <div data-testid="status-bar">
+        {rawView.StatusBar && <rawView.StatusBar doc={doc} />}
+      </div>
+      <div data-testid="problem">
+        <rawProblemDetails.Component doc={doc} />
+      </div>
+    </Suspense>,
+  );
+}
+
+const lines = (count: number) =>
+  Array.from({ length: count }, (_, at) => `{"n":${at + 1}}`).join("\n");
+
+/** [number, text] of every row mounted. */
+const mounted = () =>
+  screen
+    .getAllByTestId("pager-row")
+    .map((row) => [
+      row.querySelector(".raw-pager-number")?.textContent,
+      row.querySelector(".raw-pager-text")?.textContent,
+    ]);
+const status = () => screen.getByTestId("status-bar").textContent;
+
+describe("the pager", () => {
+  it("shows a document over the limit as numbered lines, without an editor", async () => {
+    show(large(lines(3)));
+    await screen.findByText('{"n":1}');
+    expect(mounted()).toEqual([
+      ["1", '{"n":1}'],
+      ["2", '{"n":2}'],
+      ["3", '{"n":3}'],
+    ]);
+    expect(document.querySelector(".cm-editor")).toBeNull();
+    expect(screen.getByRole("list", { name: "Document text" })).toBeDefined();
+  });
+
+  it("is read only, says so, and reports the line it is on", async () => {
+    show(large(lines(3)));
+    await screen.findByText('{"n":1}');
+    await waitFor(() =>
+      expect(status()).toBe(
+        "Ln 1, Col 1Read only: files over 2 MB open for reading",
+      ),
+    );
+  });
+
+  it("shows markup in the document as text", async () => {
+    const markup = "<img src=x onerror=alert(1)>";
+    show(large(`"${markup}"`));
+    await screen.findByText(`"${markup}"`);
+    expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("numbers a long line once and its pieces not at all", async () => {
+    options = { rowBytes: 10 };
+    show(large(`${"0123456789".repeat(3)}\nshort`));
+    await screen.findByText("short");
+    expect(mounted()).toEqual([
+      ["1", "0123456789"],
+      ["", "0123456789"],
+      ["", "0123456789"],
+      ["2", "short"],
+    ]);
+    const user = userEvent.setup();
+    await user.click(screen.getAllByTestId("pager-row")[1] as HTMLElement);
+    expect(status()).toContain("Ln 1 (continued)");
+  });
+
+  it("moves the active row with the arrow keys and reports its line", async () => {
+    const user = userEvent.setup();
+    show(large(lines(100)));
+    await screen.findByText('{"n":1}');
+    await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(status()).toContain("Ln 3, Col 1");
+    await user.keyboard("{ArrowUp}");
+    expect(status()).toContain("Ln 2, Col 1");
+    expect(document.activeElement?.getAttribute("data-row")).toBe("1");
+  });
+
+  it("goes to the end and back to the start of a long document", async () => {
+    const user = userEvent.setup();
+    show(large(lines(5000)));
+    await screen.findByText('{"n":1}');
+    await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+    await user.keyboard("{End}");
+    await screen.findByText('{"n":5000}');
+    expect(status()).toContain("Ln 5,000, Col 1");
+    await user.keyboard("{Home}");
+    await screen.findByText('{"n":1}');
+    expect(status()).toContain("Ln 1, Col 1");
+  });
+
+  it("pages by a screenful", async () => {
+    const user = userEvent.setup();
+    show(large(lines(500)));
+    await screen.findByText('{"n":1}');
+    await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+    await user.keyboard("{PageDown}");
+    const [line] = /Ln (\d+)/.exec(status() ?? "")?.slice(1) ?? [];
+    expect(Number(line)).toBeGreaterThan(10);
+  });
+
+  it("only keeps the rows near the screen", async () => {
+    const user = userEvent.setup();
+    show(large(lines(5000)));
+    await screen.findByText('{"n":1}');
+    await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+    await user.keyboard("{End}");
+    await screen.findByText('{"n":5000}');
+    expect(screen.queryByText('{"n":1}')).toBeNull();
+  });
+});
+
+describe("go to line", () => {
+  async function open(user: ReturnType<typeof userEvent.setup>, count = 2000) {
+    show(large(lines(count)));
+    await screen.findByText('{"n":1}');
+    await user.click(screen.getAllByTestId("pager-row")[0] as HTMLElement);
+    await user.keyboard("{Control>}g{/Control}");
+    return screen.findByRole("spinbutton", { name: "Go to line" });
+  }
+
+  it("opens a small input on Mod+G, which has the focus", async () => {
+    const user = userEvent.setup();
+    const input = await open(user);
+    expect(document.activeElement).toBe(input);
+    await waitFor(() =>
+      expect(screen.getByText(/of 2,000 lines/)).toBeDefined(),
+    );
+  });
+
+  it("jumps to the line and puts the focus on its row", async () => {
+    const user = userEvent.setup();
+    await open(user);
+    await user.keyboard("1500{Enter}");
+    await screen.findByText('{"n":1500}');
+    expect(status()).toContain("Ln 1,500, Col 1");
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toContain('{"n":1500}'),
+    );
+    expect(screen.queryByRole("spinbutton")).toBeNull();
+  });
+
+  it("says when the line is past the end, and stays where it was", async () => {
+    const user = userEvent.setup();
+    await open(user, 50);
+    await user.keyboard("51{Enter}");
+    expect((await screen.findByRole("status")).textContent).toBe(
+      "The document has 50 lines.",
+    );
+    expect(status()).toContain("Ln 1, Col 1");
+  });
+
+  it("closes on Escape and gives the focus back to the rows", async () => {
+    const user = userEvent.setup();
+    await open(user);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("spinbutton")).toBeNull();
+    expect(document.activeElement?.getAttribute("role")).toBe("listitem");
+  });
+});
+
+describe("a document with a syntax error", () => {
+  const text = `${lines(300)}\n{"n":301,}\n${lines(5)}`;
+  const issue: ParseIssue = {
+    message: "Expected double-quoted property name",
+    byteOffset: text.indexOf("}\n", text.indexOf('{"n":301')),
+    line: 301,
+    column: 9,
+  };
+  const invalid = () =>
+    large(text, { status: { kind: "invalid", issues: [issue] } });
+
+  it("goes to the error from the problem block and marks its row", async () => {
+    const user = userEvent.setup();
+    show(invalid());
+    await screen.findByText('{"n":1}');
+    expect(screen.getByTestId("raw-error").textContent).toBe(
+      "Line 301, column 9",
+    );
+    await user.click(screen.getByRole("button", { name: "Go to error" }));
+    const row = await screen.findByText('{"n":301,}');
+    expect(row.closest("[data-error]")).not.toBeNull();
+    expect(status()).toContain("Ln 301, Col 1");
+    // Keyboard focus follows the jump.
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toContain('{"n":301,}'),
+    );
+  });
+
+  it("offers no fix, because nothing here can edit the text", async () => {
+    show(invalid());
+    await screen.findByTestId("raw-error");
+    expect(screen.queryByTestId("raw-apply-fix")).toBeNull();
+  });
+
+  it("has no Format, Minify or Apply fix to run", () => {
+    const state = { view: "raw" } as never;
+    const available = (doc: DocumentModel) =>
+      actionsFor(
+        rawView.actions ?? [],
+        { state, doc, node: undefined },
+        "toolbar",
+      )
+        .map((action) => action.id)
+        .concat(
+          actionsFor(
+            rawView.actions ?? [],
+            { state, doc, node: undefined },
+            "palette",
+          ).map((action) => action.id),
+        );
+    expect(available(documentFixture({ status: ready }))).toContain(
+      "raw.format",
+    );
+    expect(available(large("[]"))).not.toContain("raw.format");
+    expect(available(large("[]"))).not.toContain("raw.minify");
+    expect(available(invalid())).not.toContain("raw.fix");
+  });
+});
+
+describe("when it cannot show the document", () => {
+  it("says why a refused document has nothing to show, and reads nothing", async () => {
+    show(
+      large("[]", {
+        status: { kind: "failed", message: "This file is 2.0 GB." },
+      }),
+    );
+    await screen.findByText("This file is 2.0 GB.");
+    expect(spawnPagerWorker).not.toHaveBeenCalled();
+  });
+
+  it("says when the file changed on disk", async () => {
+    show(large("[]", { source: changedBlob("[]") }));
+    await screen.findByText("File changed on disk. Reopen it.");
+  });
+
+  it("ends its worker when the view goes away", async () => {
+    const worker = fakeWorker(createPagerHandlers());
+    const terminate = vi.spyOn(worker, "terminate");
+    vi.mocked(spawnPagerWorker).mockImplementation(() => worker);
+    const { unmount } = show(large(lines(3)));
+    await screen.findByText('{"n":1}');
+    unmount();
+    expect(terminate).toHaveBeenCalled();
+    expect(rawState.getState().controls).toBeNull();
+  });
+});

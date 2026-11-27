@@ -9,16 +9,21 @@ import type { DocId, ParseIssue } from "../../platform/types";
 import type { Fix } from "./fixes";
 
 export type RawState = {
-  /** What the problem block and the actions can ask the mounted editor to do. */
+  /** What the problem block and the actions can ask the mounted view to do; the pager can only go to the error. */
   readonly controls: {
-    applyFix(fix: Fix): void;
     goToError(issue: ParseIssue): void;
-    format(): Promise<void>;
-    minify(): Promise<void>;
+    applyFix?(fix: Fix): void;
+    format?(): Promise<void>;
+    minify?(): Promise<void>;
   } | null;
-  /** Line and column from 1, columns in UTF-16 units, as the engine counts them. */
-  readonly cursor: { readonly line: number; readonly column: number } | null;
+  /** Line and column from 1, columns in UTF-16 units, as the engine counts them; no column for a row that continues a long line. */
+  readonly cursor: {
+    readonly line: number;
+    readonly column: number | null;
+  } | null;
   readonly readOnly: boolean;
+  /** The read-only pager shows the document, not the editor. */
+  readonly paged: boolean;
   /** The document that was valid the last time it was judged: what it stays, until the next verdict, while it re-indexes. */
   readonly validDoc: DocId | null;
   /** The fixes for `issue`, computed for the text the engine parsed. Absent while that text is being edited. */
@@ -34,6 +39,7 @@ export const IDLE: RawState = {
   controls: null,
   cursor: null,
   readOnly: false,
+  paged: false,
   validDoc: null,
   problem: null,
   notice: "",

@@ -1,0 +1,90 @@
+/* The read-only pager of Raw: Lumen's code type on 28 px rows, a 56 px gutter
+   for the line number and the text from there, as in the editor. */
+
+.raw-pager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.raw-pager-list {
+  flex: 1;
+  min-height: 0;
+  padding-top: var(--space-3);
+}
+
+.raw-pager-row {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  /* A piece of a long line is as wide as its text; the list scrolls sideways. */
+  min-width: max-content;
+  color: var(--ink);
+  font: var(--type-code);
+  white-space: pre;
+  cursor: default;
+}
+
+.raw-pager-row[data-active] {
+  background: var(--selected);
+}
+
+/* The list clips its rows, so the ring sits inside the row. */
+.raw-pager-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.raw-pager-number {
+  flex: none;
+  box-sizing: border-box;
+  width: 56px;
+  padding-right: var(--space-4);
+  color: var(--ink-muted);
+  text-align: right;
+  user-select: none;
+}
+
+.raw-pager-text {
+  padding-right: var(--space-4);
+}
+
+/* The error: a tinted row, a bold colored number and a wavy underline, so it
+   is never color alone (as in the editor). */
+.raw-pager-row[data-error] {
+  background: var(--danger-bg);
+}
+
+.raw-pager-row[data-error] .raw-pager-number {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.raw-pager-row[data-error] .raw-pager-text {
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: 4px;
+}
+
+/* Go to line: a row above the text that wraps in a 400 px panel. */
+.raw-goto {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  font: var(--type-label);
+}
+
+.raw-goto-input {
+  box-sizing: border-box;
+  width: 120px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  font: var(--type-label);
+}
