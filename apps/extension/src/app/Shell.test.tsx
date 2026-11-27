@@ -106,7 +106,7 @@ describe("Shell, with a document", () => {
     const { openReady, user } = setup();
     await openReady();
     await user.click(screen.getByRole("tab", { name: "Raw" }));
-    expect(await screen.findByTestId("stub-raw")).toBeDefined();
+    expect(await screen.findByTestId("raw-editor")).toBeDefined();
     // Raw's details section joins the stack under Selected.
     expect(screen.getByRole("heading", { name: "Problem" })).toBeDefined();
     await user.click(modes().getByRole("button", { name: "JWT" }));
