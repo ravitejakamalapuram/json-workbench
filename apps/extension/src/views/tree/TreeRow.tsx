@@ -15,6 +15,7 @@ type TreeRowProps = {
   readonly onToggle: (row: Row) => void;
   readonly onAction: (row: Row, action: Action) => void;
   readonly onOpenAsDocument: (row: Row) => void;
+  readonly onRetry: (row: Row) => void;
 };
 
 const BRACKETS = { object: ["{", "}"], array: ["[", "]"] } as const;
@@ -53,6 +54,7 @@ export function TreeRow({
   onToggle,
   onAction,
   onOpenAsDocument,
+  onRetry,
 }: TreeRowProps) {
   const { node, path } = row;
   const level = path.length + 1;
@@ -65,6 +67,19 @@ export function TreeRow({
     className: "tree-row",
     style: { "--level": level - 1 } as CSSProperties,
   } as const;
+  if (!node && row.failure)
+    return (
+      <div {...common} tabIndex={-1}>
+        <span className="badge badge-danger">{row.failure}</span>
+        <button
+          type="button"
+          className="badge badge-info"
+          onClick={() => onRetry(row)}
+        >
+          Retry
+        </button>
+      </div>
+    );
   if (!node)
     return (
       <div {...common} aria-busy="true" tabIndex={-1}>

@@ -37,6 +37,41 @@ function setup(docOptions: DocOptions = {}) {
   return { open, workers, spawn, spawnSearch };
 }
 
+describe("a disposed index", () => {
+  it("rejects every later call with AbortError and starts no worker to answer it", async () => {
+    // A tree that mounts after an edit settled invalid asks a proxy that
+    // already ended its worker; a new worker would answer "no index".
+    const { open, workers } = setup();
+    const { index, finished } = open('{"a":1,}');
+    expect((await finished).status.kind).toBe("invalid");
+    const spawned = workers.length;
+    const calls = [
+      index.node(""),
+      index.children("", 0, 10),
+      index.slice(0, 1),
+      index.lineAt(0),
+      index.search(
+        { text: "a", caseSensitive: false, regex: false, scope: "all" },
+        () => undefined,
+        new AbortController().signal,
+      ),
+    ];
+    for (const call of calls)
+      await expect(call).rejects.toMatchObject({ name: "AbortError" });
+    expect(workers).toHaveLength(spawned);
+  });
+
+  it("is what dispose() leaves behind for a ready document too", async () => {
+    const { open } = setup();
+    const { status } = await open("[1]").finished;
+    if (status.kind !== "ready") throw new Error("Not ready.");
+    status.index.dispose();
+    await expect(status.index.node("")).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
+});
+
 describe("openDocument", () => {
   // The proxy must not care which engine sits behind it: the memory index by
   // default, the range index when every source is "large" and read 5 bytes at a time.

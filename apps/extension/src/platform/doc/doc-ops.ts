@@ -115,7 +115,9 @@ export function createDocHandlers(options: DocOptions = {}): Handlers<DocOps> {
   let current: Promise<DocumentIndex | null> = Promise.resolve(null);
   const ready = async () => {
     const index = await current;
-    if (!index) throw new Error("This document has no index.");
+    // The same answer as a disposed proxy: this index is gone, so views stop asking.
+    if (!index)
+      throw new DOMException("This document has no index.", "AbortError");
     return index;
   };
 

@@ -49,8 +49,10 @@ export type Target = {
 export type Row = {
   readonly index: number;
   readonly path: Path;
-  /** Undefined while its page is loading. */
+  /** Undefined while its page is loading, or when it could not be read. */
   readonly node: NodeInfo | undefined;
+  /** Why its page could not be read; the row shows it with Retry. */
+  readonly failure: string | undefined;
   /** The source that lists this row: its parent's, or the document's root. */
   readonly scope: Source;
   /** Set when the row is open. */
@@ -359,6 +361,10 @@ export function createTreeModel(
         position === undefined
           ? (rootInfo ?? undefined)
           : pages.get(scope, position),
+      failure:
+        position === undefined
+          ? undefined
+          : pages.failure(scope, position)?.message,
       scope,
       open: ref.node,
       setSize: ref.parent?.total ?? 1,
@@ -432,6 +438,14 @@ export function createTreeModel(
       if (found && !found.node) await nodeOf(found.path);
       return row(at);
     }, null),
+
+    /** Reads the page of a row that could not be read again. */
+    retry({ scope, path }: Row) {
+      const position = path.at(-1);
+      if (position === undefined) return;
+      pages.retry(scope, position);
+      changed();
+    },
 
     /** VirtualList's mounted range: read the pages those rows need. */
     show(start: number, end: number) {

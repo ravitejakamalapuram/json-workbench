@@ -94,4 +94,62 @@ describe("the page cache", () => {
     expect((await pages.load(source, 0))?.text).toBe("0");
     expect(children).toHaveBeenCalledTimes(2);
   });
+
+  describe("a page that cannot be read", () => {
+    const changed = () =>
+      Object.assign(new Error("File changed on disk. Reopen it."), {
+        name: "NotReadableError",
+      });
+
+    it("is remembered, says so once, and is not asked for again until retried", async () => {
+      const { children, source, loaded, pages } = setup();
+      children.mockRejectedValueOnce(changed());
+      pages.prefetch(source, 5);
+      await vi.waitFor(() => expect(loaded).toHaveBeenCalledOnce());
+      expect(pages.failure(source, 5)?.message).toBe(
+        "File changed on disk. Reopen it.",
+      );
+      // The tree asks for its visible rows after every render.
+      pages.prefetch(source, 6);
+      expect(children).toHaveBeenCalledOnce();
+
+      pages.retry(source, 5);
+      expect(pages.failure(source, 5)).toBeUndefined();
+      await vi.waitFor(() => expect(pages.get(source, 5)?.text).toBe("5"));
+      expect(children).toHaveBeenCalledTimes(2);
+    });
+
+    it("is also remembered when a caller needs the node, which then has none", async () => {
+      const { children, source, loaded, pages } = setup();
+      children.mockRejectedValueOnce(changed());
+      expect(await pages.load(source, 5)).toBeUndefined();
+      expect(pages.failure(source, 5)).toBeDefined();
+      expect(loaded).toHaveBeenCalledOnce();
+    });
+
+    it("is not one when the index is gone: nothing is left to show it", async () => {
+      const { children, source, loaded, pages } = setup();
+      const gone = () =>
+        new DOMException("The operation was aborted.", "AbortError");
+      children.mockRejectedValueOnce(gone());
+      pages.prefetch(source, 5);
+      await vi.waitFor(() => expect(children).toHaveBeenCalledOnce());
+      await Promise.resolve();
+      expect(pages.failure(source, 5)).toBeUndefined();
+      expect(loaded).not.toHaveBeenCalled();
+      children.mockRejectedValueOnce(gone());
+      await expect(pages.load(source, 5)).rejects.toMatchObject({
+        name: "AbortError",
+      });
+    });
+
+    it("of the document is read again once the document is indexed again", async () => {
+      const { children, source, pages } = setup();
+      children.mockRejectedValueOnce(changed());
+      pages.prefetch(source, 5);
+      await vi.waitFor(() => expect(pages.failure(source, 5)).toBeDefined());
+      pages.markDocumentPagesStale();
+      expect(pages.failure(source, 5)).toBeUndefined();
+    });
+  });
 });

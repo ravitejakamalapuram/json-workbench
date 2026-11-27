@@ -50,15 +50,22 @@ function indexProxy(
   indexedSource: () => Promise<Blob>,
   spawnSearch: () => Worker,
 ): DocumentIndex {
+  let disposed = false;
+  // A client spawns a new worker for the next call after terminate(), and a
+  // new worker has no document: a view that asks late must hear that the index is gone.
+  const gone = () => new DOMException("The index was disposed.", "AbortError");
+  const call: WorkerClient<DocOps>["call"] = (op, args, options) =>
+    disposed ? Promise.reject(gone()) : client.call(op, args, options);
   return {
-    node: (pointer) => client.call("node", { pointer }),
+    node: (pointer) => call("node", { pointer }),
     children: (pointer, offset, limit) =>
-      client.call("children", { pointer, offset, limit }),
-    locate: (pointer) => client.call("locate", { pointer }),
-    pointerAt: (byteOffset) => client.call("pointerAt", { byteOffset }),
+      call("children", { pointer, offset, limit }),
+    locate: (pointer) => call("locate", { pointer }),
+    pointerAt: (byteOffset) => call("pointerAt", { byteOffset }),
     records: (pointer, offset, limit) =>
-      client.call("records", { pointer, offset, limit }),
+      call("records", { pointer, offset, limit }),
     async search(query, onHits, signal) {
+      if (disposed) throw gone();
       // A worker per search, ended on abort, so the doc worker never waits.
       const search = createWorkerClient<SearchOps>(spawnSearch, {
         terminable: true,
@@ -74,10 +81,13 @@ function indexProxy(
         search.terminate();
       }
     },
-    slice: (byteStart, byteEnd) => client.call("slice", { byteStart, byteEnd }),
-    offsets: (pointers) => client.call("offsets", { pointers }),
-    lineAt: (byteOffset) => client.call("lineAt", { byteOffset }),
-    dispose: () => client.terminate(),
+    slice: (byteStart, byteEnd) => call("slice", { byteStart, byteEnd }),
+    offsets: (pointers) => call("offsets", { pointers }),
+    lineAt: (byteOffset) => call("lineAt", { byteOffset }),
+    dispose: () => {
+      disposed = true;
+      client.terminate();
+    },
   };
 }
 

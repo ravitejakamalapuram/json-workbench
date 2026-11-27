@@ -7,7 +7,12 @@ import { ActionsContext } from "../../app/ui/actions-context";
 import { looksLikeJwt } from "../../platform/sniff";
 import type { Action, ChildrenPage, NodeInfo } from "../../platform/types";
 import { useAppStore } from "../../store";
-import { fakeIndex, fakeOpenIndex } from "../../testing/fixtures";
+import {
+  documentFixture,
+  fakeIndex,
+  fakeOpenIndex,
+  openInFakeWorker,
+} from "../../testing/fixtures";
 import {
   createTestStore,
   openText,
@@ -576,6 +581,88 @@ describe("paging", () => {
   });
 });
 
+describe("a page that cannot be read", () => {
+  const changed = () =>
+    Object.assign(new Error("File changed on disk. Reopen it."), {
+      name: "NotReadableError",
+    });
+
+  /** An array of 1,000 numbers whose second page fails until `heal()`. */
+  async function unreadableSecondPage() {
+    let healthy = false;
+    const index = fakeIndex({
+      node: async (pointer) =>
+        pointer === ""
+          ? {
+              pointer,
+              key: null,
+              kind: "array",
+              byteStart: 0,
+              childCount: 1000,
+            }
+          : null,
+      children: async (pointer, offset, limit): Promise<ChildrenPage> => {
+        if (offset === 200 && !healthy) throw changed();
+        return {
+          items: Array.from({ length: limit }, (_, i): NodeInfo => ({
+            pointer: `${pointer}/${offset + i}`,
+            key: offset + i,
+            kind: "number",
+            byteStart: 0,
+            text: String(offset + i),
+          })),
+          total: 1000,
+          totalFinal: true,
+        };
+      },
+    });
+    const { openIndex, opens } = fakeOpenIndex(() => index);
+    const store = createTestStore({ openIndex });
+    store.getState().openDocument({
+      name: "big.json",
+      origin: "paste",
+      source: new Blob(["[]"]),
+      format: "json",
+    });
+    renderWithStore(<FrontTree />, { store });
+    act(() =>
+      opens[0]!.settle({
+        kind: "ready",
+        summary: { records: 1000, nodes: null },
+      }),
+    );
+    await findRow("/0");
+    act(() => {
+      const list = screen.getByRole("tree");
+      list.scrollTop = 28 * 250;
+      list.dispatchEvent(new Event("scroll"));
+    });
+    return () => {
+      healthy = true;
+    };
+  }
+
+  it("shows an error row with Retry instead of rows that stay on the ellipsis", async () => {
+    await unreadableSecondPage();
+    const retry = await screen.findAllByRole("button", { name: "Retry" });
+    expect(retry.length).toBeGreaterThan(0);
+    const failed = retry[0]!.closest("[role=treeitem]");
+    expect(failed?.textContent).toContain("File changed on disk. Reopen it.");
+    expect(failed?.getAttribute("aria-busy")).toBeNull();
+    expect(screen.queryByText("…")).toBeNull();
+  });
+
+  it("reads the page again on Retry, and the rows come back", async () => {
+    const user = userEvent.setup();
+    const heal = await unreadableSecondPage();
+    const [retry] = await screen.findAllByRole("button", { name: "Retry" });
+    heal();
+    await user.click(retry!);
+    await findRow("/250");
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+});
+
 describe("a disposed index", () => {
   it("leaves no rejection behind when the document goes away mid-read", async () => {
     const unhandled = vi.fn();
@@ -598,6 +685,33 @@ describe("a disposed index", () => {
       opens[0]!.settle({ kind: "invalid", issues: [] });
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+  });
+});
+
+describe("an index that was disposed before the tree asked", () => {
+  it("leaves no rejection behind: this is Alt+1 racing an edit that settled invalid", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    const { index, finished } = openInFakeWorker(
+      new Blob(['{"a":1,}']),
+      "json",
+      { onUpdate: () => undefined },
+    );
+    expect((await finished).status.kind).toBe("invalid");
+    renderWithStore(
+      <treeView.Component
+        doc={documentFixture({
+          status: {
+            kind: "indexing",
+            index,
+            progress: { indexedBytes: 0, totalBytes: 8, records: 0 },
+          },
+        })}
+      />,
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 30)));
     process.off("unhandledRejection", unhandled);
     expect(unhandled).not.toHaveBeenCalled();
   });

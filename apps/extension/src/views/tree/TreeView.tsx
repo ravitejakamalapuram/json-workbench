@@ -163,6 +163,7 @@ function TreeBody({ doc, index }: ViewProps & { index: DocumentIndex }) {
         }
         onAction={onAction}
         onOpenAsDocument={onOpenAsDocument}
+        onRetry={model.retry}
       />
     );
   }

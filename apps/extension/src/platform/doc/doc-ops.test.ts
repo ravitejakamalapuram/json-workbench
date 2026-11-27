@@ -23,9 +23,10 @@ const open = (
 describe("doc worker handlers", () => {
   it("refuses queries before a document is open", async () => {
     const handlers = createDocHandlers();
-    await expect(handlers.node({ pointer: "" }, ctx())).rejects.toThrow(
-      "This document has no index.",
-    );
+    await expect(handlers.node({ pointer: "" }, ctx())).rejects.toMatchObject({
+      name: "AbortError",
+      message: "This document has no index.",
+    });
   });
 
   it("answers a query sent while open runs once the index exists", async () => {
