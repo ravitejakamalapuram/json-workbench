@@ -1,0 +1,23 @@
+/* The "Convert to YAML" dialog; the stack and the button row are shell.css's. */
+
+.yaml-progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* The bar only moves, and the browser draws that motion itself, out of reach
+   of the page's own reduced-motion rule. The line below it says the same. */
+@media (prefers-reduced-motion: reduce) {
+  .yaml-progress {
+    display: none;
+  }
+}
+
+/* Always present, so the live region exists before its text changes. */
+.yaml-status {
+  min-height: var(--row);
+}
+
+.yaml-error {
+  color: var(--danger);
+}
