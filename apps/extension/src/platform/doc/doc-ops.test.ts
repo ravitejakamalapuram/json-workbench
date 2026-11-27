@@ -142,6 +142,18 @@ describe("doc worker handlers", () => {
       });
     });
 
+    it("never gives a size and a limit that read the same, at the real limit", async () => {
+      // A source this large cannot be made in a test; the check reads only its size.
+      const source = new Blob([]);
+      Object.defineProperty(source, "size", { value: 1.255 * 1024 ** 3 });
+      await expect(
+        createDocHandlers().open({ source, format: "json" }, ctx()),
+      ).rejects.toMatchObject({
+        message:
+          "This file is 1.255 GB. JSON Workbench opens files up to 1.25 GB.",
+      });
+    });
+
     it("opens a source of exactly the limit", async () => {
       const handlers = createDocHandlers({ maxBytes: 1024 * 1024 });
       const text = `[${"1,".repeat(524_286)}1] `;

@@ -21,8 +21,13 @@ export type SearchState = {
   /** The search row under the toolbar is shown (narrow windows). */
   readonly open: boolean;
   readonly hits: readonly SearchHit[];
-  readonly phase: "idle" | "running" | "done" | "error";
+  /** "stopped": the person ended a running search, so the hits are only those found so far. */
+  readonly phase: "idle" | "running" | "done" | "stopped" | "error";
   readonly capped: boolean;
+  /** Whole percent of the file read while running (never 100: the summary says when it is done). */
+  readonly progress: number | null;
+  /** Keys and strings too long to search, counted by the worker. */
+  readonly skipped: number;
   readonly error: string | null;
   /** The hit shown, or -1. */
   readonly current: number;
@@ -39,6 +44,8 @@ const IDLE: SearchState = {
   hits: [],
   phase: "idle",
   capped: false,
+  progress: null,
+  skipped: 0,
   error: null,
   current: -1,
   jumps: 0,
@@ -84,12 +91,26 @@ export function focusSearch(owner: DocumentIndex) {
   patchSearch(owner, { open: true, wantsFocus: true });
 }
 
+/** The search running for each index, so the Stop button can end it. */
+const running = new WeakMap<DocumentIndex, AbortController>();
+
+/** Ends a running search and keeps the hits it has found. */
+export function stopSearch(owner: DocumentIndex) {
+  const controller = running.get(owner);
+  if (!controller || read(owner).phase !== "running") return;
+  running.delete(owner);
+  controller.abort();
+  patchSearch(owner, { phase: "stopped", progress: null });
+}
+
 export const hasMatches = () => store.getState().hits.length > 0;
 
 const NO_RESULTS = {
   hits: [],
   phase: "idle",
   capped: false,
+  progress: null,
+  skipped: 0,
   error: null,
   current: -1,
 } as const satisfies Partial<SearchState>;
@@ -110,6 +131,7 @@ export function useSearchRunner(
     const live = () => !controller.signal.aborted;
     const timer = setTimeout(() => {
       patchSearch(owner, { ...NO_RESULTS, phase: "running" });
+      running.set(owner, controller);
       index
         .search(
           query,
@@ -122,17 +144,37 @@ export function useSearchRunner(
               });
           },
           controller.signal,
+          // The worker sends a few a second; the label changes only when the whole percent does.
+          ({ scannedBytes, totalBytes }) => {
+            const percent = Math.min(
+              99,
+              Math.floor((scannedBytes / Math.max(totalBytes, 1)) * 100),
+            );
+            if (live() && percent !== read(owner).progress)
+              patchSearch(owner, { progress: percent });
+          },
         )
         .then(
-          ({ capped }) =>
-            live() && patchSearch(owner, { phase: "done", capped }),
+          ({ capped, skipped = 0 }) =>
+            live() &&
+            patchSearch(owner, {
+              phase: "done",
+              capped,
+              skipped,
+              progress: null,
+            }),
           (error: unknown) =>
             live() &&
-            patchSearch(owner, { phase: "error", error: describe(error) }),
+            patchSearch(owner, {
+              phase: "error",
+              error: describe(error),
+              progress: null,
+            }),
         );
     }, DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
+      if (running.get(owner) === controller) running.delete(owner);
       controller.abort();
     };
   }, [owner, index, query]);

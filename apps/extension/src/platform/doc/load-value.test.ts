@@ -73,6 +73,26 @@ describe("loadValue", () => {
     );
   });
 
+  it("keeps a member named __proto__, as a value and under its pointer", async () => {
+    const source = blob('{"__proto__":{"admin":true},"a":1}');
+    const value = (await loadValue(source, "", json)) as object;
+    expect(Object.keys(value)).toEqual(["__proto__", "a"]);
+    expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
+    expect(await loadValue(source, "/__proto__/admin", json)).toBe(true);
+  });
+
+  it("names the nesting limit instead of overflowing the stack", async () => {
+    const deep = (levels: number) => "[".repeat(levels) + "]".repeat(levels);
+    expect(await loadValue(blob(deep(1_000)), "", json)).toBeInstanceOf(Array);
+    for (const levels of [1_001, 50_000])
+      await expect(loadValue(blob(deep(levels)), "", json)).rejects.toThrow(
+        "Nesting is too deep (limit 1,000 levels)",
+      );
+    await expect(
+      loadValue(blob(`${deep(1_001)}\n`), "", jsonl),
+    ).rejects.toThrow("Nesting is too deep (limit 1,000 levels)");
+  });
+
   describe("in a document above rawEditChars", () => {
     // Four hundred thousand numbers, about 2.7 MB.
     const numbers = Array.from({ length: 400_000 }, (_, at) => at).join(",");

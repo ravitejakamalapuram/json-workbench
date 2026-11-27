@@ -3,7 +3,12 @@
 // Call it inside a describe() with a factory that indexes a Blob. Beyond the
 // types, it fixes one choice: pointerAt maps an object member's key to that
 // member, so a key search hit resolves to the node that holds the key.
-import { parseJsonValue, type JsonValue } from "@json-workbench/core";
+import {
+  MAX_INDEX_DEPTH,
+  parseJsonValue,
+  SYNTAX,
+  type JsonValue,
+} from "@json-workbench/core";
 import { afterEach, expect, it } from "vitest";
 import { parse as parseYamlText, stringify as stringifyYamlText } from "yaml";
 import {
@@ -39,17 +44,27 @@ export type Diagnose = (
 
 /**
  * Every engine puts the same document's first error at the same byte, line and
- * column: a file must not change verdict, or move its error, when it crosses
- * the size that switches engines.
+ * column, in the same sentence: a file must not change verdict, move its
+ * error or reword it when it crosses the size that switches engines.
  */
 export function invalidDocumentContract(diagnose: Diagnose): void {
   for (const fixture of INVALID_FIXTURES)
     it(`reports ${fixture.name}`, async () => {
       const issues = await diagnose(new Blob([fixture.bytes]), fixture.format);
-      expect(issues).toHaveLength(1);
-      expect(issues[0]).toMatchObject(fixture.issue);
-      expect(issues[0]?.message).not.toBe("");
+      expect(issues).toEqual([fixture.issue]);
     });
+
+  // A sentence nobody can reach is a sentence nobody tests: every one in the
+  // table is the verdict of some fixture, so adding one means adding its case.
+  it("has a fixture for every sentence of the syntax table", () => {
+    const said = INVALID_FIXTURES.map((fixture) => fixture.issue.message);
+    for (const sentence of Object.values(SYNTAX))
+      if (typeof sentence === "string") expect(said).toContain(sentence);
+    expect(said).toContain(SYNTAX.tooDeep(MAX_INDEX_DEPTH));
+    expect(said.some((said) => said.startsWith("Unexpected character '"))).toBe(
+      true,
+    );
+  });
 }
 
 /**

@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAction } from "../../app/actions";
+import type { DocumentIndex, SearchProgress } from "../../platform/types";
 import { useAppStore } from "../../store";
 import {
   createTestStore,
@@ -175,5 +176,117 @@ describe("tree search", () => {
     await run("tree.search");
     expect(document.activeElement).toBe(search());
     expect(screen.queryByRole("button", { name: "Close search" })).toBeNull();
+  });
+
+  describe("a search that takes a while", () => {
+    /** The search of the front document, held open until the test says how it goes. */
+    async function slowSearch() {
+      const user = userEvent.setup();
+      const { store } = await showTree();
+      const status = store.getState().docs[0]?.status;
+      if (status?.kind !== "ready") throw new Error("Not ready.");
+      const control: {
+        progress: (progress: SearchProgress) => void;
+        hits: (hits: { byteStart: number; byteEnd: number }[]) => void;
+        finish: (summary: {
+          hits: number;
+          capped: boolean;
+          skipped?: number;
+        }) => void;
+        aborted: boolean;
+      } = {
+        progress: () => undefined,
+        hits: () => undefined,
+        finish: () => undefined,
+        aborted: false,
+      };
+      vi.spyOn(status.index as DocumentIndex, "search").mockImplementation(
+        (_query, onHits, signal, onProgress) =>
+          new Promise((resolve, reject) => {
+            control.progress = (value) => onProgress?.(value);
+            control.hits = (batch) =>
+              onHits(batch.map((hit) => ({ ...hit, field: "value" })));
+            control.finish = resolve;
+            signal.addEventListener("abort", () => {
+              control.aborted = true;
+              reject(new DOMException("Aborted", "AbortError"));
+            });
+          }),
+      );
+      await run("tree.search");
+      await user.type(search(), "x");
+      await waitFor(() => expect(count().textContent).toBe("Searching…"));
+      return { user, control };
+    }
+
+    it("says how far it has read, next to the button that stops it", async () => {
+      const { control } = await slowSearch();
+      act(() => control.progress({ scannedBytes: 40, totalBytes: 100 }));
+      expect(count().textContent).toBe("Searching… 40%");
+      act(() =>
+        control.progress({ scannedBytes: 99_999, totalBytes: 100_000 }),
+      );
+      expect(count().textContent).toBe("Searching… 99%");
+      expect(
+        screen.getByRole("button", { name: "Stop searching" }),
+      ).toBeDefined();
+    });
+
+    it("keeps counting the matches found so far, with the share read", async () => {
+      const { control } = await slowSearch();
+      act(() => control.hits([{ byteStart: 9, byteEnd: 12 }]));
+      act(() => control.progress({ scannedBytes: 1, totalBytes: 4 }));
+      expect(count().textContent).toBe("1 of 1 · 25%");
+    });
+
+    it("stops on the button and keeps what it found, saying there may be more", async () => {
+      const { user, control } = await slowSearch();
+      act(() => control.hits([{ byteStart: 9, byteEnd: 12 }]));
+      await user.click(screen.getByRole("button", { name: "Stop searching" }));
+      expect(control.aborted).toBe(true);
+      expect(count().textContent).toBe("1 of 1+");
+      expect(
+        screen.queryByRole("button", { name: "Stop searching" }),
+      ).toBeNull();
+    });
+
+    it("says it was stopped when nothing was found", async () => {
+      const { user } = await slowSearch();
+      await user.click(screen.getByRole("button", { name: "Stop searching" }));
+      expect(count().textContent).toBe("Stopped");
+    });
+
+    it("loses the button and the percentage when it ends", async () => {
+      const { control } = await slowSearch();
+      act(() => control.progress({ scannedBytes: 50, totalBytes: 100 }));
+      await act(async () => control.finish({ hits: 0, capped: false }));
+      expect(count().textContent).toBe("No matches");
+      expect(
+        screen.queryByRole("button", { name: "Stop searching" }),
+      ).toBeNull();
+    });
+
+    it("says how many values were too large to search, in words a screen reader gets whole", async () => {
+      const { control } = await slowSearch();
+      await act(async () =>
+        control.finish({ hits: 0, capped: false, skipped: 2 }),
+      );
+      expect(count().textContent).toBe(
+        "No matches · 2 skipped; 2 values over 16 MB were not searched",
+      );
+      expect(screen.getByText("· 2 skipped").getAttribute("aria-hidden")).toBe(
+        "true",
+      );
+    });
+
+    it("says it for one value in the singular", async () => {
+      const { control } = await slowSearch();
+      await act(async () =>
+        control.finish({ hits: 0, capped: false, skipped: 1 }),
+      );
+      expect(count().textContent).toContain(
+        "1 value over 16 MB was not searched",
+      );
+    });
   });
 });

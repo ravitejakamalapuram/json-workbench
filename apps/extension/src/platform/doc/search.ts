@@ -7,6 +7,7 @@
 import {
   LIMITS,
   type SearchHit,
+  type SearchProgress,
   type SearchQuery,
   type SearchSummary,
 } from "../types";
@@ -19,9 +20,20 @@ export type SearchRun = {
   readonly signal?: AbortSignal;
   /** Bytes per read; tests shrink it to cut every token. */
   readonly chunkBytes?: number;
+  /** Called after each chunk; the worker's serve loop sends at most one in 100 ms of them. */
+  readonly onProgress?: (progress: SearchProgress) => void;
+  /** The most bytes one string, number or literal may have to be searched; tests shrink it. */
+  readonly maxTokenBytes?: number;
 };
 
 const DEFAULT_CHUNK = 1024 * 1024;
+/**
+ * A token that spans chunks is held whole to be matched: its pieces, then a
+ * joined copy, then (for a regular expression or an escape) its decoded text
+ * at two bytes a character. A string of a gigabyte would need several, so one
+ * past LIMITS.searchTokenBytes is skipped and counted, and the search goes on
+ * after it.
+ */
 const BOM = [0xef, 0xbb, 0xbf];
 const QUOTE = 0x22;
 const BACKSLASH = 0x5c;
@@ -48,6 +60,8 @@ const BARE = 2;
 class TokenSearch {
   hits = 0;
   capped = false;
+  /** Tokens too large to hold, which were not searched. */
+  skipped = 0;
   readonly #matcher: Matcher;
   readonly #scope: SearchQuery["scope"];
   readonly #maxHits: number;
@@ -58,6 +72,11 @@ class TokenSearch {
   #start = 0;
   /** The open token's content in earlier chunks. */
   #pieces: Uint8Array[] = [];
+  /** The bytes in `#pieces`, or what they would be once `#oversize`. */
+  #size = 0;
+  /** The open token has outgrown `#maxToken`: its bytes are no longer kept. */
+  #oversize = false;
+  readonly #maxToken: number;
   /** A string that ended at the end of a chunk, waiting for the byte that says whether it is a key. */
   #pending: { start: number; end: number; matched: boolean } | null = null;
 
@@ -66,7 +85,9 @@ class TokenSearch {
     scope: SearchQuery["scope"],
     maxHits: number,
     onHit: (hit: SearchHit) => void,
+    maxToken: number,
   ) {
+    this.#maxToken = maxToken;
     this.#matcher = matcher;
     this.#scope = scope;
     this.#maxHits = maxHits;
@@ -121,7 +142,19 @@ class TokenSearch {
       }
       at += 1;
     }
-    if (this.#kind !== NONE) this.#pieces.push(bytes.subarray(from, n));
+    if (this.#kind !== NONE) this.#hold(bytes.subarray(from, n));
+  }
+
+  /** Keeps the open token's bytes from one chunk, until the token outgrows what a match may hold. */
+  #hold(part: Uint8Array) {
+    if (this.#oversize) return;
+    this.#size += part.length;
+    if (this.#size > this.#maxToken) {
+      this.#oversize = true;
+      this.#pieces = [];
+    } else {
+      this.#pieces.push(part);
+    }
   }
 
   /** The file ended at `size`: a number or literal that touches the end is complete, a string that never closed is not. */
@@ -134,7 +167,9 @@ class TokenSearch {
   #endString(bytes: Uint8Array, base: number, from: number, close: number) {
     const start = this.#start;
     const end = base + close + 1;
-    const [buffer, lo, hi] = this.#take(bytes, from, close);
+    const taken = this.#take(bytes, from, close);
+    if (!taken) return;
+    const [buffer, lo, hi] = taken;
     // The next byte that is not whitespace tells a key from a value.
     let next = close + 1;
     while (next < bytes.length && isSpace(bytes[next] ?? 0)) next += 1;
@@ -152,22 +187,33 @@ class TokenSearch {
   }
 
   #endBare(bytes: Uint8Array, from: number, to: number, end: number) {
-    const [buffer, lo, hi] = this.#take(bytes, from, to);
+    const taken = this.#take(bytes, from, to);
+    if (!taken) return;
+    const [buffer, lo, hi] = taken;
     if (this.#wants("value") && this.#matcher(buffer, lo, hi, false))
       this.#hit("value", this.#start, end);
   }
 
-  /** Closes the open token and returns its content: in this chunk, or joined with what earlier chunks held. */
+  /** Closes the open token and returns its content: in this chunk, or joined with what earlier chunks held. Null, and counted, for a token too large to hold. */
   #take(
     bytes: Uint8Array,
     from: number,
     to: number,
-  ): [Uint8Array, number, number] {
+  ): [Uint8Array, number, number] | null {
+    const oversize =
+      this.#oversize || this.#size + (to - from) > this.#maxToken;
+    const held = this.#pieces;
     this.#kind = NONE;
     this.#escaped = false;
-    if (this.#pieces.length === 0) return [bytes, from, to];
-    const parts = [...this.#pieces, bytes.subarray(from, to)];
     this.#pieces = [];
+    this.#size = 0;
+    this.#oversize = false;
+    if (oversize) {
+      this.skipped += 1;
+      return null;
+    }
+    if (held.length === 0) return [bytes, from, to];
+    const parts = [...held, bytes.subarray(from, to)];
     const joined = new Uint8Array(
       parts.reduce((sum, part) => sum + part.length, 0),
     );
@@ -210,13 +256,25 @@ class TokenSearch {
 export async function searchBlob(
   source: Blob,
   query: SearchQuery,
-  { maxHits, signal, chunkBytes = DEFAULT_CHUNK }: SearchRun,
+  {
+    maxHits,
+    signal,
+    chunkBytes = DEFAULT_CHUNK,
+    onProgress,
+    maxTokenBytes = LIMITS.searchTokenBytes,
+  }: SearchRun,
   onHit: (hit: SearchHit) => void,
 ): Promise<SearchSummary> {
   signal?.throwIfAborted();
   const matcher = createMatcher(query);
   if (!matcher) return { hits: 0, capped: false };
-  const search = new TokenSearch(matcher, query.scope, maxHits, onHit);
+  const search = new TokenSearch(
+    matcher,
+    query.scope,
+    maxHits,
+    onHit,
+    maxTokenBytes,
+  );
 
   const size = source.size;
   const head = await readBytes(source, 0, BOM.length);
@@ -236,9 +294,14 @@ export async function searchBlob(
     at += bytes.length;
     next = at < size ? readAhead(at) : undefined;
     search.feed(bytes, base);
+    onProgress?.({ scannedBytes: at, totalBytes: size });
   }
   if (!search.capped) search.finish(size);
-  return { hits: search.hits, capped: search.capped };
+  return {
+    hits: search.hits,
+    capped: search.capped,
+    ...(search.skipped > 0 && { skipped: search.skipped }),
+  };
 }
 
 /**
@@ -264,6 +327,11 @@ export async function searchInline(
 
 /** search.worker.ts: one search per worker, so the next keystroke ends it. */
 export const searchHandlers: Handlers<SearchOps> = {
-  search: ({ source, query, maxHits }, { partial, signal }) =>
-    searchBlob(source, query, { maxHits, signal }, partial),
+  search: ({ source, query, maxHits }, { partial, progress, signal }) =>
+    searchBlob(
+      source,
+      query,
+      { maxHits, signal, onProgress: progress },
+      partial,
+    ),
 };

@@ -6,7 +6,7 @@ import {
   invalidDocumentContract,
 } from "../../testing/index-contract";
 import { yamlToJson } from "../formats";
-import type { DocFormat, IndexProgress } from "../types";
+import type { DocFormat, IndexProgress, SearchProgress } from "../types";
 import { createDocHandlers, type DocOptions } from "./doc-ops";
 import { openDocument, openTextIndex, type OpenOptions } from "./open";
 import { searchHandlers } from "./search";
@@ -92,6 +92,25 @@ describe("openDocument", () => {
         return status.kind === "invalid" ? status.issues : [];
       });
     });
+
+  it("hands the search worker's progress to the caller", async () => {
+    const { open } = setup();
+    const text = '["needle","a needle"]';
+    const { status } = await open(text).finished;
+    if (status.kind !== "ready") throw new Error("Not ready.");
+    const progress: SearchProgress[] = [];
+    const summary = await status.index.search(
+      { text: "needle", caseSensitive: false, regex: false, scope: "all" },
+      () => undefined,
+      new AbortController().signal,
+      (value) => progress.push(value),
+    );
+    expect(summary).toEqual({ hits: 2, capped: false });
+    // One chunk covers the document, so the first update already says all.
+    expect(progress).toEqual([
+      { scannedBytes: text.length, totalBytes: text.length },
+    ]);
+  });
 
   it("answers while indexing runs and settles ready with the summary", async () => {
     const updates: IndexProgress[] = [];
@@ -196,6 +215,6 @@ describe("openTextIndex", () => {
     const { spawn, spawnSearch } = setup();
     await expect(
       openTextIndex("{\n  oops\n}", { spawn, spawnSearch }),
-    ).rejects.toThrow("Line 2, column 3: Unexpected character 'o'");
+    ).rejects.toThrow("Line 2, column 3: Expected object property name");
   });
 });

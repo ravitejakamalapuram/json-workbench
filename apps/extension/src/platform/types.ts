@@ -32,6 +32,8 @@ export const LIMITS = {
   maxMarkersDrawn: 500,
   /** Search stops after this many hits and says "1,000+". */
   searchHits: 1_000,
+  /** A key or string longer than this is not searched (the worker holds a token whole to match it) and is counted as skipped. */
+  searchTokenBytes: 16 * MiB,
   /** NodeInfo.text and Cell.text are cut here, long enough for a typical JWT. */
   previewChars: 1_024,
   /** One page of children() or records(). */
@@ -126,7 +128,17 @@ export type SearchHit = {
   readonly byteEnd: number;
   readonly field: "key" | "value";
 };
-export type SearchSummary = { readonly hits: number; readonly capped: boolean };
+export type SearchSummary = {
+  readonly hits: number;
+  readonly capped: boolean;
+  /** Strings and other tokens over the size one match may need memory for; they were not searched. Absent when there were none. */
+  readonly skipped?: number;
+};
+/** How far a search has read: it covers the whole file, so this is a share of its bytes. */
+export type SearchProgress = {
+  readonly scannedBytes: number;
+  readonly totalBytes: number;
+};
 export type ByteRange = {
   readonly byteStart: number;
   readonly byteEnd: number;
@@ -160,6 +172,8 @@ export interface DocumentIndex {
     query: SearchQuery,
     onHits: (hits: readonly SearchHit[]) => void,
     signal: AbortSignal,
+    /** At most one call in 100 ms; the proxy over the search worker sends it, the engines that search inline do not. */
+    onProgress?: (progress: SearchProgress) => void,
   ): Promise<SearchSummary>;
   /** Decoded text of a byte range of the indexed text; slice(node.byteStart, node.byteEnd) is the node's source text. */
   slice(byteStart: number, byteEnd: number): Promise<string>;

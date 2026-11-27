@@ -1,4 +1,5 @@
 import { JsonSyntaxError, scanJson, type JsonToken } from "./scanner";
+import { MAX_INDEX_DEPTH, SYNTAX } from "./syntax-messages";
 
 export type JsonContainerType = "object" | "array";
 export type JsonPrimitiveType = "string" | "number" | "boolean" | "null";
@@ -36,10 +37,39 @@ function syntax(message: string, token: JsonToken): JsonSyntaxError {
   return new JsonSyntaxError(message, token.startOffset);
 }
 
+/**
+ * The scanner fails on a number, a word or a character that is no token before
+ * the grammar has said whether one may stand there. Where none may (a key, a
+ * colon, a separator, after the root) the grammar's sentence is the better
+ * one, and it is what the byte scanner says; where a value may stand, the
+ * token's own fault is.
+ */
+function misplacedSentence(
+  stack: readonly Frame[],
+  rootComplete: boolean,
+): string | undefined {
+  const parent = stack.at(-1);
+  if (!parent) return rootComplete ? SYNTAX.afterRoot : undefined;
+  if (parent.kind === "array")
+    return parent.state === "comma-or-end"
+      ? SYNTAX.expectedCommaOrBracket
+      : undefined;
+  if (parent.state === "value") return undefined;
+  if (parent.state === "colon") return SYNTAX.expectedColon;
+  return parent.state === "comma-or-end"
+    ? SYNTAX.expectedCommaOrBrace
+    : SYNTAX.expectedPropertyName;
+}
+
 function consumeValueToken(
   token: JsonToken,
   stack: Frame[],
 ): JsonStructureEvent | undefined {
+  if (
+    stack.length >= MAX_INDEX_DEPTH &&
+    (token.kind === "startObject" || token.kind === "startArray")
+  )
+    throw syntax(SYNTAX.tooDeep(MAX_INDEX_DEPTH), token);
   if (token.kind === "startObject") {
     stack.push({ kind: "object", state: "key-or-end" });
     return {
@@ -107,101 +137,110 @@ export async function* parseJsonStructure(
     else parent.state = "comma-or-end";
   };
 
-  for await (const token of scanJson(chunks, options)) {
-    checkAbort();
-    const parent = stack[stack.length - 1];
+  try {
+    for await (const token of scanJson(chunks, options)) {
+      checkAbort();
+      const parent = stack[stack.length - 1];
 
-    if (rootComplete) throw syntax("Unexpected data after root value", token);
+      if (rootComplete) throw syntax(SYNTAX.afterRoot, token);
 
-    if (!parent) {
-      if (rootSeen) throw syntax("Unexpected root value", token);
-      if (["endArray", "endObject", "comma", "colon"].includes(token.kind)) {
-        throw syntax("Expected a JSON value", token);
+      if (!parent) {
+        if (rootSeen) throw syntax(SYNTAX.afterRoot, token);
+        if (["endArray", "endObject", "comma", "colon"].includes(token.kind)) {
+          throw syntax(SYNTAX.expectedValue, token);
+        }
+        const event = consumeValueToken(token, stack);
+        if (!event) throw syntax(SYNTAX.expectedValue, token);
+        rootSeen = true;
+        yield event;
+        if (event.type === "primitive") completeValue();
+        continue;
       }
-      const event = consumeValueToken(token, stack);
-      if (!event) throw syntax("Expected a JSON value", token);
-      rootSeen = true;
-      yield event;
-      if (event.type === "primitive") completeValue();
-      continue;
-    }
 
-    if (parent.kind === "object") {
-      if (parent.state === "key-or-end" || parent.state === "key") {
-        if (token.kind === "endObject" && parent.state === "key-or-end") {
+      if (parent.kind === "object") {
+        if (parent.state === "key-or-end" || parent.state === "key") {
+          if (token.kind === "endObject" && parent.state === "key-or-end") {
+            const depth = stack.length - 1;
+            stack.pop();
+            yield { type: "end-object", depth, offset: token.startOffset };
+            completeValue();
+            continue;
+          }
+          if (token.kind !== "string")
+            throw syntax(SYNTAX.expectedPropertyName, token);
+          parent.state = "colon";
+          yield {
+            type: "property",
+            key: token.value ?? "",
+            offset: token.startOffset,
+          };
+          continue;
+        }
+        if (parent.state === "colon") {
+          if (token.kind !== "colon") throw syntax(SYNTAX.expectedColon, token);
+          parent.state = "value";
+          continue;
+        }
+        if (parent.state === "value") {
+          const event = consumeValueToken(token, stack);
+          if (!event) throw syntax(SYNTAX.expectedPropertyValue, token);
+          yield event;
+          if (event.type === "primitive") completeValue();
+          continue;
+        }
+        if (token.kind === "comma") {
+          parent.state = "key";
+          continue;
+        }
+        if (token.kind === "endObject") {
           const depth = stack.length - 1;
           stack.pop();
           yield { type: "end-object", depth, offset: token.startOffset };
           completeValue();
           continue;
         }
-        if (token.kind !== "string")
-          throw syntax("Expected object property name", token);
-        parent.state = "colon";
-        yield {
-          type: "property",
-          key: token.value ?? "",
-          offset: token.startOffset,
-        };
-        continue;
+        throw syntax(SYNTAX.expectedCommaOrBrace, token);
       }
-      if (parent.state === "colon") {
-        if (token.kind !== "colon")
-          throw syntax("Expected ':' after property name", token);
-        parent.state = "value";
-        continue;
-      }
-      if (parent.state === "value") {
+
+      if (parent.state === "value-or-end" || parent.state === "next-value") {
+        if (token.kind === "endArray" && parent.state === "value-or-end") {
+          const depth = stack.length - 1;
+          stack.pop();
+          yield { type: "end-array", depth, offset: token.startOffset };
+          completeValue();
+          continue;
+        }
         const event = consumeValueToken(token, stack);
-        if (!event) throw syntax("Expected property value", token);
+        if (!event) throw syntax(SYNTAX.expectedArrayValue, token);
         yield event;
         if (event.type === "primitive") completeValue();
         continue;
       }
       if (token.kind === "comma") {
-        parent.state = "key";
+        parent.state = "next-value";
         continue;
       }
-      if (token.kind === "endObject") {
-        const depth = stack.length - 1;
-        stack.pop();
-        yield { type: "end-object", depth, offset: token.startOffset };
-        completeValue();
-        continue;
-      }
-      throw syntax("Expected ',' or '}'", token);
-    }
-
-    if (parent.state === "value-or-end" || parent.state === "next-value") {
-      if (token.kind === "endArray" && parent.state === "value-or-end") {
+      if (token.kind === "endArray") {
         const depth = stack.length - 1;
         stack.pop();
         yield { type: "end-array", depth, offset: token.startOffset };
         completeValue();
         continue;
       }
-      const event = consumeValueToken(token, stack);
-      if (!event) throw syntax("Expected array value", token);
-      yield event;
-      if (event.type === "primitive") completeValue();
-      continue;
+      throw syntax(SYNTAX.expectedCommaOrBracket, token);
     }
-    if (token.kind === "comma") {
-      parent.state = "next-value";
-      continue;
-    }
-    if (token.kind === "endArray") {
-      const depth = stack.length - 1;
-      stack.pop();
-      yield { type: "end-array", depth, offset: token.startOffset };
-      completeValue();
-      continue;
-    }
-    throw syntax("Expected ',' or ']'", token);
+  } catch (error) {
+    const sentence =
+      error instanceof JsonSyntaxError && error.bare
+        ? misplacedSentence(stack, rootComplete)
+        : undefined;
+    throw sentence === undefined
+      ? error
+      : new JsonSyntaxError(sentence, (error as JsonSyntaxError).offset);
   }
 
   checkAbort();
-  if (!rootSeen) throw new JsonSyntaxError("JSON input is empty", 0);
+  if (!rootSeen) throw new JsonSyntaxError(SYNTAX.empty, 0);
   if (!rootComplete || stack.length !== 0)
-    throw new JsonSyntaxError("Unexpected end of JSON input", 0);
+    throw new JsonSyntaxError(SYNTAX.endedEarly, 0);
 }

@@ -4,11 +4,16 @@ import {
   useSyncExternalStore,
   type KeyboardEvent,
 } from "react";
-import type { DocumentIndex, SearchQuery } from "../../platform/types";
+import {
+  LIMITS,
+  type DocumentIndex,
+  type SearchQuery,
+} from "../../platform/types";
 import {
   patchSearch,
   setQuery,
   stepMatch,
+  stopSearch,
   useSearch,
   type SearchState,
 } from "./search";
@@ -38,18 +43,46 @@ const SCOPES: readonly { value: SearchQuery["scope"]; label: string }[] = [
   { value: "values", label: "Values" },
 ];
 
-function countLabel({ hits, phase, capped, error, current }: SearchState) {
+function countLabel({
+  hits,
+  phase,
+  capped,
+  error,
+  current,
+  progress,
+}: SearchState) {
   if (error) return error;
+  const share = phase === "running" && progress !== null ? ` ${progress}%` : "";
   if (hits.length === 0)
     return phase === "running"
-      ? "Searching…"
+      ? `Searching…${share}`
       : phase === "done"
         ? "No matches"
-        : "";
-  const total = `${hits.length.toLocaleString("en-US")}${capped ? "+" : ""}`;
-  return current < 0
-    ? total
-    : `${(current + 1).toLocaleString("en-US")} of ${total}`;
+        : phase === "stopped"
+          ? "Stopped"
+          : "";
+  // A stopped search may have had more to find, as a capped one does.
+  const total = `${hits.length.toLocaleString("en-US")}${capped || phase === "stopped" ? "+" : ""}`;
+  const shown =
+    current < 0
+      ? total
+      : `${(current + 1).toLocaleString("en-US")} of ${total}`;
+  return share ? `${shown} ·${share}` : shown;
+}
+
+/** What the worker left out, said so a screen reader gets the whole sentence and the toolbar stays short. */
+function Skipped({ count }: { readonly count: number }) {
+  if (count === 0) return null;
+  const size = `${LIMITS.searchTokenBytes / (1024 * 1024)} MB`;
+  const noun = count === 1 ? "value" : "values";
+  return (
+    <>
+      <span aria-hidden="true">{` · ${count.toLocaleString("en-US")} skipped`}</span>
+      <span className="visually-hidden">
+        {`; ${count.toLocaleString("en-US")} ${noun} over ${size} ${count === 1 ? "was" : "were"} not searched`}
+      </span>
+    </>
+  );
 }
 
 type SearchBarProps = {
@@ -137,7 +170,23 @@ export function SearchBar({ index, layout }: SearchBarProps) {
       <div className="tree-search-steps">
         <span className="tree-search-count" role="status">
           {countLabel(state)}
+          <Skipped count={state.phase === "done" ? state.skipped : 0} />
         </span>
+        {state.phase === "running" && (
+          <button
+            type="button"
+            className="tree-search-option"
+            aria-label="Stop searching"
+            title="Stop searching"
+            onClick={() => {
+              stopSearch(index);
+              // The button leaves with the search; keep the keyboard where it was typing.
+              input.current?.focus();
+            }}
+          >
+            Stop
+          </button>
+        )}
         <button
           type="button"
           className="tree-search-option"

@@ -3,7 +3,11 @@
 // by scanning a few kilobytes from the nearest one. Nothing is decoded while
 // indexing and nothing holds more than one chunk, so a 1 GiB file costs the
 // worker a few megabytes.
-import { decodeJsonPointerSegment, toJsonPointer } from "@json-workbench/core";
+import {
+  decodeJsonPointerSegment,
+  SYNTAX,
+  toJsonPointer,
+} from "@json-workbench/core";
 import {
   type ByteRange,
   type Cell,
@@ -207,7 +211,7 @@ export class RangeIndex implements DocumentIndex {
     let message = issue.message;
     if (issue.unexpected) {
       const [char = ""] = decoder.decode(await this.#read(offset, offset + 4));
-      message += ` '${char}'`;
+      message = SYNTAX.unexpectedCharacter(char);
     }
     // Back to the start of the line, then forward over it, decoding as it goes.
     let lineStart = 0;

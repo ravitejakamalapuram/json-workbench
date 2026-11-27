@@ -258,13 +258,27 @@ function numbers(count: number) {
   return Array.from({ length: count }, (_, i) => i).join(",");
 }
 
-/** A document the indexes must refuse, and where: the first error's byte, line and column (UTF-16 units). */
+/** A document the indexes must refuse, and where: the first error's sentence, byte, line and column (UTF-16 units). */
 export type InvalidFixture = {
   readonly name: string;
   readonly bytes: Uint8Array<ArrayBuffer>;
   readonly format: DocFormat;
-  readonly issue: Pick<ParseIssue, "byteOffset" | "line" | "column">;
+  readonly issue: ParseIssue;
 };
+
+/** A one-line document: the error's column is its byte offset plus one. */
+const flat = (
+  name: string,
+  text: string | Uint8Array<ArrayBuffer>,
+  byteOffset: number,
+  message: string,
+  format: DocFormat = "json",
+): InvalidFixture => ({
+  name,
+  bytes: typeof text === "string" ? bytesOf(text) : text,
+  format,
+  issue: { message, byteOffset, line: 1, column: byteOffset + 1 },
+});
 
 export const INVALID_FIXTURES: readonly InvalidFixture[] = [
   {
@@ -272,84 +286,209 @@ export const INVALID_FIXTURES: readonly InvalidFixture[] = [
     name: "a missing comma after a BOM and a multi-byte key",
     bytes: bytesOf([0xef, 0xbb, 0xbf], '{\n  "é": 1\n  "b": 2\n}'),
     format: "json",
-    issue: { byteOffset: 17, line: 3, column: 3 },
+    issue: {
+      message: "Expected ',' or '}'",
+      byteOffset: 17,
+      line: 3,
+      column: 3,
+    },
   },
-  {
-    name: "a trailing comma",
-    bytes: bytesOf('{"a":1,}'),
-    format: "json",
-    issue: { byteOffset: 7, line: 1, column: 8 },
-  },
-  {
-    name: "input that ends early, after its last token",
-    bytes: bytesOf('{"a":[1,2  \n'),
-    format: "json",
-    issue: { byteOffset: 9, line: 1, column: 10 },
-  },
-  {
-    name: "a string that never closes, at its opening quote",
-    bytes: bytesOf('["abc'),
-    format: "json",
-    issue: { byteOffset: 1, line: 1, column: 2 },
-  },
+  flat("a trailing comma", '{"a":1,}', 7, "Expected object property name"),
+  flat("a missing value", '{"a":}', 5, "Expected property value"),
+  flat("a missing array value", "[1,]", 3, "Expected array value"),
+  flat("a missing root value", ",", 0, "Expected a JSON value"),
+  flat("a missing colon", '{"a" 1}', 5, "Expected ':' after property name"),
+  flat("a missing array comma", "[1 2]", 3, "Expected ',' or ']'"),
+  flat(
+    "input that ends early, after its last token",
+    '{"a":[1,2  \n',
+    9,
+    "Unexpected end of JSON input",
+  ),
+  flat(
+    "a string that never closes, at its opening quote",
+    '["abc',
+    1,
+    "Unexpected end of JSON input",
+  ),
   {
     name: "an astral character and a two-byte one before the error",
     bytes: bytesOf('["😀","é",x]'),
     format: "json",
-    issue: { byteOffset: 13, line: 1, column: 11 },
+    issue: {
+      message: "Unexpected character 'x'",
+      byteOffset: 13,
+      line: 1,
+      column: 11,
+    },
   },
+  flat(
+    "an astral character that no value starts with, named whole",
+    "[😀]",
+    1,
+    "Unexpected character '😀'",
+  ),
   {
     name: "a latin-1 byte before the error, one byte and one column",
     bytes: bytesOf('{"name":"caf', [0xe9], '","n":}'),
     format: "json",
-    issue: { byteOffset: 19, line: 1, column: 20 },
+    issue: {
+      message: "Expected property value",
+      byteOffset: 19,
+      line: 1,
+      column: 20,
+    },
   },
   {
     name: "an error on a later CRLF line",
     bytes: bytesOf('{\r\n  "a": 1,\r\n  "b": [1, 2,\r\n  3,,\r\n]\r\n}'),
     format: "json",
-    issue: { byteOffset: 33, line: 4, column: 5 },
+    issue: {
+      message: "Expected array value",
+      byteOffset: 33,
+      line: 4,
+      column: 5,
+    },
   },
-  {
-    name: "a number with a leading zero, at the number",
-    bytes: bytesOf("[0, 01]"),
-    format: "json",
-    issue: { byteOffset: 4, line: 1, column: 5 },
-  },
-  {
-    name: "a character no value can start with",
-    bytes: bytesOf("[1, ?]"),
-    format: "json",
-    issue: { byteOffset: 4, line: 1, column: 5 },
-  },
-  {
-    name: "data after the root value",
-    bytes: bytesOf("{} x"),
-    format: "json",
-    issue: { byteOffset: 3, line: 1, column: 4 },
-  },
-  {
-    name: "an empty document",
-    bytes: bytesOf("  \n"),
-    format: "json",
-    issue: { byteOffset: 0, line: 1, column: 1 },
-  },
+  flat(
+    "a number with a leading zero, at the number",
+    "[0, 01]",
+    4,
+    "Invalid JSON number",
+  ),
+  flat("a number cut by a letter", "[1x]", 1, "Invalid JSON number"),
+  flat("a number that ends at a minus", "[-]", 1, "Invalid JSON number"),
+  flat(
+    "a character no value can start with",
+    "[1, ?]",
+    4,
+    "Unexpected character '?'",
+  ),
+  flat("a word that is not a literal", "[tru]", 1, "Invalid literal"),
+  flat("a literal that runs on", "[truex]", 1, "Invalid literal"),
+  flat("a literal that ends early", "[tru", 1, "Unexpected end of JSON input"),
+  flat(
+    "data after the root value",
+    "{} x",
+    3,
+    "Unexpected data after root value",
+  ),
+  flat(
+    "a number after the root value",
+    '"a"1x',
+    3,
+    "Unexpected data after root value",
+  ),
+  flat("a second root value", "1 2", 2, "Unexpected data after root value"),
+  flat(
+    "a non-token where a key belongs, which the grammar names",
+    "{x:1}",
+    1,
+    "Expected object property name",
+  ),
+  flat(
+    "a bad number where a colon belongs, which the grammar names",
+    '{"a"-',
+    4,
+    "Expected ':' after property name",
+  ),
+  flat(
+    "a bad word where a comma belongs, which the grammar names",
+    "[1 tru]",
+    3,
+    "Expected ',' or ']'",
+  ),
+  flat("a bad escape", '["a\\q"]', 4, "Invalid escape sequence"),
+  flat(
+    "a bad unicode escape, at its backslash",
+    '["\\u12zz"]',
+    2,
+    "Invalid unicode escape",
+  ),
+  flat(
+    "a bare string with a truncated unicode escape, at its backslash",
+    '"\\u12"',
+    1,
+    "Invalid unicode escape",
+  ),
+  flat(
+    "a bare string that ends inside a unicode escape, at its quote",
+    '"\\u12',
+    0,
+    "Unexpected end of JSON input",
+  ),
+  flat(
+    "a control character in a string",
+    '["a\tb"]',
+    3,
+    "Unescaped control character in string",
+  ),
+  flat(
+    "a string with an error, even where a colon belongs",
+    '{"a" "b\\q"}',
+    8,
+    "Invalid escape sequence",
+  ),
+  flat(
+    "nesting past what the indexes read",
+    `${"[".repeat(100_001)}${"]".repeat(100_001)}`,
+    100_000,
+    "Nesting is too deep (limit 100,000 levels)",
+  ),
+  flat("an empty document", "  \n", 0, "JSON input is empty"),
   {
     name: "a document of only a BOM",
     bytes: bytesOf([0xef, 0xbb, 0xbf]),
     format: "json",
-    issue: { byteOffset: 3, line: 1, column: 1 },
+    issue: {
+      message: "JSON input is empty",
+      byteOffset: 3,
+      line: 1,
+      column: 1,
+    },
   },
   {
     name: "a JSONL record that breaks, by its line",
     bytes: bytesOf('{"a":1}\n{"a":}\n{'),
     format: "jsonl",
-    issue: { byteOffset: 13, line: 2, column: 6 },
+    issue: {
+      message: "Expected property value",
+      byteOffset: 13,
+      line: 2,
+      column: 6,
+    },
   },
   {
     name: "a JSONL record cut at its CRLF line",
     bytes: bytesOf('{"a":1}\r\n{"a" 2}\r\n'),
     format: "jsonl",
-    issue: { byteOffset: 14, line: 2, column: 6 },
+    issue: {
+      message: "Expected ':' after property name",
+      byteOffset: 14,
+      line: 2,
+      column: 6,
+    },
+  },
+  {
+    name: "a JSONL record that ends inside a word",
+    bytes: bytesOf('{"a":1}\n[tru\n[2]\n'),
+    format: "jsonl",
+    issue: {
+      message: "Unexpected end of JSON input",
+      byteOffset: 9,
+      line: 2,
+      column: 2,
+    },
+  },
+  {
+    name: "a JSONL record whose string never closes",
+    bytes: bytesOf('{"a":1}\n["b\n'),
+    format: "jsonl",
+    issue: {
+      message: "Unexpected end of JSON input",
+      byteOffset: 9,
+      line: 2,
+      column: 2,
+    },
   },
 ];

@@ -32,6 +32,25 @@ describe("export worker handlers", () => {
     });
   });
 
+  it("keeps a member named __proto__ in every format", async () => {
+    const text = '[{"__proto__":{"x":1},"n":2}]';
+    expect((await run(text)).text).toBe(
+      '[\n  {\n    "__proto__": {\n      "x": 1\n    },\n    "n": 2\n  }\n]',
+    );
+    expect((await run(text, { to: "jsonl" })).text).toBe(
+      '{"__proto__":{"x":1},"n":2}\n',
+    );
+    expect((await run('[{"__proto__":"x"}]', { to: "csv" })).text).toBe(
+      "__proto__\nx\n",
+    );
+  });
+
+  it("says how deep it can read instead of overflowing the stack", async () => {
+    await expect(run("[".repeat(5_000) + "]".repeat(5_000))).rejects.toThrow(
+      "Nesting is too deep (limit 1,000 levels)",
+    );
+  });
+
   it("writes one record per line for JSONL and NDJSON", async () => {
     const lines = '{"a":1}\n{"a":2}\n';
     expect(await run('[{"a":1},{"a":2}]', { to: "jsonl" })).toEqual({

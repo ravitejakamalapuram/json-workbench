@@ -5,6 +5,7 @@
 // elements and container ends only down to `maxDepth` (the rest of the file
 // is skipped at string-scanning speed), and keeps all of its state between
 // `write` calls, so it works on 1 MiB chunks and mid-document slices alike.
+import { MAX_INDEX_DEPTH, SYNTAX } from "@json-workbench/core";
 import type { IndexedFormat } from "../types";
 
 /**
@@ -33,7 +34,7 @@ export type ScanSink = {
 export type ScanIssue = {
   readonly offset: number;
   readonly message: string;
-  /** The byte at `offset` cannot start anything here; the caller may name its character. */
+  /** The byte at `offset` cannot start anything here. `message` is empty: the caller words it with the whole character, which may be several bytes. */
   readonly unexpected?: true;
 };
 
@@ -45,9 +46,6 @@ export type ScanOptions = {
   /** Also report `end` for primitives. */
   readonly detail?: boolean;
 };
-
-/** Deeper than any real document; bounds the stack of a hostile file. */
-const MAX_NESTING = 100_000;
 
 const ARRAY = 1;
 const OBJECT = 2;
@@ -211,11 +209,7 @@ export class ByteScanner {
             this.#state = ESCAPE;
             i = j + 1;
           } else if (c === NEWLINE && this.#jsonl) return this.#cutString();
-          else
-            return this.#fail(
-              base + j,
-              "Unescaped control character in string",
-            );
+          else return this.#fail(base + j, SYNTAX.controlCharacter);
           continue;
         }
         case ESCAPE:
@@ -224,13 +218,13 @@ export class ByteScanner {
             this.#hexLeft = 4;
             this.#state = UNICODE;
           } else if (isEscape(b)) this.#state = STRING;
-          else return this.#fail(at, "Invalid escape sequence");
+          else return this.#fail(at, SYNTAX.badEscape);
           i += 1;
           continue;
         case UNICODE:
           if (b === NEWLINE && this.#jsonl) return this.#cutString();
           if (!isHex(b))
-            return this.#fail(this.#escapeStart, "Invalid unicode escape");
+            return this.#fail(this.#escapeStart, SYNTAX.badUnicode);
           this.#hexLeft -= 1;
           if (this.#hexLeft === 0) this.#state = STRING;
           i += 1;
@@ -253,12 +247,11 @@ export class ByteScanner {
         case MINUS:
           if (b === 0x30) this.#state = ZERO;
           else if (isDigit(b)) this.#state = INT;
-          else return this.#fail(this.#tokenStart, "Invalid JSON number");
+          else return this.#fail(this.#tokenStart, SYNTAX.badNumber);
           i += 1;
           continue;
         case ZERO:
-          if (isDigit(b))
-            return this.#fail(this.#tokenStart, "Invalid JSON number");
+          if (isDigit(b)) return this.#fail(this.#tokenStart, SYNTAX.badNumber);
           if (this.#numberEnd(b, at)) {
             i += 1;
             continue;
@@ -267,32 +260,33 @@ export class ByteScanner {
           continue;
         case DOT:
           if (!isDigit(b))
-            return this.#fail(this.#tokenStart, "Invalid JSON number");
+            return this.#fail(this.#tokenStart, SYNTAX.badNumber);
           this.#state = FRACTION;
           i += 1;
           continue;
         case EXPONENT_MARK:
           if (b === 0x2b || b === 0x2d) this.#state = EXPONENT_SIGN;
           else if (isDigit(b)) this.#state = EXPONENT;
-          else return this.#fail(this.#tokenStart, "Invalid JSON number");
+          else return this.#fail(this.#tokenStart, SYNTAX.badNumber);
           i += 1;
           continue;
         case EXPONENT_SIGN:
           if (!isDigit(b))
-            return this.#fail(this.#tokenStart, "Invalid JSON number");
+            return this.#fail(this.#tokenStart, SYNTAX.badNumber);
           this.#state = EXPONENT;
           i += 1;
           continue;
         case WORD:
+          if (b === NEWLINE && this.#jsonl) return this.#cutString();
           if (b !== this.#word.charCodeAt(this.#wordAt))
-            return this.#fail(this.#tokenStart, "Invalid literal");
+            return this.#fail(this.#tokenStart, SYNTAX.badLiteral);
           this.#wordAt += 1;
           if (this.#wordAt === this.#word.length) this.#state = WORD_END;
           i += 1;
           continue;
         case WORD_END:
           if (!isBoundary(b))
-            return this.#fail(this.#tokenStart, "Invalid literal");
+            return this.#fail(this.#tokenStart, SYNTAX.badLiteral);
           this.#complete(this.#tokenStart + this.#word.length);
           continue;
         default:
@@ -301,7 +295,7 @@ export class ByteScanner {
       if (isSpace(b)) {
         if (b === NEWLINE && this.#jsonl) {
           if (this.#depth > 0)
-            return this.#fail(this.#lastEnd, "Unexpected end of JSON input");
+            return this.#fail(this.#lastEnd, SYNTAX.endedEarly);
           this.#state = VALUE;
         }
         i += 1;
@@ -326,7 +320,7 @@ export class ByteScanner {
           if (b === 0x3a) {
             this.#lastEnd = at + 1;
             this.#state = VALUE;
-          } else this.#misplace(b, at, "Expected ':' after property name");
+          } else this.#misplace(b, at, SYNTAX.expectedColon);
           break;
         case AFTER: {
           const inArray = this.#stack[this.#depth - 1] === ARRAY;
@@ -339,12 +333,14 @@ export class ByteScanner {
             this.#misplace(
               b,
               at,
-              inArray ? "Expected ',' or ']'" : "Expected ',' or '}'",
+              inArray
+                ? SYNTAX.expectedCommaOrBracket
+                : SYNTAX.expectedCommaOrBrace,
             );
           break;
         }
         default:
-          this.#misplace(b, at, "Unexpected data after root value");
+          this.#misplace(b, at, SYNTAX.afterRoot);
       }
       if (this.#issue) return this.#issue;
       i += 1;
@@ -362,12 +358,12 @@ export class ByteScanner {
       case ESCAPE:
       case UNICODE:
       case WORD:
-        return this.#fail(this.#tokenStart, "Unexpected end of JSON input");
+        return this.#fail(this.#tokenStart, SYNTAX.endedEarly);
       case MINUS:
       case DOT:
       case EXPONENT_MARK:
       case EXPONENT_SIGN:
-        return this.#fail(this.#tokenStart, "Invalid JSON number");
+        return this.#fail(this.#tokenStart, SYNTAX.badNumber);
       case ZERO:
       case INT:
       case FRACTION:
@@ -381,13 +377,13 @@ export class ByteScanner {
     }
     if (this.#jsonl ? this.#depth === 0 : this.#state === DONE)
       return undefined;
-    if (!this.#seen) return this.#fail(this.#origin, "JSON input is empty");
-    return this.#fail(this.#lastEnd, "Unexpected end of JSON input");
+    if (!this.#seen) return this.#fail(this.#origin, SYNTAX.empty);
+    return this.#fail(this.#lastEnd, SYNTAX.endedEarly);
   }
 
-  /** A JSONL record ends at its line, so a string still open there never closed. */
+  /** A JSONL record ends at its line, so a string or a word still open there never closed. */
   #cutString(): ScanIssue {
-    return this.#fail(this.#tokenStart, "Unexpected end of JSON input");
+    return this.#fail(this.#tokenStart, SYNTAX.endedEarly);
   }
 
   #fail(offset: number, message: string, unexpected = false): ScanIssue {
@@ -456,7 +452,7 @@ export class ByteScanner {
       // The boundary byte is read again in the state after the value.
       return false;
     } else {
-      this.#fail(this.#tokenStart, "Invalid JSON number");
+      this.#fail(this.#tokenStart, SYNTAX.badNumber);
       return false;
     }
     return true;
@@ -464,7 +460,7 @@ export class ByteScanner {
 
   #key(b: number, at: number): void {
     if (b !== QUOTE) {
-      this.#fail(at, "Expected object property name");
+      this.#fail(at, SYNTAX.expectedPropertyName);
       return;
     }
     this.#seen = true;
@@ -517,12 +513,12 @@ export class ByteScanner {
           this.#fail(
             at,
             top === ARRAY
-              ? "Expected array value"
+              ? SYNTAX.expectedArrayValue
               : top === OBJECT
-                ? "Expected property value"
-                : "Expected a JSON value",
+                ? SYNTAX.expectedPropertyValue
+                : SYNTAX.expectedValue,
           );
-        else this.#fail(at, "Unexpected character", true);
+        else this.#fail(at, "", true);
     }
   }
 
@@ -533,8 +529,8 @@ export class ByteScanner {
   }
 
   #open(b: number): void {
-    if (this.#depth >= MAX_NESTING) {
-      this.#fail(this.#valueStart, "Nested more than 100,000 levels deep");
+    if (this.#depth >= MAX_INDEX_DEPTH) {
+      this.#fail(this.#valueStart, SYNTAX.tooDeep(MAX_INDEX_DEPTH));
       return;
     }
     if (this.#gate)

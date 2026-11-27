@@ -56,7 +56,9 @@ export const exportHandlers: Handlers<ExportOps> = {
   async decodeString({ source }) {
     const value = await loadValue(new Blob([source]), "", {
       format: "json",
-      // The caller copies values up to rawEditChars, which loadValue also caps.
+      // The caller refuses a value longer than rawEditChars bytes before it
+      // slices one. loadValue has no rawEditChars cap of its own: maxBytes,
+      // counted in bytes, is the only cap it applies.
       maxBytes: LIMITS.rawEditChars,
     });
     if (typeof value !== "string") throw new Error("This is not a string.");

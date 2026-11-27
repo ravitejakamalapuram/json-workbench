@@ -35,6 +35,33 @@ describe("rewriteJson", () => {
     );
   });
 
+  it("keeps a member named __proto__ when it indents, too", async () => {
+    expect(await pretty('{"__proto__":{"x":1},"a":2}')).toBe(
+      '{\n  "__proto__": {\n    "x": 1\n  },\n  "a": 2\n}',
+    );
+  });
+
+  it("indents as deep as a value can be read and says so beyond that", async () => {
+    const deep = (levels: number) => "[".repeat(levels) + "]".repeat(levels);
+    expect(await pretty(deep(1_000))).toContain("\n");
+    for (const levels of [1_001, 100_000])
+      await expect(pretty(deep(levels))).rejects.toThrow(
+        "Nesting is too deep (limit 1,000 levels)",
+      );
+  });
+
+  it("puts a document on one line however deep it is, up to what the index reads", async () => {
+    const deep = '{"a":'.repeat(5_000) + "1" + "}".repeat(5_000);
+    expect(await compact(deep)).toBe(deep);
+  });
+
+  it("names the depth the indexes read, in the words of their errors, beyond it", async () => {
+    const deep = "[".repeat(100_001) + "]".repeat(100_001);
+    await expect(compact(deep)).rejects.toThrow(
+      "Nesting is too deep (limit 100,000 levels)",
+    );
+  });
+
   it("keeps duplicate keys, which the document reads as valid", async () => {
     expect(await compact('{ "a": 1, "a": 2 }')).toBe('{"a":1,"a":2}');
   });

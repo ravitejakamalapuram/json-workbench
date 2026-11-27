@@ -64,7 +64,7 @@ function indexProxy(
     pointerAt: (byteOffset) => call("pointerAt", { byteOffset }),
     records: (pointer, offset, limit) =>
       call("records", { pointer, offset, limit }),
-    async search(query, onHits, signal) {
+    async search(query, onHits, signal, onProgress) {
       if (disposed) throw gone();
       // A worker per search, ended on abort, so the doc worker never waits.
       const search = createWorkerClient<SearchOps>(spawnSearch, {
@@ -75,7 +75,7 @@ function indexProxy(
         return await search.call(
           "search",
           { source, query, maxHits: LIMITS.searchHits },
-          { signal, onPartial: onHits },
+          { signal, onPartial: onHits, ...(onProgress && { onProgress }) },
         );
       } finally {
         search.terminate();

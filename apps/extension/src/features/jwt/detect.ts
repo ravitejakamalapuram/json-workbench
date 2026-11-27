@@ -1,7 +1,10 @@
 // Decodes a JWT. It never verifies: the signature is shown as sent, so nothing
 // here can say a token is genuine.
 import type { JsonObject, JsonValue } from "@json-workbench/core";
-import { parseJsonValue } from "@json-workbench/core/input";
+import {
+  NestingTooDeepError,
+  parseJsonValue,
+} from "@json-workbench/core/input";
 import { LIMITS } from "../../platform/types";
 
 // The tree's badge and this mode agree on what a token looks like because
@@ -56,6 +59,12 @@ function decodePart(
   try {
     value = parseJsonValue(text);
   } catch (error) {
+    if (error instanceof NestingTooDeepError)
+      return {
+        error: `The ${part} decoded, but it is nested too deeply (limit ${error.limit.toLocaleString("en-US")} levels).`,
+        part,
+        text,
+      };
     // The parser refuses a repeated key, which is JSON; say which one.
     const key = /^Duplicate key '(.*)' encountered/.exec(
       error instanceof Error ? error.message : "",

@@ -22,7 +22,7 @@ import type {
 import { buildMemoryIndex } from "./memory-index";
 import { RangeIndex } from "./range-index";
 import { friendlyReadError, readBytes } from "./read";
-import { sizeText } from "./size-text";
+import { sizeAgainst } from "./size-text";
 
 export type DocOptions = {
   /** Sources larger than this many bytes get the range index; tests lower it. */
@@ -78,15 +78,17 @@ function openIndex(
   }: DocOptions,
 ): Opening {
   const { source, format } = args;
-  if (source.size > maxBytes)
+  if (source.size > maxBytes) {
+    const [size, limit] = sizeAgainst(source.size, maxBytes);
     return {
       index: Promise.resolve(null),
       result: Promise.reject(
         new TooLargeError(
-          `This file is ${sizeText(source.size)}. JSON Workbench opens files up to ${sizeText(maxBytes)}.`,
+          `This file is ${size}. JSON Workbench opens files up to ${limit}.`,
         ),
       ),
     };
+  }
 
   // A YAML input is converted to JSON text first, which its own limit bounds.
   if (format === "yaml" || source.size <= rangeAboveBytes) {

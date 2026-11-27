@@ -1,3 +1,5 @@
+import { SYNTAX } from "./syntax-messages";
+
 export type JsonTokenKind =
   | "startObject"
   | "endObject"
@@ -27,6 +29,13 @@ export class JsonSyntaxError extends Error {
   constructor(
     message: string,
     readonly offset: number,
+    /**
+     * The fault is in a number, a word or a character that starts no token,
+     * which the grammar may judge first: where a value does not belong, the
+     * structure parser names what it expected instead. A string's own faults
+     * come before the grammar's, as in the byte scanner.
+     */
+    readonly bare = false,
   ) {
     super(message);
   }
@@ -62,7 +71,7 @@ export async function* scanJson(
   ): JsonToken | undefined => {
     if (result === null) return undefined;
     if (result === "invalid")
-      throw new JsonSyntaxError("Invalid JSON number", tokenStart);
+      throw new JsonSyntaxError(SYNTAX.badNumber, tokenStart, true);
     const [end, complete] = result;
     if (!complete) return undefined;
     const value = buffer.slice(cursor, end);
@@ -137,7 +146,7 @@ export async function* scanJson(
           };
           continue;
         case '"': {
-          const end = scanString(buffer, cursor);
+          const end = scanString(buffer, cursor, bufferOffset);
           if (end === null) {
             compact();
             break parseChunk;
@@ -180,10 +189,20 @@ export async function* scanJson(
         continue;
       }
       if (isLiteralPrefix(char)) {
+        const word = LITERALS.find((candidate) => candidate[0] === char)!;
+        // Wait for more text only while the rest could still become the word.
+        if (!word.startsWith(buffer.slice(cursor, cursor + word.length)))
+          throw new JsonSyntaxError(SYNTAX.badLiteral, tokenStart, true);
         compact();
         break;
       }
-      throw new JsonSyntaxError(`Unexpected character '${char}'`, tokenStart);
+      throw new JsonSyntaxError(
+        SYNTAX.unexpectedCharacter(
+          String.fromCodePoint(buffer.codePointAt(cursor)!),
+        ),
+        tokenStart,
+        true,
+      );
     }
     compact();
   }
@@ -198,7 +217,7 @@ export async function* scanJson(
     if (isNumberStart(char)) {
       const result = scanNumber(buffer, cursor);
       if (result === "invalid" || result === null)
-        throw new JsonSyntaxError("Invalid JSON number", tokenStart);
+        throw new JsonSyntaxError(SYNTAX.badNumber, tokenStart, true);
       const end = result[0];
       yield {
         kind: "number",
@@ -220,23 +239,26 @@ export async function* scanJson(
       cursor = literal.end;
       continue;
     }
-    throw new JsonSyntaxError("Unexpected end of JSON input", tokenStart);
+    // What is left is a string that never closed or the start of a word.
+    throw new JsonSyntaxError(SYNTAX.endedEarly, tokenStart, char !== '"');
   }
 }
 
-function scanString(input: string, start: number): number | null {
+/** The index of the closing quote of the string at `start`, or null when `input` ends first; `base` is the offset of input[0], so errors point into the document. */
+function scanString(input: string, start: number, base: number): number | null {
   let escaped = false;
   for (let i = start + 1; i < input.length; i += 1) {
     const char = input[i]!;
     if (escaped) {
       if (char === "u") {
-        if (i + 4 >= input.length) return null;
         const hex = input.slice(i + 1, i + 5);
-        if (!/^[0-9a-fA-F]{4}$/.test(hex))
-          throw new JsonSyntaxError("Invalid unicode escape", i - 1);
+        // A wrong character is wrong however much text is still to come.
+        if (!/^[0-9a-fA-F]*$/.test(hex))
+          throw new JsonSyntaxError(SYNTAX.badUnicode, base + i - 1);
+        if (hex.length < 4) return null;
         i += 4;
       } else if (!'"\\/bfnrt'.includes(char)) {
-        throw new JsonSyntaxError("Invalid escape sequence", i);
+        throw new JsonSyntaxError(SYNTAX.badEscape, base + i);
       }
       escaped = false;
       continue;
@@ -247,7 +269,7 @@ function scanString(input: string, start: number): number | null {
     }
     if (char === '"') return i;
     if (char < " ")
-      throw new JsonSyntaxError("Unescaped control character in string", i);
+      throw new JsonSyntaxError(SYNTAX.controlCharacter, base + i);
   }
   return null;
 }
@@ -306,12 +328,14 @@ function scanLiteral(
       const end = start + value.length;
       if (end === input.length) return atFinal ? { end, value } : null;
       if (!isTokenBoundary(input[end]!))
-        throw new JsonSyntaxError(`Invalid literal near '${value}'`, start);
+        throw new JsonSyntaxError(SYNTAX.badLiteral, start, true);
       return { end, value };
     }
   }
   return null;
 }
+
+const LITERALS = ["true", "false", "null"];
 
 function isLiteralPrefix(char: string): boolean {
   return char === "t" || char === "f" || char === "n";

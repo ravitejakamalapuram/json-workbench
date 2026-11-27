@@ -142,6 +142,28 @@ describe("decodeJwt", () => {
     );
   });
 
+  it("keeps a claim named __proto__", () => {
+    const text = '{"sub":"a","__proto__":{"role":"admin"}}';
+    const { payload } = decoded(
+      [base64url("{}"), base64url(text), "sig"].join("."),
+    );
+    expect(Object.keys(payload)).toEqual(["sub", "__proto__"]);
+    expect(Object.getPrototypeOf(payload)).toBe(Object.prototype);
+    expect(stringifyJsonValue(payload)).toBe(text);
+  });
+
+  it("says when a part is nested too deeply to read, not that it is not JSON", () => {
+    const text = '{"a":'.repeat(4_500) + "1" + "}".repeat(4_500);
+    expect(failed([base64url("{}"), base64url(text), "sig"].join("."))).toEqual(
+      {
+        error:
+          "The payload decoded, but it is nested too deeply (limit 1,000 levels).",
+        part: "payload",
+        text,
+      },
+    );
+  });
+
   it.each(["[1,2]", '"text"', "123", "null", "true"])(
     "says when a part is JSON but not an object: %s",
     (text) => {

@@ -363,14 +363,15 @@ describe("the JWT page", () => {
     });
   });
 
-  describe("a payload that indents into megabytes", () => {
-    // Each level of nesting adds an indent to every line below it, so a few
-    // KB of brackets would print as tens of MB.
-    it("is shown on one line instead", async () => {
+  describe("a payload nested past what a value can be read at", () => {
+    // 3,000 levels would indent into tens of MB, and the parser stops at 1,000.
+    it("says so, with the limit", async () => {
       render(<JwtMode />);
       const nested = `{"a":${"[".repeat(3000)}${"]".repeat(3000)}}`;
       await paste([base64url("{}"), base64url(nested), "c2ln"].join("."));
-      expect(payload().textContent).toBe(nested);
+      expect(screen.getByRole("status").textContent).toBe(
+        "The payload decoded, but it is nested too deeply (limit 1,000 levels).",
+      );
     });
   });
 

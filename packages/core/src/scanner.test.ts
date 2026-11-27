@@ -41,4 +41,64 @@ describe("scanJson", () => {
       "true",
     );
   });
+
+  it("points a string's fault at its place in the whole text, whatever the chunks", async () => {
+    // The first chunk is dropped from the buffer before the fault arrives.
+    const fault = (parts: string[]) =>
+      collect(parts).then(
+        () => undefined,
+        (error: { message: string; offset: number }) => error,
+      );
+    expect(await fault(["[1,2,3,", '"ab\\q"'])).toMatchObject({
+      message: "Invalid escape sequence",
+      offset: 11,
+    });
+    expect(await fault(['["12345",', '"x\\u12zz"'])).toMatchObject({
+      message: "Invalid unicode escape",
+      offset: 11,
+    });
+    expect(await fault(['["12345",', '"x\ty"'])).toMatchObject({
+      message: "Unescaped control character in string",
+      offset: 11,
+    });
+  });
+
+  it("names a bad unicode escape at its backslash as soon as a bad digit is in sight", async () => {
+    await expect(collect(['"\\u12"'])).rejects.toMatchObject({
+      message: "Invalid unicode escape",
+      offset: 1,
+    });
+    // Still to come: the digits the text has so far are fine.
+    await expect(collect(['"\\u12'])).rejects.toMatchObject({
+      message: "Unexpected end of JSON input",
+      offset: 0,
+    });
+  });
+
+  it("calls a word that cannot become a literal invalid as soon as it is read", async () => {
+    await expect(collect(["[tru]"])).rejects.toMatchObject({
+      message: "Invalid literal",
+      offset: 1,
+      bare: true,
+    });
+    await expect(collect(["[truex]"])).rejects.toMatchObject({
+      message: "Invalid literal",
+      offset: 1,
+    });
+    await expect(collect(["[tru"])).rejects.toMatchObject({
+      message: "Unexpected end of JSON input",
+      offset: 1,
+      bare: true,
+    });
+    // A word cut by a chunk is not wrong yet.
+    await expect(collect(["[tr", "ue]"])).resolves.toHaveLength(3);
+  });
+
+  it("names a character that starts no token whole, an astral one too", async () => {
+    await expect(collect(["[😀]"])).rejects.toMatchObject({
+      message: "Unexpected character '😀'",
+      offset: 1,
+      bare: true,
+    });
+  });
 });

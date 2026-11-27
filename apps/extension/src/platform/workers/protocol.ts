@@ -13,6 +13,7 @@ import {
   type Pointer,
   type RecordsPage,
   type SearchHit,
+  type SearchProgress,
   type SearchQuery,
   type SearchSummary,
 } from "../types";
@@ -194,7 +195,7 @@ export type SearchOps = {
   search: Op<
     { source: Blob; query: SearchQuery; maxHits: number },
     SearchSummary,
-    never,
+    SearchProgress,
     SearchHit
   >;
 };

@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { changedBlob, CountingBlob } from "../../testing/blobs";
 import { fakeWorker } from "../../testing/fake-worker";
-import { LIMITS, type SearchHit, type SearchQuery } from "../types";
+import {
+  LIMITS,
+  type SearchHit,
+  type SearchProgress,
+  type SearchQuery,
+} from "../types";
 import { createWorkerClient } from "../workers/client";
 import type { SearchOps } from "../workers/protocol";
 import { searchBlob, searchHandlers } from "./search";
@@ -230,6 +235,88 @@ describe("searchBlob", () => {
     expect(hits).toHaveLength(1);
   });
 
+  it("reports the bytes read after each chunk, up to the whole file", async () => {
+    const source = new Blob([`[${"1,".repeat(500)}1]`]);
+    const seen: SearchProgress[] = [];
+    await searchBlob(
+      source,
+      query("zzz"),
+      { maxHits: 10, chunkBytes: 300, onProgress: (p) => seen.push(p) },
+      () => undefined,
+    );
+    expect(seen).toEqual(
+      [300, 600, 900, source.size].map((scannedBytes) => ({
+        scannedBytes,
+        totalBytes: source.size,
+      })),
+    );
+  });
+
+  describe("a token larger than maxTokenBytes", () => {
+    // Cut into chunks of 16 bytes, so the open token spans many of them.
+    const run16 = (text: string, maxTokenBytes: number, q = "needle") =>
+      searchBlob(
+        new Blob([text]),
+        query(q),
+        { maxHits: 10, chunkBytes: 16, maxTokenBytes },
+        () => undefined,
+      );
+    const document = `["a needle",${JSON.stringify(`${"x".repeat(200)}needle`)},"another needle"]`;
+
+    it("is left unsearched and counted, and the search goes on after it", async () => {
+      expect(await run16(document, 64)).toEqual({
+        hits: 2,
+        capped: false,
+        skipped: 1,
+      });
+    });
+
+    it("is searched when it fits, and says nothing then", async () => {
+      expect(await run16(document, 1000)).toEqual({ hits: 3, capped: false });
+    });
+
+    it("counts a key and a number that ends the file alike", async () => {
+      const key = `{"${"k".repeat(100)}needle":1,"n":${"7".repeat(100)}}`;
+      expect(await run16(key, 64, "7")).toMatchObject({ skipped: 2 });
+    });
+
+    it("is never joined into an array of its own size", async () => {
+      // Joining the pieces of the open token is what needs a second copy.
+      async function longestArray(text: string) {
+        const lengths: number[] = [0];
+        vi.stubGlobal(
+          "Uint8Array",
+          new Proxy(Uint8Array, {
+            construct(target, args: [unknown], newTarget) {
+              if (typeof args[0] === "number") lengths.push(args[0]);
+              return Reflect.construct(target, args, newTarget) as object;
+            },
+          }),
+        );
+        try {
+          await run16(text, 1024);
+        } finally {
+          vi.unstubAllGlobals();
+        }
+        return Math.max(...lengths);
+      }
+      // A token that fits is joined, which the spy sees...
+      expect(await longestArray(`["${"x".repeat(500)}"]`)).toBe(500);
+      // ...one that does not is read to its end without being kept.
+      expect(await longestArray(`["${"x".repeat(100_000)}"]`)).toBeLessThan(
+        1024 + 16,
+      );
+    });
+  });
+
+  it("does not search a string past the default bound, which no match needs memory for", async () => {
+    const huge = "z".repeat(17 * 1024 * 1024);
+    const source = new Blob([`["needle","${huge}needle","needle"]`]);
+    const { hits, summary } = await run(source, query("needle"));
+    expect(summary).toEqual({ hits: 2, capped: false, skipped: 1 });
+    expect(hits).toHaveLength(2);
+  });
+
   it("matches nothing for an empty query and rejects an invalid pattern", async () => {
     expect((await run(DOC, query(""))).summary).toEqual({
       hits: 0,
@@ -290,6 +377,31 @@ describe("the search worker", () => {
     expect(summary).toEqual({ hits: 1000, capped: true });
     expect(batches.length).toBeGreaterThan(1);
     expect(batches.flat()).toHaveLength(1000);
+    client.terminate();
+  });
+
+  it("sends how much of the file it has read, ending at the whole", async () => {
+    const client = createWorkerClient<SearchOps>(
+      () => fakeWorker(searchHandlers),
+      { terminable: true },
+    );
+    const source = new Blob([`[${"1,".repeat(1_572_866)}1]`]);
+    const size = source.size;
+    const progress: SearchProgress[] = [];
+    await client.call(
+      "search",
+      {
+        source,
+        query: query("zzz"),
+        maxHits: 10,
+      },
+      { onProgress: (value) => progress.push(value) },
+    );
+    expect(progress.length).toBeGreaterThan(0);
+    for (const { totalBytes } of progress) expect(totalBytes).toBe(size);
+    const scanned = progress.map((value) => value.scannedBytes);
+    expect(scanned).toEqual([...scanned].sort((a, b) => a - b));
+    expect(scanned[0]).toBe(1024 * 1024);
     client.terminate();
   });
 

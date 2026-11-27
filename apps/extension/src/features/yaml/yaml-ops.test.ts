@@ -54,7 +54,7 @@ describe("yamlHandlers.toYaml", () => {
     const { result } = run("[".repeat(depth) + "1" + "]".repeat(depth), {
       maxBytes: 1024 * 1024,
     });
-    await expect(result).rejects.toThrow(/nested too deeply/);
+    await expect(result).rejects.toThrow(/Nesting is too deep/);
   });
 
   it("refuses a document over the memory limit before writing anything", async () => {
