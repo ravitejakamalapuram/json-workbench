@@ -81,16 +81,16 @@ export async function parseTree(
           if (done) done.end = byte(from + event.offset + 1);
           continue;
         }
+        // The JSONL root holds records by index; the JSON root has no container.
         const container = stack.at(-1) ?? parent;
         const siblings = container?.children ?? [];
         const inObject = stack.length > 0 && container?.kind === "object";
+        let key: string | number | null = null;
+        if (inObject) key = member?.key ?? "";
+        else if (container) key = siblings.length;
         const start = byte(from + event.offset);
         const common = {
-          key: inObject
-            ? (member?.key ?? "")
-            : container
-              ? siblings.length
-              : null,
+          key,
           parent: container,
           position: siblings.length,
           spanStart: inObject ? byte(from + (member?.offset ?? 0)) : start,

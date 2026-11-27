@@ -1,6 +1,8 @@
 // The one suite every DocumentIndex implementation passes (TARGET.md section
 // 5): the memory index, the range index, and the proxy over the doc worker.
-// Call it inside a describe() with a factory that indexes a Blob.
+// Call it inside a describe() with a factory that indexes a Blob. Beyond the
+// types, it fixes one choice: pointerAt maps an object member's key to that
+// member, so a key search hit resolves to the node that holds the key.
 import { parseJsonValue, type JsonValue } from "@json-workbench/core";
 import { afterEach, expect, it } from "vitest";
 import { parse as parseYamlText, stringify as stringifyYamlText } from "yaml";
@@ -12,6 +14,7 @@ import {
 } from "../platform/types";
 import { bytesOf, FIXTURES, WRAPPER } from "./index-fixtures";
 
+/** The walk expects totalFinal pages, so a progressive index resolves once it is complete. */
 export type MakeIndex = (
   source: Blob,
   format: DocFormat,
