@@ -95,7 +95,7 @@ describe("Shell, with a document", () => {
       screen.getByRole("tab", { name: "Tree", selected: true }),
     ).toBeDefined();
     expect(
-      within(screen.getByRole("tabpanel")).getByTestId("stub-tree"),
+      within(screen.getByRole("tabpanel")).getByRole("tree"),
     ).toBeDefined();
     expect(screen.getByRole("region", { name: "Recent" }).textContent).toBe(
       "Recentorders.json",
